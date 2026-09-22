@@ -1,0 +1,34 @@
+# CMake and Pico SDK build products
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+build.ninja
+.ninja_deps
+.ninja_log
+compile_commands.json
+
+# Firmware binaries and reports
+*.bin
+*.dis
+*.elf
+*.hex
+*.map
+*.uf2
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local logs, captures and secrets
+*.log
+serial-output/
+.env
+.env.*
+!.env.example
+
