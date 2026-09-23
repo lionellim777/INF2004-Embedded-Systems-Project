@@ -12,9 +12,9 @@ The goal is an autonomous two-wheel robot that follows a line, decodes navigatio
 | Servo safe range | Bench tested: 45-130 degrees; scans use 50-125 degrees |
 | Ultrasonic coarse/fine scanning | Bench tested with broad, front-facing targets |
 | IMU level calibration and multi-hump state machine | Bench tested |
-| Three IR sensors | Connected; calibration and track testing pending |
-| Line following | Early two-sensor prototype; not track validated |
-| Wheel encoders and PID motion | Not started |
+| Three IR sensors | Light/dark calibration recorded for all three; straight-line bench testing underway |
+| Line following | Three-sensor control, local lost-line recovery, GP20 start/stop, and diagnostics implemented; full-course testing pending |
+| Wheel encoders and PID motion | Encoder counting code compiles; wiring and physical test pending, PID not implemented |
 | Barcode decoding | Not started |
 | Obstacle bypass and line recovery | Not started |
 | Wi-Fi/MQTT telemetry | Not started |
@@ -25,7 +25,7 @@ Detailed evidence and limitations are recorded in [docs/development-status.md](d
 
 ```text
 docs/                         Project requirements, design and wiring records
-firmware/app/robot_firmware/  Current integration prototype
+firmware/app/robot_firmware/  Current three-sensor integration firmware and modules
 firmware/tests/               Standalone hardware test programs
 ```
 
@@ -44,8 +44,8 @@ Set `PICO_SDK_PATH` to the Pico SDK directory before configuring a project.
 Example using the IMU test:
 
 ```powershell
-cmake -S firmware/tests/imu_hump_test -B firmware/tests/imu_hump_test/build -G Ninja -DPICO_BOARD=pico
-cmake --build firmware/tests/imu_hump_test/build
+cmake -S firmware/app/robot_firmware -B firmware/app/robot_firmware/build -G Ninja -DPICO_BOARD=pico_w
+cmake --build firmware/app/robot_firmware/build
 ```
 
 Flash the generated `.uf2` file by holding `BOOTSEL` while connecting the Pico W, then copy the UF2 to the `RPI-RP2` drive.

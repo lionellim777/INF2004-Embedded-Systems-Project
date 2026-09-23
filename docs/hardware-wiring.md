@@ -17,9 +17,11 @@ This table records the current assembled robot. Update it before changing any co
 | SG90 servo signal | Servo header | GP12 | Tested |
 | Start/test button | Robo Pico button | GP20 | Tested |
 | Secondary test button | Robo Pico button | GP21 | Tested |
-| IR sensor on Grove 5, AO | Grove 5 | GP26 | Connected; calibration pending |
-| IR sensor on Grove 6, AO | Grove 6 | GP27 | Connected; calibration pending |
-| IR sensor on Grove 7, AO | Grove 7 | GP28 | Connected; calibration pending |
+| Left IR sensor, AO | Grove 5 | GP26 | Connected; light/dark readings recorded |
+| Right IR sensor, AO | Grove 6 | GP27 | Connected; light/dark readings recorded |
+| Centre IR sensor, AO | Grove 7 | GP28 | Connected; light/dark readings recorded |
+| Left motor encoder A/B | Grove 2 | GP2/GP3 | Firmware ready; wiring pending |
+| Right motor encoder A/B | Grove 4 | GP16/GP17 | Firmware ready; wiring pending |
 
 For each IR sensor: red connects to VCC, black to GND, and yellow connects to AO. The white Grove signal and the sensor's DO output are currently unused.
 
@@ -49,12 +51,13 @@ Motor wire colours are not sufficient evidence of polarity. Confirm direction wi
 
 ## Pending encoder wiring
 
-The encoder portions of both six-pin motor connectors are not yet integrated. Before wiring, identify and verify:
+The encoder portions of both six-pin motor connectors are not yet connected. The kit diagram identifies pins 1-4 as ground, A, B, and supply. Comparing that numbered diagram with the user's photographed connector order gives this provisional colour mapping:
 
-1. Encoder ground
-2. Encoder output A
-3. Encoder output B
-4. Encoder supply
+| Motor lead | Left motor via Grove 2 breakout | Right motor via Grove 4 breakout |
+| --- | --- | --- |
+| Blue, encoder ground | GND | GND |
+| Red, encoder A | GP2 | GP16 |
+| Green, encoder B | GP3 | GP17 |
+| White, encoder supply | 3V3, only after compatibility check | 3V3, only after compatibility check |
 
-Do not infer these four wires from colour alone. Record their final GPIO assignment here after verification.
-
+Yellow and black are the separate motor-power pair already attached to the M1 and M2 screw terminals. Do not insert the encoder leads into those terminals. The female encoder leads do not fit directly into the white Grove sockets: each motor needs a Grove-to-four-wire breakout cable plus four male-to-male jumper wires. This wiring is planned, not yet physically verified. Confirm that the encoder board operates at 3.3 V before connecting white; never feed a possible 5 V encoder output into Pico GPIO. Disconnect all power before wiring. The integration firmware prints `EncL` and `EncR` raw counts for the first hand-rotation test; it does not yet use them for speed or turning.

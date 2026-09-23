@@ -10,6 +10,8 @@ pico_sdk_init()
 
 add_executable(robot_firmware
     robot_firmware.c
+    terrain.c
+    encoders.c
 )
 
 target_link_libraries(robot_firmware
@@ -17,6 +19,8 @@ target_link_libraries(robot_firmware
     hardware_adc
     hardware_clocks
     hardware_pwm
+    hardware_i2c
+    m
 )
 
 pico_enable_stdio_usb(robot_firmware 1)

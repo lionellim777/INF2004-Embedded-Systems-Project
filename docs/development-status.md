@@ -1,6 +1,6 @@
 # Development and test status
 
-Last updated: 22 September 2026.
+Last updated: 23 September 2026.
 
 ## Verified on the assembled robot
 
@@ -9,7 +9,7 @@ Last updated: 22 September 2026.
 - Both motors have been driven in the expected forward direction.
 - The right motor polarity was corrected during bring-up.
 - GP20 start/stop behaviour was demonstrated in the integration prototype.
-- Encoder feedback has not yet been connected or tested.
+- Encoder counting code has been added but encoder feedback has not yet been connected or tested.
 
 ### Ultrasonic sensor and servo
 
@@ -40,10 +40,18 @@ The second hump was correctly reported as the highest climb angle. Actual hump-h
 
 ### IR sensors and line following
 
-- Three analogue IR connections have been assigned to GP26, GP27 and GP28.
-- Earlier readings demonstrated strong light/dark contrast on two sensors.
-- Three-sensor calibration and physical track testing are pending.
-- The current integration prototype uses only two sensors and must not be treated as final line-following firmware.
+- All three analogue IR sensors have been measured on the light styrofoam and dark line.
+- Physical left/centre/right order is Grove 5/7/6, using GP26/28/27 respectively.
+- Three-sensor following, GP20 start/stop, short-gap crossing, and bounded lost-line recovery are implemented.
+- Serial diagnostics report the run state, line state, sensor readings, drive commands, range, and terrain status.
+- Straight-line bench testing has begun; full-course line and junction performance is not yet verified.
+
+### Integrated safety behaviour
+
+- The robot starts with both motors stopped and waits for GP20.
+- Two consecutive valid ultrasonic readings below 30 cm stop and disarm the motors.
+- A missing ultrasonic echo is treated as unknown, not as a confirmed clear path.
+- The sonar stop is not an obstacle-bypass implementation.
 
 ## Standalone firmware tests
 
@@ -57,10 +65,8 @@ The second hump was correctly reported as the highest climb angle. Actual hump-h
 
 ## Next development priorities
 
-1. Identify and wire both wheel encoders.
-2. Count quadrature pulses and determine counts per wheel revolution.
-3. Calibrate wheel circumference, distance and turn accuracy.
-4. Complete three-sensor IR calibration on the actual track.
-5. Refactor proven drivers into reusable modules.
-6. Add Wi-Fi/MQTT telemetry and the final mission state machine.
-
+1. Obtain eight male jumper wires and connect the four encoder leads from each motor to Grove 2 and Grove 4 through the Grove breakout cables, after confirming 3.3 V compatibility.
+2. With wheels raised and motors stopped, turn each wheel by hand and verify that only its own `EncL` or `EncR` count changes.
+3. Determine encoder counts per wheel revolution and calibrate measured distance and turns.
+4. Test the three-sensor line follower and recovery on the actual track; tune speed and thresholds.
+5. Implement encoder-based motion control, barcode navigation, obstacle bypass, and Wi-Fi/MQTT telemetry.
