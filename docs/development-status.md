@@ -63,6 +63,31 @@ The second hump was correctly reported as the highest climb angle. Actual hump-h
 - Three-sensor following, GP20 start/stop, short-gap crossing, and bounded lost-line recovery are implemented.
 - Serial diagnostics report the run state, line state, sensor readings, drive commands, range, and terrain status.
 - Straight-line bench testing has begun; full-course line and junction performance is not yet verified.
+- A motor-disabled line/junction diagnostic now records stable three-sensor
+  patterns and flags broad `111` regions as junction candidates for physical
+  course testing.
+
+### Barcode and navigation commands
+
+- A reusable command module maps the brief's example symbols A-D to left,
+  right, straight and U-turn requests.
+- A compact Code 39 decoder recognises one A-Z letter between `*` start/stop
+  markers from 29 alternating bar/space widths. It accepts either travel
+  direction and uses relative widths rather than a fixed speed or scale.
+- A fixed-size reader captures full-width black/white transitions using a
+  two-of-three sensor majority and suppresses repeated commands for three
+  seconds. Sustained junction-like readings time out without producing a
+  barcode command.
+- Host tests pass for A-D navigation commands, the supplied A and Z samples,
+  live capture, scaled and reversed input, duplicate suppression,
+  invalid-pattern rejection and junction timeout.
+- Left, right and U-turn commands carry requested angles for the future motion
+  subsystem. Until that subsystem consumes them, the integrated firmware
+  stops safely and reports the requested turn; straight commands continue.
+- Sensor thresholds, the 750 ms edge timeout and the 3 s duplicate window
+  still require physical validation on the printed course.
+- Accurate command execution remains dependent on integrating the calibrated
+  encoder-based distance and turn control into the main firmware.
 
 ### Integrated safety behaviour
 
@@ -83,9 +108,10 @@ The second hump was correctly reported as the highest climb angle. Actual hump-h
 | `encoder_wiring_test` | Motors held off; report A/B edges and quadrature counts while each raised wheel is turned by hand. Hardware verified; no invalid transitions observed. |
 | `encoder_motor_test` | With wheels raised, run left, right, and both motors at 35%, followed by a 3000 counts/s PI-controlled stage. All stages hardware verified. |
 | `motion_control_test` | Defaults to one run of straight 30 cm, right 90 degrees, left 90 degrees, and right 180 degrees; individual motions remain selectable with GP21. Each completed stage is saved to flash and the full report is replayed after reconnection. Batch 5 completed all four stages; the operator reported good straight and turn behaviour, and every stage had zero invalid encoder transitions. This standalone calibration is ready for main-firmware integration. |
+| `line_junction_test` | Motors held off; record stable three-sensor patterns and junction candidates while the car is moved manually over the course. |
 
 ## Next development priorities
 
 1. Integrate the verified speed and turn control into the main robot firmware.
 2. Test the three-sensor line follower and recovery on the actual track; tune speed and thresholds.
-3. Implement barcode navigation, obstacle bypass, and Wi-Fi/MQTT telemetry.
+3. Validate barcode navigation on the physical course; implement obstacle bypass and Wi-Fi/MQTT telemetry.

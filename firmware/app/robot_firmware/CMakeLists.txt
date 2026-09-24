@@ -12,6 +12,9 @@ add_executable(robot_firmware
     robot_firmware.c
     terrain.c
     encoders.c
+    barcode_decoder.c
+    barcode_reader.c
+    navigation_commands.c
 )
 
 target_link_libraries(robot_firmware

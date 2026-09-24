@@ -23,7 +23,9 @@
 #include "hardware/clocks.h"
 #include "hardware/pwm.h"
 #include "pico/stdlib.h"
+#include "barcode_reader.h"
 #include "encoders.h"
+#include "navigation_commands.h"
 #include "terrain.h"
 
 enum {
@@ -66,6 +68,7 @@ static const uint64_t GAP_CROSSING_US = 120000u;
 static const uint64_t RECOVERY_TIMEOUT_US = 900000u;
 static const float GAP_THROTTLE = 0.40f;
 static const float SEARCH_THROTTLE = 0.40f;
+static const float BARCODE_THROTTLE = 0.40f;
 static const float OBSTACLE_STOP_CM = 30.0f;
 static const uint64_t RANGE_INTERVAL_US = 100000u;
 
@@ -276,6 +279,10 @@ int main(void)
     uint close_readings = 0;
     int last_seen_side = 0;
     bool line_ever_seen = false;
+    bool navigation_waiting = false;
+    navigation_command_t last_navigation_command = NAV_COMMAND_NONE;
+    barcode_reader_t barcode_reader;
+    barcode_reader_init(&barcode_reader);
     const char *motion_state = "STOPPED";
 
     while (true) {
@@ -285,6 +292,7 @@ int main(void)
         if (previous_start_button && !start_button &&
             button_pressed(START_STOP_BUTTON_PIN)) {
             running = !running;
+            navigation_waiting = false;
             line_ever_seen = false;
             last_seen_side = 0;
             if (!running) {
@@ -315,7 +323,40 @@ int main(void)
                                             RIGHT_IR_BLACK);
 
         uint64_t now_us = time_us_64();
-        if (now_us >= next_range_us) {
+        unsigned int black_sensor_count =
+            (left_blackness >= LINE_PRESENT_LEVEL ? 1u : 0u) +
+            (centre_blackness >= LINE_PRESENT_LEVEL ? 1u : 0u) +
+            (right_blackness >= LINE_PRESENT_LEVEL ? 1u : 0u);
+        bool broad_black = black_sensor_count >= 2u;
+        char barcode_letter = '\0';
+        bool barcode_ready = running && barcode_reader_update(
+            &barcode_reader, broad_black, (uint32_t)now_us,
+            &barcode_letter);
+        bool barcode_scanning = barcode_reader_active(&barcode_reader);
+
+        if (barcode_ready) {
+            navigation_command_t command =
+                navigation_decode_symbol(barcode_letter);
+            navigation_manoeuvre_t manoeuvre =
+                navigation_create_manoeuvre(command);
+
+            if (command != NAV_COMMAND_INVALID) {
+                last_navigation_command = command;
+                printf("BARCODE=%c Command=%s Turn=%+.0fdeg\n",
+                       barcode_letter, navigation_command_name(command),
+                       manoeuvre.requested_turn_degrees);
+
+                if (manoeuvre.requires_turn) {
+                    navigation_waiting = true;
+                    running = false;
+                    motors_stop();
+                    printf("Navigation request ready for Buddy 2 motion API. "
+                           "Press GP20 to resume without executing it.\n");
+                }
+            }
+        }
+
+        if (!barcode_scanning && now_us >= next_range_us) {
             range_valid = ultrasonic_read_cm(&distance_cm);
             next_range_us = time_us_64() + RANGE_INTERVAL_US;
             if (range_valid && distance_cm < OBSTACLE_STOP_CM) {
@@ -340,12 +381,24 @@ int main(void)
         float right_throttle = 0.0f;
         now_us = time_us_64();
 
-        if (running && close_readings >= 2u) {
+        if (navigation_waiting) {
+            motors_stop();
+            motion_state = "NAVIGATION_WAIT";
+        } else if (running && close_readings >= 2u) {
             motors_stop();
             running = false;
             motion_state = "OBSTACLE_STOP";
             printf("OBSTACLE at %.1f cm: motors stopped. Clear it and press GP20 to restart.\n",
                    distance_cm);
+        } else if (running && barcode_scanning) {
+            /* Cross the alternating full-width barcode without steering. */
+            left_throttle = BARCODE_THROTTLE;
+            right_throttle = BARCODE_THROTTLE;
+            motor_set(&left_motor, left_throttle);
+            motor_set(&right_motor, right_throttle);
+            line_ever_seen = true;
+            last_line_us = now_us;
+            motion_state = "BARCODE_SCAN";
         } else if (running && line_visible) {
             /*
              * Positive error means the line is under the left sensor:
@@ -426,6 +479,9 @@ int main(void)
             printf(" EncL=%ld EncR=%ld",
                    (long)encoder_left_count(),
                    (long)encoder_right_count());
+            printf(" Barcode=%s Nav=%s",
+                   barcode_scanning ? "CAPTURE" : "IDLE",
+                   navigation_command_name(last_navigation_command));
             printf("\n");
             next_report_us = now_us + 250000u;
         }

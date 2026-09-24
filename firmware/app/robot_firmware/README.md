@@ -33,8 +33,10 @@ encoder output directly to a Pico GPIO. Unplug all power before wiring.
 
 After flashing, leave the car stopped and turn each wheel slowly by hand.
 `EncL` should change only for the left wheel, and `EncR` only for the right.
-These are raw quadrature counts; the sign is not calibrated yet. Counts are
-reported but not yet used to control speed or turns.
+These are raw quadrature counts. Forward wheel travel gives negative left and
+positive right counts on the tested robot. The standalone Buddy 2 motion test
+uses this calibration; this integrated firmware reports counts but does not yet
+use them to control speed or turns.
 
 ## Line following and other functions
 
@@ -65,8 +67,14 @@ The servo is held at its centre position. With the ultrasonic sensor on Grove
 1, two consecutive valid readings below 30 cm stop and disarm the motors.
 Move the obstacle away and press GP20 to restart. `Range=NO_ECHO` means the
 sensor did not return a usable distance; it does not mean the way is clear.
-This is an emergency stop, **not** obstacle bypass. Barcode decoding,
-encoder-based turns, obstacle bypass, and WiFi telemetry are not implemented.
+This is an emergency stop, **not** obstacle bypass. The three IR sensors also
+capture full-width Code 39 bars using a two-of-three majority. Valid A-D
+symbols generate left, right, straight or U-turn requests; duplicate symbols
+are suppressed for three seconds. Straight continues, while turn requests
+stop safely until Buddy 2's encoder-motion API is connected. Barcode timing
+still requires physical validation. Encoder-based turns are calibrated in a
+standalone test but not yet integrated here. Obstacle bypass and WiFi telemetry
+are not implemented.
 
 The GY-511 accelerometer now also calibrates for about two seconds at startup,
 while the motors are stopped. Place the car level and still before powering it.
