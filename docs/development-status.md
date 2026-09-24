@@ -45,6 +45,31 @@ The second hump was correctly reported as the highest climb angle. Actual hump-h
 - Three-sensor following, GP20 start/stop, short-gap crossing, and bounded lost-line recovery are implemented.
 - Serial diagnostics report the run state, line state, sensor readings, drive commands, range, and terrain status.
 - Straight-line bench testing has begun; full-course line and junction performance is not yet verified.
+- A motor-disabled line/junction diagnostic now records stable three-sensor
+  patterns and flags broad `111` regions as junction candidates for physical
+  course testing.
+
+### Barcode and navigation commands
+
+- A reusable command module maps the brief's example symbols A-D to left,
+  right, straight and U-turn requests.
+- A compact Code 39 decoder recognises one A-Z letter between `*` start/stop
+  markers from 29 alternating bar/space widths. It accepts either travel
+  direction and uses relative widths rather than a fixed speed or scale.
+- A fixed-size reader captures full-width black/white transitions using a
+  two-of-three sensor majority and suppresses repeated commands for three
+  seconds. Sustained junction-like readings time out without producing a
+  barcode command.
+- Host tests pass for A-D navigation commands, the supplied A and Z samples,
+  live capture, scaled and reversed input, duplicate suppression,
+  invalid-pattern rejection and junction timeout.
+- Left, right and U-turn commands carry requested angles for the future motion
+  subsystem. Until that subsystem consumes them, the integrated firmware
+  stops safely and reports the requested turn; straight commands continue.
+- Sensor thresholds, the 750 ms edge timeout and the 3 s duplicate window
+  still require physical validation on the printed course.
+- Accurate command execution remains dependent on calibrated encoder-based
+  distance and turn control.
 
 ### Integrated safety behaviour
 
@@ -63,6 +88,7 @@ The second hump was correctly reported as the highest climb angle. Actual hump-h
 | `imu_hump_test` | Automatic level calibration and multi-hump detection |
 | `ir_calibration_test` | Capture light/dark values for three IR sensors |
 | `encoder_wiring_test` | Motors held off; report A/B edges and quadrature counts while each raised wheel is turned by hand. Compiled but not yet tested on hardware. |
+| `line_junction_test` | Motors held off; record stable three-sensor patterns and junction candidates while the car is moved manually over the course. |
 
 ## Next development priorities
 

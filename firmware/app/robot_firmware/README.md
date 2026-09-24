@@ -65,8 +65,13 @@ The servo is held at its centre position. With the ultrasonic sensor on Grove
 1, two consecutive valid readings below 30 cm stop and disarm the motors.
 Move the obstacle away and press GP20 to restart. `Range=NO_ECHO` means the
 sensor did not return a usable distance; it does not mean the way is clear.
-This is an emergency stop, **not** obstacle bypass. Barcode decoding,
-encoder-based turns, obstacle bypass, and WiFi telemetry are not implemented.
+This is an emergency stop, **not** obstacle bypass. The three IR sensors also
+capture full-width Code 39 bars using a two-of-three majority. Valid A-D
+symbols generate left, right, straight or U-turn requests; duplicate symbols
+are suppressed for three seconds. Straight continues, while turn requests
+stop safely until Buddy 2's encoder-motion API is connected. Barcode timing
+still requires physical validation. Encoder-based turns, obstacle bypass, and
+WiFi telemetry are not implemented.
 
 The GY-511 accelerometer now also calibrates for about two seconds at startup,
 while the motors are stopped. Place the car level and still before powering it.

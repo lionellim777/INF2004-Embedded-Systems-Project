@@ -15,7 +15,7 @@ The goal is an autonomous two-wheel robot that follows a line, decodes navigatio
 | Three IR sensors | Light/dark calibration recorded for all three; straight-line bench testing underway |
 | Line following | Three-sensor control, local lost-line recovery, GP20 start/stop, and diagnostics implemented; full-course testing pending |
 | Wheel encoders and PID motion | Encoder counting code compiles; wiring and physical test pending, PID not implemented |
-| Barcode decoding | Not started |
+| Barcode navigation | Three-sensor Code 39 capture, A-D commands and duplicate suppression implemented; physical validation pending |
 | Obstacle bypass and line recovery | Not started |
 | Wi-Fi/MQTT telemetry | Not started |
 
