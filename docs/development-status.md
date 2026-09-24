@@ -62,6 +62,7 @@ The second hump was correctly reported as the highest climb angle. Actual hump-h
 | `ultrasonic_scan_test` | Coarse/fine obstacle scans and profile diagnostics |
 | `imu_hump_test` | Automatic level calibration and multi-hump detection |
 | `ir_calibration_test` | Capture light/dark values for three IR sensors |
+| `encoder_wiring_test` | Motors held off; report A/B edges and quadrature counts while each raised wheel is turned by hand. Compiled but not yet tested on hardware. |
 
 ## Next development priorities
 
