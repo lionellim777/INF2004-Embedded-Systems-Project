@@ -14,7 +14,7 @@ The goal is an autonomous two-wheel robot that follows a line, decodes navigatio
 | IMU level calibration and multi-hump state machine | Bench tested |
 | Three IR sensors | Light/dark calibration recorded for all three; straight-line bench testing underway |
 | Line following | Three-sensor control, local lost-line recovery, GP20 start/stop, and diagnostics implemented; full-course testing pending |
-| Wheel encoders and PID motion | Encoder counting code compiles; wiring and physical test pending, PID not implemented |
+| Wheel encoders and PID motion | Both channels verified; about 2543 counts/revolution. The standalone floor test completed 30 cm straight, right/left 90-degree turns, and a right 180-degree turn; all looked correct to the operator, with zero invalid encoder transitions. Main-firmware integration pending. |
 | Barcode decoding | Not started |
 | Obstacle bypass and line recovery | Not started |
 | Wi-Fi/MQTT telemetry | Not started |

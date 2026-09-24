@@ -1,15 +1,33 @@
 # Development and test status
 
-Last updated: 23 September 2026.
+Last updated: 24 September 2026.
 
 ## Verified on the assembled robot
 
 ### Motor bring-up
 
 - Both motors have been driven in the expected forward direction.
-- The right motor polarity was corrected during bring-up.
+- The right motor polarity was corrected and reverified during the raised-wheel
+  encoder motor test.
 - GP20 start/stop behaviour was demonstrated in the integration prototype.
-- Encoder counting code has been added but encoder feedback has not yet been connected or tested.
+- Both encoder A/B channels have been hand-rotation tested with no invalid
+  transitions. Forward count signs are left negative and right positive.
+- A repeated ten-revolution hand test measured approximately 2539 counts per
+  revolution on the left and 2547 on the right; 2543 is the initial shared
+  calibration value.
+- At equal 35% PWM with both wheels raised, the left wheel measured about 3229
+  counts/s and the right about 3393 counts/s. The right wheel was 4.9% faster;
+  both directions were correct and both invalid-transition counts remained zero.
+- The standalone PI controller targeted 3000 counts/s and measured 3000 counts/s
+  left and 3017 counts/s right over eight seconds. It reduced the mismatch to
+  0.5% using approximately 32.5% left and 30.8% right PWM, with zero invalid
+  transitions. Integration into the main motion module remains pending.
+- The Batch 5 floor test completed 30 cm straight, right 90 degrees, left 90
+  degrees, and right 180 degrees in one run. The operator reported that the
+  motions looked good. Final straight counts were 4255 left and 4217 right;
+  peak wheel-count skew during travel was 56 counts. All four stages reported
+  zero invalid encoder transitions. This is a visual floor check, not a
+  measured-angle or full-course acceptance test.
 
 ### Ultrasonic sensor and servo
 
@@ -62,12 +80,12 @@ The second hump was correctly reported as the highest climb angle. Actual hump-h
 | `ultrasonic_scan_test` | Coarse/fine obstacle scans and profile diagnostics |
 | `imu_hump_test` | Automatic level calibration and multi-hump detection |
 | `ir_calibration_test` | Capture light/dark values for three IR sensors |
-| `encoder_wiring_test` | Motors held off; report A/B edges and quadrature counts while each raised wheel is turned by hand. Compiled but not yet tested on hardware. |
+| `encoder_wiring_test` | Motors held off; report A/B edges and quadrature counts while each raised wheel is turned by hand. Hardware verified; no invalid transitions observed. |
+| `encoder_motor_test` | With wheels raised, run left, right, and both motors at 35%, followed by a 3000 counts/s PI-controlled stage. All stages hardware verified. |
+| `motion_control_test` | Defaults to one run of straight 30 cm, right 90 degrees, left 90 degrees, and right 180 degrees; individual motions remain selectable with GP21. Each completed stage is saved to flash and the full report is replayed after reconnection. Batch 5 completed all four stages; the operator reported good straight and turn behaviour, and every stage had zero invalid encoder transitions. This standalone calibration is ready for main-firmware integration. |
 
 ## Next development priorities
 
-1. Obtain eight male jumper wires and connect the four encoder leads from each motor to Grove 2 and Grove 4 through the Grove breakout cables, after confirming 3.3 V compatibility.
-2. With wheels raised and motors stopped, turn each wheel by hand and verify that only its own `EncL` or `EncR` count changes.
-3. Determine encoder counts per wheel revolution and calibrate measured distance and turns.
-4. Test the three-sensor line follower and recovery on the actual track; tune speed and thresholds.
-5. Implement encoder-based motion control, barcode navigation, obstacle bypass, and Wi-Fi/MQTT telemetry.
+1. Integrate the verified speed and turn control into the main robot firmware.
+2. Test the three-sensor line follower and recovery on the actual track; tune speed and thresholds.
+3. Implement barcode navigation, obstacle bypass, and Wi-Fi/MQTT telemetry.

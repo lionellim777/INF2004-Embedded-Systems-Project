@@ -31,10 +31,13 @@ The tested integration prototype uses:
 
 ```c
 LEFT_FORWARD_SIGN = 1.0f
-RIGHT_FORWARD_SIGN = -1.0f
+RIGHT_FORWARD_SIGN = 1.0f
 ```
 
-Motor wire colours are not sufficient evidence of polarity. Confirm direction with the driven wheels raised after any rewiring.
+This polarity was reverified with the raised-wheel encoder motor test: both
+normalized encoder counts increase for a forward command. Motor wire colours
+are not sufficient evidence of polarity. Confirm direction with the driven
+wheels raised after any rewiring.
 
 ## Mechanical limits
 

@@ -53,7 +53,7 @@ enum {
 
 /* These signs reflect the motor wiring verified on the assembled robot. */
 static const float LEFT_FORWARD_SIGN = 1.0f;
-static const float RIGHT_FORWARD_SIGN = -1.0f;
+static const float RIGHT_FORWARD_SIGN = 1.0f;
 
 /* 23% spun unloaded wheels but could not start the car on the track. */
 static const float BASE_THROTTLE = 0.55f;
