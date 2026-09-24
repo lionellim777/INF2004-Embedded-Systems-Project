@@ -1,0 +1,6 @@
+# Replace all paths and this address with the laptop's private LAN values.
+listener 1883 192.168.1.10
+allow_anonymous false
+password_file C:/buddy1/mosquitto/passwords
+acl_file C:/buddy1/mosquitto/acl
+persistence false

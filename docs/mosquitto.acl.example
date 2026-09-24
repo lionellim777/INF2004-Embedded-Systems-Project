@@ -1,0 +1,11 @@
+user buddy1
+topic read inf2004/team1/robot1/command/#
+topic write inf2004/team1/robot1/telemetry
+topic write inf2004/team1/robot1/event
+topic write inf2004/team1/robot1/status
+topic write inf2004/team1/robot1/command_result
+
+user observer
+topic read inf2004/team1/robot1/#
+topic write inf2004/team1/robot1/command/get_status
+topic write inf2004/team1/robot1/command/set_period_ms
