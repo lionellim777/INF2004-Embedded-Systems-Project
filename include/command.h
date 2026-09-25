@@ -23,6 +23,18 @@ typedef struct
     uint32_t period_ms;
 } command_request_t;
 
+typedef struct
+{
+    char payload[COMMAND_PAYLOAD_SIZE];
+    size_t expected_length;
+    size_t length;
+    bool b_is_valid;
+} command_frame_t;
+
+bool command_frame_begin(command_frame_t *p_frame, size_t expected_length);
+bool command_frame_append(command_frame_t *p_frame,
+                          uint8_t const *p_data, size_t length,
+                          bool b_is_last);
 bool command_parse(char const *p_topic, char const *p_payload,
                    size_t length, command_request_t *p_request);
 

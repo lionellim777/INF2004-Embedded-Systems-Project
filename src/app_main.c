@@ -5,18 +5,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <tk/tkernel.h>
-
 #include "comm.h"
 #include "comm_secrets.h"
+#include "mtk_bridge.h"
 #include "pico/stdlib.h"
 
 #define APP_TASK_STACK_SIZE 4096U
 #define APP_DEMO_PERIOD_MS 500U
 
 static void app_demo_task(int start_code, void *p_context);
-static bool app_start_task(void (*p_task)(int, void *),
-                           int priority, int stack_size);
 static void app_publish_simulated(uint32_t now_ms);
 
 /* The RTOS requires this exported name; see docs/barr-c-review.md. */
@@ -28,13 +25,13 @@ usermain(void)
 
     if (COMM_OK == comm_init(&config))
     {
-        if ((true == app_start_task(comm_task, 9,
-                                    APP_TASK_STACK_SIZE)) &&
-            (true == app_start_task(app_demo_task, 12,
-                                    APP_TASK_STACK_SIZE)))
+        if ((true == mtk_bridge_start_task(comm_task, 9,
+                                           APP_TASK_STACK_SIZE)) &&
+            (true == mtk_bridge_start_task(app_demo_task, 12,
+                                           APP_TASK_STACK_SIZE)))
         {
             printf("Communication and demo tasks started\n");
-            (void)tk_slp_tsk(TMO_FEVR);
+            mtk_bridge_sleep_forever();
             result = 0;
         }
     }
@@ -44,33 +41,6 @@ usermain(void)
     }
 
     return (result);
-}
-
-static bool
-app_start_task(void (*p_task)(int, void *), int priority, int stack_size)
-{
-    bool b_is_started = false;
-    ID task_id = 0;
-    T_CTSK task_config = {0};
-
-    task_config.itskpri = priority;
-    task_config.stksz = stack_size;
-    task_config.task = p_task;
-    task_config.tskatr = TA_HLNG | TA_RNG3;
-    task_id = tk_cre_tsk(&task_config);
-    if (E_OK < task_id)
-    {
-        if (E_OK == tk_sta_tsk(task_id, 0))
-        {
-            b_is_started = true;
-        }
-        else
-        {
-            (void)tk_del_tsk(task_id);
-        }
-    }
-
-    return (b_is_started);
 }
 
 static void
@@ -91,12 +61,14 @@ app_demo_task(int start_code, void *p_context)
         if ((0U == (demo_count % 20U)) &&
             (COMM_OK == comm_get_status(&status)))
         {
-            printf("demo=%lu comm=%lu state=%u\n",
+            printf("demo=%lu comm=%lu state=%u retries=%lu error=%lu\n",
                    (unsigned long)demo_count,
                    (unsigned long)status.task_ticks,
-                   (unsigned int)status.state);
+                   (unsigned int)status.state,
+                   (unsigned long)status.reconnect_count,
+                   (unsigned long)status.last_error);
         }
-        (void)tk_dly_tsk(APP_DEMO_PERIOD_MS);
+        mtk_bridge_delay_ms(APP_DEMO_PERIOD_MS);
     }
 }
 

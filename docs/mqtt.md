@@ -37,7 +37,8 @@ All times are milliseconds since boot. Speeds are millimetres/second,
 distances and hump estimates are millimetres, line readings are raw sensor
 values, and encoder counts are ticks. Each valid producer record has its own
 capture time. Status includes `state`, `boot_id`, `uptime_ms`, `reconnects`,
-`dropped`, and `task_ticks`. An unexpected disconnect causes the broker to
+`dropped`, `last_error`, `period_ms`, `queue_peak`, and `task_ticks`. An
+unexpected disconnect causes the broker to
 publish the retained plain text `offline` Last Will.
 
 Events use `kind` (`barcode`, `hump`, `scan_point`, or `obstacle`), `scan_id`,
@@ -67,7 +68,10 @@ do not steer the robot.
 Install Mosquitto and its `mosquitto_pub` and `mosquitto_sub` clients. Create
 passwords for `buddy1` and `observer` with `mosquitto_passwd`. Copy the example
 broker and ACL files to local paths, replace the IP address and file paths,
-then start Mosquitto with that configuration. Bind its listener to the
+then start Mosquitto with `mosquitto -c <local-broker.conf> -v`. On Windows,
+`winget install --id EclipseFoundation.Mosquitto --exact` installs the broker
+and clients; its default service may listen only on localhost. Bind the
+project listener to the
 laptop's private LAN address, allow port 1883 on the private firewall profile,
 and test that the Pico W can reach it. Do not use `localhost` as the robot's
 broker address. Check access point client isolation if the connection fails.

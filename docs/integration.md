@@ -1,6 +1,10 @@
 # Buddy 1 integration guide
 
 The public task-context API is in `include/comm.h` and `include/telemetry.h`.
+`port/mtk_bridge.h` wraps task and mutex calls because the upstream BSP and
+Pico SDK headers define conflicting C names; application files include only
+the bridge and Pico SDK headers. The bridge is the only project source that
+includes the micro T-Kernel API header.
 `comm_init` copies and checks the configuration. `comm_task` is the only task
 that calls CYW43, lwIP, and MQTT. Other tasks publish typed samples through
 `comm_update_telemetry` and events through `comm_post_event`. Both copy the

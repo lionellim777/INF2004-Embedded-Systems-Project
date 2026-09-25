@@ -1,6 +1,7 @@
 /build/
 /vendor/
 /config/comm_secrets.h
+/config/local/
 *.uf2
 *.elf
 *.map

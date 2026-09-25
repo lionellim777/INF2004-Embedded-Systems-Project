@@ -4,6 +4,52 @@
 #include <string.h>
 
 bool
+command_frame_begin(command_frame_t *p_frame, size_t expected_length)
+{
+    bool b_is_valid = false;
+
+    if (NULL != p_frame)
+    {
+        memset(p_frame, 0, sizeof(*p_frame));
+        p_frame->expected_length = expected_length;
+        p_frame->b_is_valid = (expected_length < COMMAND_PAYLOAD_SIZE);
+        b_is_valid = p_frame->b_is_valid;
+    }
+
+    return (b_is_valid);
+}
+
+bool
+command_frame_append(command_frame_t *p_frame, uint8_t const *p_data,
+                     size_t length, bool b_is_last)
+{
+    bool b_is_valid = false;
+
+    if ((NULL != p_frame) && (true == p_frame->b_is_valid))
+    {
+        if (((0U == length) || (NULL != p_data)) &&
+            (length <= (p_frame->expected_length - p_frame->length)))
+        {
+            if (0U < length)
+            {
+                memcpy(&p_frame->payload[p_frame->length], p_data,
+                       length);
+                p_frame->length += length;
+            }
+            if ((false == b_is_last) ||
+                (p_frame->expected_length == p_frame->length))
+            {
+                p_frame->payload[p_frame->length] = '\0';
+                b_is_valid = true;
+            }
+        }
+        p_frame->b_is_valid = b_is_valid;
+    }
+
+    return (b_is_valid);
+}
+
+bool
 command_parse(char const *p_topic, char const *p_payload,
               size_t length, command_request_t *p_request)
 {

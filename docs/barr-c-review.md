@@ -30,6 +30,8 @@ exact BARR-C rule, affected source, justification, and reviewer:
 | --- | --- | --- | --- |
 | `src/app_main.c` | 6.1.i | RTOS requires exported `usermain` symbol | Pending team review |
 | `port/mtk_pico_main.c` | 1.1.c | SDK hardware exception registration needs its API | Pending team review |
+| `port/mtk_pico_main.c` | 6.1.i, 7.1.j | SDK requires `main`; the BSP requires `knl_lowmem_top` and `knl_lowmem_limit` symbols | Pending team review |
+| Firmware build | 1.1 | Pico SDK 2.2.0 headers require C11 `static_assert`; project C sources use C99-compatible constructs | Pending team review |
 
 The port uses a fixed 96 KiB pool for micro T-Kernel's internal allocator.
 Application telemetry buffers and queues have static storage. lwIP and SDK

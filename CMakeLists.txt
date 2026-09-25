@@ -11,6 +11,10 @@ if(BUDDY1_HOST_TESTS)
     add_executable(buddy1_protocol_tests tests/protocol_tests.c)
     target_link_libraries(buddy1_protocol_tests PRIVATE buddy1_protocol)
     add_test(NAME protocol COMMAND buddy1_protocol_tests)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME json_contract COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/json_contract_test.py
+        $<TARGET_FILE:buddy1_protocol_tests>)
     return()
 endif()
 
@@ -24,7 +28,8 @@ endif()
 set(PICO_BOARD pico_w CACHE STRING "Pico W board")
 include("${PICO_SDK_PATH}/external/pico_sdk_import.cmake")
 project(buddy1_pico_w C CXX ASM)
-set(CMAKE_C_STANDARD 99)
+# Pico SDK 2.2.0 headers use static_assert; application sources remain C99.
+set(CMAKE_C_STANDARD 11)
 pico_sdk_init()
 
 if(NOT MTK_BSP_PATH AND DEFINED ENV{MTK_BSP_PATH})
@@ -44,6 +49,12 @@ string(REGEX REPLACE
 string(REGEX REPLACE
     "#define[ \t]+USE_SDEV_DRV[ \t]+\\(1\\)"
     "#define USE_SDEV_DRV (0)" MTK_CONFIG "${MTK_CONFIG}")
+string(REGEX REPLACE
+    "#define[ \t]+USE_SHUTDOWN[ \t]+\\(1\\)"
+    "#define USE_SHUTDOWN (0)" MTK_CONFIG "${MTK_CONFIG}")
+string(REGEX REPLACE
+    "#define[ \t]+CNF_TIMER_PERIOD[ \t]+10"
+    "#define CNF_TIMER_PERIOD 5" MTK_CONFIG "${MTK_CONFIG}")
 file(WRITE "${CMAKE_BINARY_DIR}/generated/config.h" "${MTK_CONFIG}")
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/config/comm_secrets.h")
@@ -88,23 +99,27 @@ target_include_directories(mtkernel PRIVATE
     "${MTK}/include"
     "${MTK}/kernel/knlinc")
 
-add_executable(buddy1_pico_w
+set(BUDDY1_APP_SOURCES
+    port/mtk_bridge.c
     port/mtk_pico_main.c
     src/app_main.c
     src/comm.c
     src/command.c
     src/telemetry.c)
+add_executable(buddy1_pico_w ${BUDDY1_APP_SOURCES})
 target_include_directories(buddy1_pico_w PRIVATE
-    include config
+    include config port
     "${CMAKE_BINARY_DIR}/generated"
     "${MTK}/config"
     "${MTK}/include")
-target_compile_definitions(buddy1_pico_w PRIVATE _PICO_RP2040_)
-target_compile_options(buddy1_pico_w PRIVATE
-    $<$<COMPILE_LANGUAGE:C>:-Wall;-Wextra;-Werror;-Wconversion>)
+target_compile_definitions(buddy1_pico_w PRIVATE
+    _PICO_RP2040_ PROHIBIT_DEF_SIZE_T)
+set_source_files_properties(${BUDDY1_APP_SOURCES} PROPERTIES
+    COMPILE_OPTIONS "-Wall;-Wextra;-Werror;-Wconversion")
 target_link_libraries(buddy1_pico_w PRIVATE
     mtkernel
     pico_stdlib
+    pico_rand
     pico_cyw43_arch_lwip_poll
     pico_lwip_mqtt
     hardware_exception

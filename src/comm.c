@@ -4,15 +4,16 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <tk/tkernel.h>
-
 #include "command.h"
 #include "lwip/apps/mqtt.h"
 #include "lwip/ip_addr.h"
+#include "mtk_bridge.h"
 #include "pico/cyw43_arch.h"
+#include "pico/rand.h"
 #include "pico/stdlib.h"
 
-#define COMM_POLL_MS 10U
+/* T-Kernel adds one 5 ms tick to a task delay. */
+#define COMM_POLL_MS 5U
 #define COMM_WIFI_DEADLINE_MS 15000U
 #define COMM_MQTT_DEADLINE_MS 10000U
 #define COMM_HEARTBEAT_MS 1000U
@@ -36,7 +37,7 @@ typedef struct
     comm_status_t status;
     telemetry_snapshot_t snapshot;
     telemetry_event_t events[COMM_EVENT_CAPACITY];
-    ID mutex_id;
+    int32_t mutex_id;
     uint32_t event_head;
     uint32_t event_count;
     uint32_t sequence;
@@ -74,8 +75,7 @@ typedef struct
     char client_id[COMM_CLIENT_ID_SIZE];
     char inbound_topic[COMMAND_PAYLOAD_SIZE];
     char pending_command[COMMAND_PAYLOAD_SIZE];
-    char inbound_data[COMMAND_PAYLOAD_SIZE];
-    size_t inbound_length;
+    command_frame_t inbound_frame;
     command_request_t command;
     char output[TELEMETRY_JSON_SIZE];
 } comm_runtime_t;
@@ -89,6 +89,7 @@ static bool comm_make_topic(char *p_output, size_t capacity,
                             char const *p_suffix);
 static void comm_set_state(comm_state_t state);
 static void comm_record_drop(void);
+static void comm_expire_events(uint32_t now_ms);
 static void comm_fail(uint32_t now_ms, uint32_t error_code);
 static void comm_on_connection(mqtt_client_t *p_client, void *p_arg,
                                mqtt_connection_status_t status);
@@ -108,7 +109,7 @@ static void comm_start_subscriptions(uint32_t now_ms);
 static void comm_process_command(void);
 static void comm_publish_status(uint32_t now_ms);
 static void comm_publish_result(void);
-static void comm_publish_event(uint32_t now_ms);
+static void comm_publish_event(void);
 static void comm_publish_telemetry(uint32_t now_ms);
 static void comm_step(uint32_t now_ms);
 
@@ -116,7 +117,6 @@ comm_result_t
 comm_init(comm_config_t const *p_config)
 {
     comm_result_t result = COMM_INVALID;
-    T_CMTX mutex_config = {0};
 
     if ((NULL != p_config) &&
         (true == comm_has_text(p_config->ssid,
@@ -139,12 +139,11 @@ comm_init(comm_config_t const *p_config)
         g_comm.config = *p_config;
         g_comm.retry_delay_ms = 1000U;
         g_comm.status.telemetry_period_ms = COMMAND_PERIOD_DEFAULT_MS;
-        g_comm.status.boot_id = time_us_32();
+        g_comm.status.boot_id = get_rand_32();
         g_comm.state = COMM_STATE_STARTING;
         g_comm.status.state = COMM_STATE_STARTING;
-        mutex_config.mtxatr = TA_INHERIT;
-        g_comm.mutex_id = tk_cre_mtx(&mutex_config);
-        if (E_OK < g_comm.mutex_id)
+        g_comm.mutex_id = mtk_bridge_create_mutex();
+        if (0 < g_comm.mutex_id)
         {
             if (true == comm_make_topics())
             {
@@ -153,7 +152,7 @@ comm_init(comm_config_t const *p_config)
             }
             else
             {
-                (void)tk_del_mtx(g_comm.mutex_id);
+                mtk_bridge_delete_mutex(g_comm.mutex_id);
                 result = COMM_ERROR;
             }
         }
@@ -174,7 +173,7 @@ comm_update_telemetry(telemetry_sample_t const *p_sample)
     if ((NULL != p_sample) && (true == g_comm.b_is_started))
     {
         result = COMM_BUSY;
-        if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_POL))
+        if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
         {
             if (true == telemetry_apply_sample(&g_comm.snapshot, p_sample))
             {
@@ -184,7 +183,7 @@ comm_update_telemetry(telemetry_sample_t const *p_sample)
             {
                 result = COMM_INVALID;
             }
-            (void)tk_unl_mtx(g_comm.mutex_id);
+            mtk_bridge_unlock_mutex(g_comm.mutex_id);
         }
     }
 
@@ -201,7 +200,7 @@ comm_post_event(telemetry_event_t const *p_event)
         (true == g_comm.b_is_started))
     {
         result = COMM_BUSY;
-        if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_POL))
+        if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
         {
             if (COMM_EVENT_CAPACITY == g_comm.event_count)
             {
@@ -220,7 +219,7 @@ comm_post_event(telemetry_event_t const *p_event)
                 }
                 result = COMM_OK;
             }
-            (void)tk_unl_mtx(g_comm.mutex_id);
+            mtk_bridge_unlock_mutex(g_comm.mutex_id);
         }
     }
 
@@ -235,11 +234,11 @@ comm_get_status(comm_status_t *p_status)
     if ((NULL != p_status) && (true == g_comm.b_is_started))
     {
         result = COMM_BUSY;
-        if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_POL))
+        if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
         {
             *p_status = g_comm.status;
             result = COMM_OK;
-            (void)tk_unl_mtx(g_comm.mutex_id);
+            mtk_bridge_unlock_mutex(g_comm.mutex_id);
         }
     }
 
@@ -271,6 +270,7 @@ comm_task(int start_code, void *p_context)
     for (;;)
     {
         now_ms = to_ms_since_boot(get_absolute_time());
+        comm_expire_events(now_ms);
         if (true == g_comm.b_is_network_ready)
         {
             cyw43_arch_poll();
@@ -289,12 +289,12 @@ comm_task(int start_code, void *p_context)
                 comm_fail(now_ms, 1U);
             }
         }
-        if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_POL))
+        if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
         {
             g_comm.status.task_ticks++;
-            (void)tk_unl_mtx(g_comm.mutex_id);
+            mtk_bridge_unlock_mutex(g_comm.mutex_id);
         }
-        (void)tk_dly_tsk(COMM_POLL_MS);
+        mtk_bridge_delay_ms(COMM_POLL_MS);
     }
 }
 
@@ -391,20 +391,38 @@ static void
 comm_set_state(comm_state_t state)
 {
     g_comm.state = state;
-    if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_FEVR))
+    if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, true))
     {
         g_comm.status.state = state;
-        (void)tk_unl_mtx(g_comm.mutex_id);
+        mtk_bridge_unlock_mutex(g_comm.mutex_id);
     }
 }
 
 static void
 comm_record_drop(void)
 {
-    if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_FEVR))
+    if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, true))
     {
         g_comm.status.dropped_count++;
-        (void)tk_unl_mtx(g_comm.mutex_id);
+        mtk_bridge_unlock_mutex(g_comm.mutex_id);
+    }
+}
+
+static void
+comm_expire_events(uint32_t now_ms)
+{
+    if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
+    {
+        while ((0U < g_comm.event_count) &&
+               (COMM_EVENT_MAX_AGE_MS <
+                (now_ms - g_comm.events[g_comm.event_head].captured_ms)))
+        {
+            g_comm.event_head =
+                (g_comm.event_head + 1U) % COMM_EVENT_CAPACITY;
+            g_comm.event_count--;
+            g_comm.status.dropped_count++;
+        }
+        mtk_bridge_unlock_mutex(g_comm.mutex_id);
     }
 }
 
@@ -429,11 +447,11 @@ comm_fail(uint32_t now_ms, uint32_t error_code)
             g_comm.retry_delay_ms = 30000U;
         }
     }
-    if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_FEVR))
+    if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, true))
     {
         g_comm.status.reconnect_count++;
         g_comm.status.last_error = error_code;
-        (void)tk_unl_mtx(g_comm.mutex_id);
+        mtk_bridge_unlock_mutex(g_comm.mutex_id);
     }
     comm_set_state(COMM_STATE_RETRYING);
 }
@@ -485,21 +503,22 @@ comm_on_incoming_publish(void *p_arg, char const *p_topic,
     char const *p_name = NULL;
 
     (void)p_arg;
-    g_comm.inbound_length = 0U;
     g_comm.b_is_inbound_valid = false;
 
-    g_comm.command.kind = COMMAND_INVALID;
-    g_comm.command.period_ms = 0U;
-
-    if ((NULL != p_topic) && (COMMAND_PAYLOAD_SIZE > length) &&
-        (false == g_comm.b_has_command) &&
+    if ((false == g_comm.b_has_command) &&
         (false == g_comm.b_has_result))
     {
-        if (0 == strcmp(p_topic, g_comm.topic_get_status))
+        g_comm.command.kind = COMMAND_INVALID;
+        g_comm.command.period_ms = 0U;
+        g_comm.inbound_topic[0] = '\0';
+
+        if ((NULL != p_topic) &&
+            (0 == strcmp(p_topic, g_comm.topic_get_status)))
         {
             p_name = "get_status";
         }
-        else if (0 == strcmp(p_topic, g_comm.topic_set_period))
+        else if ((NULL != p_topic) &&
+                 (0 == strcmp(p_topic, g_comm.topic_set_period)))
         {
             p_name = "set_period_ms";
         }
@@ -512,7 +531,8 @@ comm_on_incoming_publish(void *p_arg, char const *p_topic,
         {
             (void)snprintf(g_comm.inbound_topic,
                            sizeof(g_comm.inbound_topic), "%s", p_name);
-            g_comm.b_is_inbound_valid = true;
+            g_comm.b_is_inbound_valid = command_frame_begin(
+                &g_comm.inbound_frame, (size_t)length);
         }
     }
 }
@@ -523,27 +543,20 @@ comm_on_incoming_data(void *p_arg, u8_t const *p_data,
 {
     (void)p_arg;
 
-    if ((true == g_comm.b_is_inbound_valid) && (NULL != p_data) &&
-        ((size_t)length <
-         (sizeof(g_comm.inbound_data) - g_comm.inbound_length)))
+    if (true == g_comm.b_is_inbound_valid)
     {
-        memcpy(&g_comm.inbound_data[g_comm.inbound_length],
-               p_data, length);
-        g_comm.inbound_length += length;
-    }
-    else
-    {
-        g_comm.b_is_inbound_valid = false;
+        g_comm.b_is_inbound_valid = command_frame_append(
+            &g_comm.inbound_frame, p_data, (size_t)length,
+            (0U != (flags & MQTT_DATA_FLAG_LAST)));
     }
 
     if (0U != (flags & MQTT_DATA_FLAG_LAST))
     {
         if (true == g_comm.b_is_inbound_valid)
         {
-            g_comm.inbound_data[g_comm.inbound_length] = '\0';
             g_comm.b_is_command_accepted = command_parse(
-                g_comm.inbound_topic, g_comm.inbound_data,
-                g_comm.inbound_length, &g_comm.command);
+                g_comm.inbound_topic, g_comm.inbound_frame.payload,
+                g_comm.inbound_frame.length, &g_comm.command);
             g_comm.b_has_command = true;
         }
         else
@@ -598,12 +611,12 @@ comm_publish_complete(uint32_t now_ms)
         {
             if (COMM_PUBLISH_EVENT == g_comm.publish_kind)
             {
-                if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_FEVR))
+                if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, true))
                 {
                     g_comm.event_head =
                         (g_comm.event_head + 1U) % COMM_EVENT_CAPACITY;
                     g_comm.event_count--;
-                    (void)tk_unl_mtx(g_comm.mutex_id);
+                    mtk_bridge_unlock_mutex(g_comm.mutex_id);
                 }
             }
             else if (COMM_PUBLISH_RESULT == g_comm.publish_kind)
@@ -725,11 +738,11 @@ comm_process_command(void)
         {
             if (COMMAND_SET_PERIOD == g_comm.command.kind)
             {
-                if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_FEVR))
+                if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, true))
                 {
                     g_comm.status.telemetry_period_ms =
                         g_comm.command.period_ms;
-                    (void)tk_unl_mtx(g_comm.mutex_id);
+                    mtk_bridge_unlock_mutex(g_comm.mutex_id);
                 }
             }
             else if (COMMAND_GET_STATUS == g_comm.command.kind)
@@ -764,10 +777,14 @@ comm_publish_status(uint32_t now_ms)
             g_comm.output, sizeof(g_comm.output),
             "{\"schema\":1,\"state\":\"online\",\"boot_id\":%lu,"
             "\"uptime_ms\":%lu,\"reconnects\":%lu,\"dropped\":%lu,"
-            "\"task_ticks\":%lu}",
+            "\"last_error\":%lu,\"period_ms\":%lu,"
+            "\"queue_peak\":%lu,\"task_ticks\":%lu}",
             (unsigned long)status.boot_id, (unsigned long)now_ms,
             (unsigned long)status.reconnect_count,
             (unsigned long)status.dropped_count,
+            (unsigned long)status.last_error,
+            (unsigned long)status.telemetry_period_ms,
+            (unsigned long)status.queue_peak,
             (unsigned long)status.task_ticks);
         if ((0 < length) && ((size_t)length < sizeof(g_comm.output)))
         {
@@ -800,27 +817,19 @@ comm_publish_result(void)
 }
 
 static void
-comm_publish_event(uint32_t now_ms)
+comm_publish_event(void)
 {
     telemetry_event_t event = {0};
     bool b_has_event = false;
 
-    if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_FEVR))
+    if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, true))
     {
         b_has_event = (0U < g_comm.event_count);
         if (true == b_has_event)
         {
             event = g_comm.events[g_comm.event_head];
-            if (COMM_EVENT_MAX_AGE_MS < (now_ms - event.captured_ms))
-            {
-                g_comm.event_head =
-                    (g_comm.event_head + 1U) % COMM_EVENT_CAPACITY;
-                g_comm.event_count--;
-                g_comm.status.dropped_count++;
-                b_has_event = false;
-            }
         }
-        (void)tk_unl_mtx(g_comm.mutex_id);
+        mtk_bridge_unlock_mutex(g_comm.mutex_id);
     }
 
     if ((true == b_has_event) &&
@@ -841,12 +850,12 @@ comm_publish_telemetry(uint32_t now_ms)
     uint32_t period_ms = COMMAND_PERIOD_DEFAULT_MS;
     bool b_has_snapshot = false;
 
-    if (E_OK == tk_loc_mtx(g_comm.mutex_id, TMO_POL))
+    if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
     {
         snapshot = g_comm.snapshot;
         period_ms = g_comm.status.telemetry_period_ms;
         b_has_snapshot = true;
-        (void)tk_unl_mtx(g_comm.mutex_id);
+        mtk_bridge_unlock_mutex(g_comm.mutex_id);
     }
 
     if ((true == b_has_snapshot) &&
@@ -952,7 +961,7 @@ comm_step(uint32_t now_ms)
                 }
                 if (false == g_comm.b_is_publish_busy)
                 {
-                    comm_publish_event(now_ms);
+                    comm_publish_event();
                 }
                 comm_publish_telemetry(now_ms);
                 if (30000U <= (now_ms - g_comm.online_since_ms))
