@@ -645,6 +645,7 @@ comm_publish_complete(uint32_t now_ms)
 static void
 comm_start_wifi(uint32_t now_ms)
 {
+    printf("WiFi: starting association\n");
     if (0 == cyw43_arch_wifi_connect_async(
                  g_comm.config.ssid, g_comm.config.wifi_password,
                  CYW43_AUTH_WPA2_AES_PSK))
@@ -654,6 +655,7 @@ comm_start_wifi(uint32_t now_ms)
     }
     else
     {
+        printf("WiFi: association request failed\n");
         comm_fail(now_ms, 2U);
     }
 }
@@ -899,10 +901,13 @@ comm_step(uint32_t now_ms)
         case COMM_STATE_WIFI_CONNECTING:
             if (CYW43_LINK_UP == link_status)
             {
+                printf("WiFi: link up\n");
                 comm_start_mqtt(now_ms);
             }
             else if (now_ms >= g_comm.deadline_ms)
             {
+                printf("WiFi: deadline, CYW43 link status=%d\n",
+                       link_status);
                 comm_fail(now_ms, 2U);
             }
             else

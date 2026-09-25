@@ -40,8 +40,11 @@ cmake --build build/pico
 
 Flash `build/pico/buddy1_pico_w.uf2` with BOOTSEL or a compatible SWD tool.
 The example configuration cannot connect until its placeholders are replaced.
-The firmware builds and both RTOS tasks have run on a connected Pico W; WiFi,
-MQTT, recovery, and integrated robot behavior still need hardware verification.
+The firmware builds and both RTOS tasks have run on a connected Pico W. WiFi
+and authenticated MQTT have been observed, including online status,
+telemetry, command acknowledgement, and reconnection after a broker restart.
+Longer recovery, timing, and integrated robot behavior still need hardware
+verification; see [the validation record](docs/validation.md).
 
 The Pico SDK owns reset, flash boot stage, clocks, C runtime, and the vector
 table. The port registers the micro T-Kernel PendSV and SysTick handlers,

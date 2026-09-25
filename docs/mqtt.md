@@ -10,6 +10,10 @@ If the laptop or board moves to another network, update the broker IPv4
 address in that local header, then rebuild and reflash the Pico W. A CYW43
 `CYW43_LINK_NONET` result means the board did not find the configured SSID;
 check that the network is in range and supports 2.4 GHz WiFi.
+The current firmware requests WPA2 AES PSK. A WPA3-only SSID will not satisfy
+that request; configure a WPA2-Personal compatible 2.4 GHz SSID and use its
+exact name and password in the local header. USB serial reports the CYW43
+link status at the 15-second WiFi deadline without printing credentials.
 
 The topic prefix is `inf2004/<team_id>/<robot_id>/`. IDs contain only lowercase
 letters, digits, `_`, or `-`. Replace `team1` and `robot1` below with the chosen

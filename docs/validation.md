@@ -1,5 +1,139 @@
 # Verification record
 
+## Scoped LAN firewall rule on 2026-09-25
+
+- After administrator approval, Windows Firewall rule `Buddy1MosquittoLAN`
+  was created and read back. It is enabled, inbound, allow, Public profile,
+  TCP local port 1883, program `C:\Program Files\Mosquitto\mosquitto.exe`,
+  local address `192.168.0.163`, remote subnet `192.168.0.0/24`, and interface
+  `Wi-Fi`. No broad port-only rule was added.
+- The authenticated LAN broker continued running, and the observer received
+  a fresh Pico `state:"online"` heartbeat after the rule was installed.
+  If the laptop's WiFi IP or subnet changes, update the rule, broker listener,
+  and firmware broker address together.
+
+## Pico MQTT connection on 2026-09-25
+
+- Created ignored `config/local/mosquitto.conf` bound to the laptop's WiFi
+  address `192.168.0.163:1883`, using ignored `config/local/passwords` and
+  `config/local/acl`. Added a separate `observer` account; its generated
+  password is in ignored `config/local/observer_password`. The listener uses
+  `allow_anonymous false`, and the ACL gives `buddy1` its robot topics and
+  `observer` read and diagnostic command access.
+- Mosquitto 2.1.2 accepted the Pico from `192.168.0.159` as client
+  `inf2004-team1-robot1` with username `buddy1`. It acknowledged both command
+  subscriptions and a retained status publication. The observer received
+  `state:"online"` heartbeats and telemetry snapshots; three sampled
+  `captured_ms` values were 366946, 367146, and 367346, 200 ms apart.
+- The observer published `set_period_ms` commands for 500 and 200 ms. The
+  Pico returned `accepted:true` results for both, and the status again
+  reported `period_ms:200`. A broker restart caused the Pico to reconnect;
+  subsequent online status reported `reconnects:14` with the same `boot_id`.
+- The LAN broker is running as a hidden user process using the local config,
+  alongside the default localhost-only Mosquitto service. It is bound only
+  to the laptop's WiFi IP and will need restarting after a reboot or IP
+  change. Windows classifies this WiFi network as Public. Attempting to add
+  an inbound firewall rule limited to Mosquitto, port 1883, and the local
+  subnet initially failed with `Access is denied`. The later administrator
+  run and verified rule are recorded above.
+
+## Credential firmware reflash on 2026-09-25
+
+- Rebuilt `build/pico-current/buddy1_pico_w.uf2` after changing the ignored
+  firmware configuration. CMake regenerated the build, the generated secrets
+  header matched the local one by hash, and the 45-step incremental build
+  passed with Pico SDK 2.3.1 and Arm GNU Toolchain 15.2.Rel1.
+- The Pico entered `RPI-RP2` BOOTSEL mode, accepted the UF2, and returned as
+  `COM3`. USB serial showed an initial `CYW43_LINK_NONET` timeout, a retry,
+  `WiFi: link up`, and `demo=60 comm=2977 state=2 retries=1 error=2`.
+  `state=2` is MQTT connecting. Later output showed
+  `demo=80 comm=3987 state=2 retries=2 error=3`. Both tasks advanced.
+- The new broker address and generated `buddy1` credential are now flashed.
+  The Mosquitto service was running, but its port 1883 listeners were bound
+  only to `127.0.0.1` and `::1`. No listener was bound to the laptop's WiFi
+  address, so MQTT login and publication from the Pico remain unverified.
+
+## Broker credential preparation on 2026-09-25
+
+- Mosquitto 2.1.2's `mosquitto_passwd` created an ignored local password file
+  at `config/local/passwords` with user `buddy1` and a generated password.
+  The same credential and the laptop's current WiFi IP `192.168.0.163` were
+  placed in ignored `config/comm_secrets.h`; no password was printed.
+- A temporary Mosquitto listener bound to `127.0.0.1:1884` accepted an
+  authenticated QoS 1 publication from `buddy1` and acknowledged it. The
+  listener was stopped and its temporary configuration removed. This proves
+  the password file works locally, but does not establish Pico MQTT access.
+- At this checkpoint, the firmware on the Pico predated the credential
+  changes. The later reflash is recorded above.
+
+## WiFi link established after router compatibility change, 2026-09-25
+
+- The router was set to a 20 MHz 2.4 GHz channel, automatic channel selection,
+  802.11b/g/n/ax mixed mode, and WPA2-PSK[AES]. Windows reported the laptop
+  connected to `TP-Link_ADBE` on 2.4 GHz with WPA2-Personal and CCMP.
+- Without reflashing, Pico USB serial advanced to
+  `demo=820 comm=41343 state=2 retries=12 error=3`, then retried. State 2 is
+  MQTT connecting, reached only after `CYW43_LINK_UP`. The WiFi link therefore
+  succeeded with the router's new settings; both tasks continued running.
+- No laptop listener was present on TCP port 1883, no Mosquitto service or
+  local broker configuration was found, and the laptop's WiFi network profile
+  is Public. The ignored firmware configuration still has placeholder broker
+  credentials and a broker IP different from the laptop's current
+  `192.168.0.163`. `error=3` is therefore consistent with missing broker
+  access. MQTT connection, heartbeat, and telemetry remain unverified.
+
+## WiFi continuation on 2026-09-25
+
+- The ignored `config/comm_secrets.h` is now present. Its SSID matches the
+  laptop's connected network, and its WiFi password matches the laptop's
+  saved profile; neither password was printed. The broker address
+  differs from the laptop's current `192.168.0.163`, and the broker username
+  and password remain placeholders. These values were checked without
+  printing credentials.
+- This host has Pico SDK 2.3.1, CMake 4.3.4, Ninja 1.13.2, Arm GNU Toolchain
+  15.2.Rel1, and picotool 2.3.1 under `C:\Users\jwooh\.pico-sdk`. The pinned
+  micro T-Kernel BSP commit `15ed232c08f2d89e54e514db79de150e224307e3`
+  was fetched to ignored `vendor/mtk3_bsp`. A clean 253-step firmware build
+  passed using the installed SDK and compiler, which differ from the
+  previously verified 2.2.0 and 14.3.Rel1 versions.
+- The resulting `build/pico-current/buddy1_pico_w.uf2` was flashed via the
+  board's `RPI-RP2` BOOTSEL drive. `COM3` returned. New serial diagnostics
+  showed WiFi deadlines with CYW43 link status `-1` and then `-2` on two
+  attempts. `-2` is `CYW43_LINK_NONET` (no matching SSID found). The board
+  still did not join, despite the laptop seeing the SSID on 2.4 GHz with
+  WPA2-Personal and CCMP. MQTT cannot be tested until WiFi joins and the
+  broker settings are populated.
+- After the router was changed, Windows reported `TP-Link_ADBE` on 2.4 GHz,
+  channel 8, as WPA2-Personal with CCMP. A wireless scan also showed that
+  SSID and its 2.4 GHz BSSID. The laptop retained `192.168.0.163/24`.
+  The Pico's existing firmware continued through another association attempt:
+  `demo=1740 comm=87798 state=1 retries=22 error=2`, then
+  `demo=1760 comm=88808 state=5 retries=23 error=2`. Thus the router change
+  alone has not established the link. The flashed SSID and password cannot be
+  verified from this checkout, and this image predates the new link-status
+  diagnostic messages.
+- The Pico W was present as `VID_2E8A` on `COM3`. With DTR asserted, its USB
+  serial output included `demo=920 comm=46398 state=5 retries=13 error=2`.
+  The tasks are still running, but the board remains in the WiFi retry state.
+- The laptop's current `TP-Link_ADBE` connection is on 2.4 GHz, channel 6,
+  with WPA3-Personal (H2E). The firmware requests WPA2 AES PSK. The access
+  point needs to advertise a WPA2-Personal compatible 2.4 GHz network for
+  this firmware. The laptop's current WiFi IPv4 address is `192.168.0.163`;
+  recheck it when configuring the broker because it can change.
+- This checkout has no `config/comm_secrets.h`, Pico SDK/BSP environment
+  variables, or Pico build tools. The connected board runs an earlier image.
+  No new firmware was built or flashed in this continuation. The firmware
+  now prints association start, link up, and CYW43 link status at the WiFi
+  deadline to make the next hardware check conclusive.
+- MinGW GCC host protocol test, independent JSON contract check, and the
+  mechanical BARR-C checker passed. The system Python launcher points to an
+  unavailable WindowsApps interpreter, so the checks used Codex's bundled
+  Python runtime.
+
+At this checkpoint, the next step was to check the router's 2.4 GHz
+compatibility settings. The subsequent result is recorded at the top of this
+file.
+
 ## Hardware and build check on 2026-09-25
 
 - With the local WiFi credentials configured, the Pico W booted and both
