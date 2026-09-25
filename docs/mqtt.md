@@ -6,6 +6,10 @@ The laptop and Pico W must be able to reach each other directly. Copy
 `config/comm_secrets.example.h` to ignored `config/comm_secrets.h` and set the
 WiFi SSID, password, laptop LAN IPv4 address, broker user/password, team ID,
 and robot ID. Do not commit the populated secrets file.
+If the laptop or board moves to another network, update the broker IPv4
+address in that local header, then rebuild and reflash the Pico W. A CYW43
+`CYW43_LINK_NONET` result means the board did not find the configured SSID;
+check that the network is in range and supports 2.4 GHz WiFi.
 
 The topic prefix is `inf2004/<team_id>/<robot_id>/`. IDs contain only lowercase
 letters, digits, `_`, or `-`. Replace `team1` and `robot1` below with the chosen

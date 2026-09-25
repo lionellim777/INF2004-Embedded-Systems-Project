@@ -2,6 +2,20 @@
 
 ## Hardware and build check on 2026-09-25
 
+- With the local WiFi credentials configured, the Pico W booted and both
+  tasks continued to run. A temporary diagnostic build reported CYW43 link
+  status `-2` (`CYW43_LINK_NONET`, no matching SSID found) at the 15-second
+  WiFi deadline, then entered its retry state. This points to the configured
+  access point being unavailable to the board in the current location; it
+  does not establish WiFi or MQTT operation.
+- Pico USB serial output was visible when the terminal asserted DTR. Earlier
+  empty captures without DTR were a capture issue, not evidence of a stopped
+  scheduler. The temporary diagnostic logging was removed after this check.
+- The laptop broker accepted an authenticated local diagnostic publication
+  on its LAN listener, but no Pico-originated MQTT connection or heartbeat
+  was seen. Recheck the laptop LAN IP in the ignored firmware configuration
+  and rebuild/reflash after moving the board to the target 2.4 GHz network.
+
 - Pico W firmware built with Pico SDK 2.2.0, Arm GNU Toolchain 14.3.Rel1,
   Visual Studio host C++, and the pinned micro T-Kernel BSP. ELF and UF2 were
   produced. A fresh `build/pico-clean` configuration and 248-step build also
