@@ -32,3 +32,4 @@ serial-output/
 .env.*
 !.env.example
 
+*.exe
