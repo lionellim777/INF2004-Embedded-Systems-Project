@@ -26,6 +26,7 @@
 #include "barcode_reader.h"
 #include "encoders.h"
 #include "navigation_commands.h"
+#include "obstacle_data.h"
 #include "terrain.h"
 
 enum {
@@ -69,7 +70,6 @@ static const uint64_t RECOVERY_TIMEOUT_US = 900000u;
 static const float GAP_THROTTLE = 0.40f;
 static const float SEARCH_THROTTLE = 0.40f;
 static const float BARCODE_THROTTLE = 0.40f;
-static const float OBSTACLE_STOP_CM = 30.0f;
 static const uint64_t RANGE_INTERVAL_US = 100000u;
 
 typedef struct {
@@ -182,7 +182,7 @@ static void ultrasonic_init(void)
     gpio_set_dir(ULTRASONIC_ECHO_PIN, GPIO_IN);
 }
 
-static bool ultrasonic_read_cm(float *distance_cm)
+static obstacle_sample_t ultrasonic_read_sample(void)
 {
     gpio_put(ULTRASONIC_TRIG_PIN, 0);
     sleep_us(2);
@@ -193,7 +193,7 @@ static bool ultrasonic_read_cm(float *distance_cm)
     uint64_t deadline = time_us_64() + 30000u;
     while (!gpio_get(ULTRASONIC_ECHO_PIN)) {
         if (time_us_64() >= deadline) {
-            return false;
+            return obstacle_sample_make(0u, OBSTACLE_UNAVAILABLE);
         }
         tight_loop_contents();
     }
@@ -201,12 +201,11 @@ static bool ultrasonic_read_cm(float *distance_cm)
     deadline = start + 30000u;
     while (gpio_get(ULTRASONIC_ECHO_PIN)) {
         if (time_us_64() >= deadline) {
-            return false;
+            return obstacle_sample_make(0u, OBSTACLE_UNAVAILABLE);
         }
         tight_loop_contents();
     }
-    *distance_cm = (float)(time_us_64() - start) * 0.01715f;
-    return *distance_cm >= 2.0f && *distance_cm <= 400.0f;
+    return obstacle_sample_from_echo_us((uint32_t)(time_us_64() - start));
 }
 
 static uint16_t line_sensor_read(uint gpio_pin)
@@ -274,9 +273,8 @@ int main(void)
     uint64_t next_report_us = 0;
     uint64_t last_line_us = 0;
     uint64_t next_range_us = 0;
-    float distance_cm = 0.0f;
-    bool range_valid = false;
-    uint close_readings = 0;
+    obstacle_sample_t range = obstacle_sample_make(0u, OBSTACLE_NOT_MEASURED);
+    uint8_t obstacle_flags = 0u; /* Bits 0-1: close-reading count, capped at 2. */
     int last_seen_side = 0;
     bool line_ever_seen = false;
     bool navigation_waiting = false;
@@ -357,15 +355,19 @@ int main(void)
         }
 
         if (!barcode_scanning && now_us >= next_range_us) {
-            range_valid = ultrasonic_read_cm(&distance_cm);
+            range = ultrasonic_read_sample();
             next_range_us = time_us_64() + RANGE_INTERVAL_US;
-            if (range_valid && distance_cm < OBSTACLE_STOP_CM) {
+            uint8_t close_readings = obstacle_flags & 0x03u;
+            if (obstacle_sample_status(range) == OBSTACLE_VALID &&
+                obstacle_sample_mm(range) < OBSTACLE_STOP_MM) {
                 if (close_readings < 2u) {
                     ++close_readings;
                 }
             } else {
                 close_readings = 0;
             }
+            obstacle_flags = (uint8_t)((obstacle_flags & (uint8_t)~0x03u) |
+                                       close_readings);
         }
 
         int32_t strongest_blackness = left_blackness;
@@ -384,12 +386,12 @@ int main(void)
         if (navigation_waiting) {
             motors_stop();
             motion_state = "NAVIGATION_WAIT";
-        } else if (running && close_readings >= 2u) {
+        } else if (running && (obstacle_flags & 0x03u) >= 2u) {
             motors_stop();
             running = false;
             motion_state = "OBSTACLE_STOP";
-            printf("OBSTACLE at %.1f cm: motors stopped. Clear it and press GP20 to restart.\n",
-                   distance_cm);
+            printf("OBSTACLE at %u mm: motors stopped. Clear it and press GP20 to restart.\n",
+                   (unsigned)obstacle_sample_mm(range));
         } else if (running && barcode_scanning) {
             /* Cross the alternating full-width barcode without steering. */
             left_throttle = BARCODE_THROTTLE;
@@ -471,10 +473,19 @@ int main(void)
             } else {
                 printf(" Terrain=UNAVAILABLE");
             }
-            if (range_valid) {
-                printf(" Range=%.1fcm", distance_cm);
-            } else {
-                printf(" Range=NO_ECHO");
+            switch (obstacle_sample_status(range)) {
+            case OBSTACLE_VALID:
+                printf(" Range=%umm", (unsigned)obstacle_sample_mm(range));
+                break;
+            case OBSTACLE_OVER_LIMIT:
+                printf(" Range=OVER_1000MM");
+                break;
+            case OBSTACLE_UNAVAILABLE:
+                printf(" Range=NO_ECHO_OR_INVALID");
+                break;
+            default:
+                printf(" Range=NOT_MEASURED");
+                break;
             }
             printf(" EncL=%ld EncR=%ld",
                    (long)encoder_left_count(),

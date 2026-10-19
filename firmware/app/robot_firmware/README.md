@@ -65,8 +65,11 @@ recovery, not obstacle bypass.
 
 The servo is held at its centre position. With the ultrasonic sensor on Grove
 1, two consecutive valid readings below 30 cm stop and disarm the motors.
-Move the obstacle away and press GP20 to restart. `Range=NO_ECHO` means the
-sensor did not return a usable distance; it does not mean the way is clear.
+Move the obstacle away and press GP20 to restart. The obstacle sample now uses
+10 bits for 0-1000 mm and 2 bits for its status. `Range=NO_ECHO_OR_INVALID`
+means the sensor did not return a usable distance, and `Range=OVER_1000MM`
+means an echo was beyond the proposed reporting limit. Neither proves the way
+is clear. The 1000 mm limit still needs validation for scanning and bypass.
 This is an emergency stop, **not** obstacle bypass. The three IR sensors also
 capture full-width Code 39 bars using a two-of-three majority. Valid A-D
 symbols generate left, right, straight or U-turn requests; duplicate symbols
@@ -85,6 +88,12 @@ terrain indicator; it is not yet a physical hump height measurement.
 Open the USB serial monitor to see `Run`, `State`, `Line`, the three sensor
 readings, distance, hump count and highest climb angle.
 The robot starts stopped on every power-up or reset.
+
+The compact sample and 16-point fine-scan index layout are defined in
+`obstacle_data.h`. The host boundary check can be run with
+`gcc -std=c11 -Wall -Wextra -Werror firmware/tests/obstacle_data_test.c -o obstacle_data_test`
+followed by `./obstacle_data_test`. The fine-scan layout is not yet used by the
+standalone scan diagnostic or integrated bypass.
 
 The initial 23% motor command was too weak to start the loaded car on the
 styrofoam. This build commands 55% for straight travel and reports both motor
