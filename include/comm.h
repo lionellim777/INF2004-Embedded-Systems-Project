@@ -55,6 +55,10 @@ comm_result_t comm_init(comm_config_t const *p_config);
 comm_result_t comm_update_telemetry(telemetry_sample_t const *p_sample);
 comm_result_t comm_post_event(telemetry_event_t const *p_event);
 comm_result_t comm_get_status(comm_status_t *p_status);
+/* Copies current motion and both histories together, without consuming them. */
+comm_result_t comm_get_motion_history(
+    telemetry_motion_t *p_motion, telemetry_wheel_history_t *p_left,
+    telemetry_wheel_history_t *p_right);
 void comm_task(int start_code, void *p_context);
 
 #endif /* COMM_H */

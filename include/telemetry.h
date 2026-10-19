@@ -6,6 +6,31 @@
 #include <stdint.h>
 
 #define TELEMETRY_JSON_SIZE 1024U
+#define TELEMETRY_WHEEL_HISTORY_CAPACITY 26U
+#define TELEMETRY_WHEEL_CAPTURE_MAX_MS 1800000U
+
+/* Speed: bits 0-9, two's complement. Capture ms: 10-30. Bit 31: zero. */
+typedef struct
+{
+    uint32_t records[TELEMETRY_WHEEL_HISTORY_CAPACITY];
+    /* Bits 0-4: oldest; 5-9: count; 10: recovery pending; others zero. */
+    uint16_t state;
+} telemetry_wheel_history_t;
+
+bool telemetry_wheel_record_pack(int32_t speed_mm_s, uint32_t captured_ms,
+                                 uint32_t *p_record);
+bool telemetry_wheel_record_unpack(uint32_t record, int32_t *p_speed_mm_s,
+                                   uint32_t *p_captured_ms);
+/* Zero-initialize each wheel's history; synchronize shared access. */
+/* Use capture-time order; equal speeds keep their original timestamp. */
+bool telemetry_wheel_history_append(telemetry_wheel_history_t *p_history,
+                                    int32_t speed_mm_s, uint32_t captured_ms);
+uint8_t telemetry_wheel_history_count(
+    telemetry_wheel_history_t const *p_history);
+/* Index zero is the oldest retained record; a read does not remove it. */
+bool telemetry_wheel_history_get(telemetry_wheel_history_t const *p_history,
+                                 size_t index, int32_t *p_speed_mm_s,
+                                 uint32_t *p_captured_ms);
 
 typedef enum
 {
@@ -54,6 +79,12 @@ typedef struct
     int32_t right_ticks;
     uint32_t distance_mm;
 } telemetry_motion_t;
+
+/* Caller synchronizes access. Invalid samples refresh current, not history. */
+/* Malformed valid samples return false without changing current or history. */
+bool telemetry_apply_motion_sample(
+    telemetry_motion_t *p_current, telemetry_wheel_history_t *p_left,
+    telemetry_wheel_history_t *p_right, telemetry_motion_t const *p_sample);
 
 typedef struct
 {

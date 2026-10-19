@@ -36,6 +36,8 @@ typedef struct
     comm_config_t config;
     comm_status_t status;
     telemetry_snapshot_t snapshot;
+    telemetry_wheel_history_t left_history;
+    telemetry_wheel_history_t right_history;
     telemetry_event_t events[COMM_EVENT_CAPACITY];
     int32_t mutex_id;
     uint32_t event_head;
@@ -169,13 +171,25 @@ comm_result_t
 comm_update_telemetry(telemetry_sample_t const *p_sample)
 {
     comm_result_t result = COMM_INVALID;
+    bool b_is_updated = false;
 
     if ((NULL != p_sample) && (true == g_comm.b_is_started))
     {
         result = COMM_BUSY;
         if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
         {
-            if (true == telemetry_apply_sample(&g_comm.snapshot, p_sample))
+            if (TELEMETRY_SOURCE_MOTION == p_sample->source)
+            {
+                b_is_updated = telemetry_apply_motion_sample(
+                    &g_comm.snapshot.motion, &g_comm.left_history,
+                    &g_comm.right_history, &p_sample->data.motion);
+            }
+            else
+            {
+                b_is_updated = telemetry_apply_sample(&g_comm.snapshot,
+                                                       p_sample);
+            }
+            if (true == b_is_updated)
             {
                 result = COMM_OK;
             }
@@ -237,6 +251,30 @@ comm_get_status(comm_status_t *p_status)
         if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
         {
             *p_status = g_comm.status;
+            result = COMM_OK;
+            mtk_bridge_unlock_mutex(g_comm.mutex_id);
+        }
+    }
+
+    return (result);
+}
+
+comm_result_t
+comm_get_motion_history(
+    telemetry_motion_t *p_motion, telemetry_wheel_history_t *p_left,
+    telemetry_wheel_history_t *p_right)
+{
+    comm_result_t result = COMM_INVALID;
+
+    if ((NULL != p_motion) && (NULL != p_left) && (NULL != p_right) &&
+        (p_left != p_right) && (true == g_comm.b_is_started))
+    {
+        result = COMM_BUSY;
+        if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, false))
+        {
+            *p_motion = g_comm.snapshot.motion;
+            *p_left = g_comm.left_history;
+            *p_right = g_comm.right_history;
             result = COMM_OK;
             mtk_bridge_unlock_mutex(g_comm.mutex_id);
         }

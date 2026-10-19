@@ -5,6 +5,19 @@
 #include <stdio.h>
 #include <string.h>
 
+#define TELEMETRY_WHEEL_SPEED_MASK 0x3FFU
+#define TELEMETRY_WHEEL_TIME_SHIFT 10U
+#define TELEMETRY_WHEEL_HEAD_MASK 0x1FU
+#define TELEMETRY_WHEEL_COUNT_SHIFT 5U
+#define TELEMETRY_WHEEL_RECOVERY_MASK 0x400U
+
+#if (0U == TELEMETRY_WHEEL_HISTORY_CAPACITY) || \
+    (TELEMETRY_WHEEL_HEAD_MASK < TELEMETRY_WHEEL_HISTORY_CAPACITY)
+#error "Widen wheel history state before using a capacity outside 1..31."
+#endif
+
+static bool telemetry_wheel_history_is_valid(
+    telemetry_wheel_history_t const *p_history);
 static bool telemetry_append(char *p_output, size_t capacity,
                              size_t *p_used, char const *p_format, ...);
 static char const *telemetry_mission_name(telemetry_mission_state_t state);
@@ -24,6 +37,174 @@ static bool telemetry_write_terrain(telemetry_terrain_t const *p_sample,
 static bool telemetry_write_obstacle(telemetry_obstacle_t const *p_sample,
                                      char *p_output, size_t capacity,
                                      size_t *p_used);
+
+static bool
+telemetry_wheel_history_is_valid(telemetry_wheel_history_t const *p_history)
+{
+    return ((NULL != p_history) &&
+            ((p_history->state & TELEMETRY_WHEEL_HEAD_MASK) <
+             TELEMETRY_WHEEL_HISTORY_CAPACITY) &&
+            (telemetry_wheel_history_count(p_history) <=
+             TELEMETRY_WHEEL_HISTORY_CAPACITY));
+}
+
+bool
+telemetry_wheel_record_pack(int32_t speed_mm_s, uint32_t captured_ms,
+                            uint32_t *p_record)
+{
+    if ((NULL == p_record) || (-500 > speed_mm_s) || (500 < speed_mm_s) ||
+        (TELEMETRY_WHEEL_CAPTURE_MAX_MS < captured_ms))
+    {
+        return (false);
+    }
+
+    *p_record = (captured_ms << TELEMETRY_WHEEL_TIME_SHIFT) |
+                ((uint32_t)speed_mm_s & TELEMETRY_WHEEL_SPEED_MASK);
+    return (true);
+}
+
+bool
+telemetry_wheel_record_unpack(uint32_t record, int32_t *p_speed_mm_s,
+                              uint32_t *p_captured_ms)
+{
+    int32_t speed_mm_s = (int32_t)(record & TELEMETRY_WHEEL_SPEED_MASK);
+    uint32_t captured_ms = record >> TELEMETRY_WHEEL_TIME_SHIFT;
+
+    if (512 <= speed_mm_s)
+    {
+        speed_mm_s -= 1024;
+    }
+    if ((NULL == p_speed_mm_s) || (NULL == p_captured_ms) ||
+        (0U != (record & 0x80000000U)) || (-500 > speed_mm_s) ||
+        (500 < speed_mm_s) || (TELEMETRY_WHEEL_CAPTURE_MAX_MS < captured_ms))
+    {
+        return (false);
+    }
+
+    *p_speed_mm_s = speed_mm_s;
+    *p_captured_ms = captured_ms;
+    return (true);
+}
+
+uint8_t
+telemetry_wheel_history_count(telemetry_wheel_history_t const *p_history)
+{
+    if (NULL == p_history)
+    {
+        return (0U);
+    }
+
+    return ((uint8_t)((p_history->state >> TELEMETRY_WHEEL_COUNT_SHIFT) &
+                       TELEMETRY_WHEEL_HEAD_MASK));
+}
+
+bool
+telemetry_wheel_history_append(telemetry_wheel_history_t *p_history,
+                               int32_t speed_mm_s, uint32_t captured_ms)
+{
+    uint32_t record = 0U;
+    uint8_t head = 0U;
+    uint8_t count = 0U;
+    size_t index = 0U;
+
+    if ((false == telemetry_wheel_history_is_valid(p_history)) ||
+        (false == telemetry_wheel_record_pack(speed_mm_s, captured_ms,
+                                               &record)))
+    {
+        return (false);
+    }
+
+    head = (uint8_t)(p_history->state & TELEMETRY_WHEEL_HEAD_MASK);
+    count = telemetry_wheel_history_count(p_history);
+    if ((0U < count) &&
+        (0U == (p_history->state & TELEMETRY_WHEEL_RECOVERY_MASK)))
+    {
+        index = ((size_t)head + count - 1U) % TELEMETRY_WHEEL_HISTORY_CAPACITY;
+        if ((record & TELEMETRY_WHEEL_SPEED_MASK) ==
+            (p_history->records[index] & TELEMETRY_WHEEL_SPEED_MASK))
+        {
+            return (true);
+        }
+    }
+
+    index = ((size_t)head + count) % TELEMETRY_WHEEL_HISTORY_CAPACITY;
+    p_history->records[index] = record;
+    if (TELEMETRY_WHEEL_HISTORY_CAPACITY == count)
+    {
+        head = (uint8_t)(((uint32_t)head + 1U) %
+                          TELEMETRY_WHEEL_HISTORY_CAPACITY);
+    }
+    else
+    {
+        count++;
+    }
+    p_history->state = (uint16_t)((uint32_t)head |
+                         ((uint32_t)count << TELEMETRY_WHEEL_COUNT_SHIFT));
+    return (true);
+}
+
+bool
+telemetry_wheel_history_get(telemetry_wheel_history_t const *p_history,
+                            size_t index, int32_t *p_speed_mm_s,
+                            uint32_t *p_captured_ms)
+{
+    uint8_t head = 0U;
+    uint8_t count = telemetry_wheel_history_count(p_history);
+
+    if ((false == telemetry_wheel_history_is_valid(p_history)) ||
+        (index >= count))
+    {
+        return (false);
+    }
+    head = (uint8_t)(p_history->state & TELEMETRY_WHEEL_HEAD_MASK);
+    index = ((size_t)head + index) % TELEMETRY_WHEEL_HISTORY_CAPACITY;
+    return (telemetry_wheel_record_unpack(p_history->records[index],
+                                          p_speed_mm_s, p_captured_ms));
+}
+
+bool
+telemetry_apply_motion_sample(
+    telemetry_motion_t *p_current, telemetry_wheel_history_t *p_left,
+    telemetry_wheel_history_t *p_right, telemetry_motion_t const *p_sample)
+{
+    uint32_t record = 0U;
+
+    if ((NULL == p_current) || (NULL == p_sample) || (p_left == p_right) ||
+        (false == telemetry_wheel_history_is_valid(p_left)) ||
+        (false == telemetry_wheel_history_is_valid(p_right)))
+    {
+        return (false);
+    }
+
+    if (true == p_sample->b_is_valid)
+    {
+        /* Validate both wheels before either history can be changed. */
+        if ((false == telemetry_wheel_record_pack(p_sample->left_mm_s,
+                            p_sample->captured_ms, &record)) ||
+            (false == telemetry_wheel_record_pack(p_sample->right_mm_s,
+                            p_sample->captured_ms, &record)))
+        {
+            return (false);
+        }
+        if ((false == telemetry_wheel_history_append(p_left,
+                       p_sample->left_mm_s, p_sample->captured_ms)) ||
+            (false == telemetry_wheel_history_append(p_right,
+                       p_sample->right_mm_s, p_sample->captured_ms)))
+        {
+            return (false);
+        }
+    }
+    else
+    {
+        p_left->state = (uint16_t)(p_left->state |
+                                   TELEMETRY_WHEEL_RECOVERY_MASK);
+        p_right->state = (uint16_t)(p_right->state |
+                                    TELEMETRY_WHEEL_RECOVERY_MASK);
+    }
+
+    *p_current = *p_sample;
+    return (true);
+}
 
 bool
 telemetry_apply_sample(telemetry_snapshot_t *p_snapshot,

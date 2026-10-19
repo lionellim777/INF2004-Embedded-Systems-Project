@@ -5,3 +5,6 @@
 *.uf2
 *.elf
 *.map
+.vibe-wise/profile.md
+.vibe-wise/progress.md
+.vibe-wise/project-map.md

@@ -44,3 +44,45 @@ requests an immediate status or changes the telemetry interval within the
 documented range. Integrate the full robot by checking that navigation
 deadlines still hold while MQTT publishes at 200 ms and while the laptop
 broker repeatedly disconnects.
+
+## Retained motion history
+
+Motion updates through `comm_update_telemetry` now refresh the current motion
+snapshot and maintain separate left/right speed histories under the same
+non-waiting mutex. Recording does not depend on the network connection.
+Each history keeps at most 26 records, replacing the oldest when full. A record
+uses four bytes: ten bits for signed speed (-500 to +500 mm/s, two's complement),
+21 bits for capture milliseconds since boot, and one reserved zero bit.
+Capture times must arrive in order. Buddy 2's agreed producer interval is 200 ms;
+the demo producer still uses its existing 500 ms interval.
+
+Repeated equal valid speeds refresh the live snapshot, including capture time,
+encoders and distance, without adding history records. A sample with
+`b_is_valid=false` refreshes the snapshot as invalid and preserves prior history.
+Its numeric speeds are not logged. The next valid sample is retained for both
+wheels even if the values equal their last valid records, then normal duplicate
+suppression resumes. Recovery uses one bit in each history's existing
+bookkeeping; it does not store the start time of the invalid period. The current
+motion-validity flag applies to both wheels.
+
+Valid-marked samples must have both speeds in range and capture time within
+0..1,800,000 ms (the supported thirty-minute session). Otherwise the update returns
+`COMM_INVALID` and changes neither the current snapshot nor either history.
+Explicit invalid samples are accepted with `COMM_OK`; consumers must inspect
+validity before using their numeric fields. No automatic clock reset or motor
+stop is introduced at the session limit.
+
+Use `comm_get_motion_history(&motion, &left, &right)` from task context to copy
+current motion and both histories into separate caller-owned objects under one
+lock. The call returns `COMM_BUSY` without changing outputs if the lock is busy,
+or `COMM_INVALID` for null/aliased history outputs or before initialization.
+On success, use `telemetry_wheel_history_count` and `telemetry_wheel_history_get`
+on those local copies to read oldest first without removing records. Decode or
+transmit after the copy; do not hold the mutex for network activity.
+
+At five updates per second, 26 records cover five seconds including an initial
+sample. This corresponds to 250 mm at a sustained 50 mm/s; braking, slower travel,
+measurement jitter and invalid/recovery transitions affect distance coverage.
+The two histories occupy 216 bytes including bookkeeping/padding on the tested
+host ABI, of which 208 bytes hold records. Target RAM usage and lock timing need
+hardware verification. This step does not transmit the history over MQTT.
