@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define COMMAND_PAYLOAD_SIZE 32U
+#define COMMAND_PAYLOAD_SIZE 8U
 #define COMMAND_PERIOD_DEFAULT_MS 200U
 #define COMMAND_PERIOD_MIN_MS 200U
 #define COMMAND_PERIOD_MAX_MS 5000U

@@ -5,8 +5,7 @@
 
 #include "telemetry.h"
 
-#define COMM_EVENT_CAPACITY 16U
-#define COMM_TEXT_SIZE 64U
+#define COMM_EVENT_CAPACITY 24U
 
 typedef enum
 {

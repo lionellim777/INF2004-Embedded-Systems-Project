@@ -9,6 +9,7 @@
 static void test_wheel_record(void);
 static void test_wheel_history(void);
 static void test_motion_ingestion(void);
+static void test_json_capacity(void);
 
 int
 main(void)
@@ -132,8 +133,81 @@ main(void)
                         output, sizeof(output)));
     printf("FULL_SNAPSHOT:%s\n", output);
 
+    test_json_capacity();
     puts("protocol tests passed");
     return (0);
+}
+
+/* Longest possible messages must fit; if not, enlarge TELEMETRY_JSON_SIZE. */
+static void
+test_json_capacity(void)
+{
+    telemetry_snapshot_t snapshot = {0};
+    telemetry_event_t event = {0};
+    char output[TELEMETRY_JSON_SIZE] = {0};
+    bool b_is_snapshot_ok = false;
+    bool b_is_event_ok = false;
+
+    snapshot.mission.b_is_valid = true;
+    snapshot.mission.b_is_simulated = true;
+    snapshot.mission.captured_ms = UINT32_MAX;
+    snapshot.mission.state = TELEMETRY_MISSION_RUNNING;
+    snapshot.motion.b_is_valid = true;
+    snapshot.motion.b_is_simulated = true;
+    snapshot.motion.captured_ms = UINT32_MAX;
+    snapshot.motion.left_mm_s = INT32_MIN;
+    snapshot.motion.right_mm_s = INT32_MIN;
+    snapshot.motion.left_ticks = INT32_MIN;
+    snapshot.motion.right_ticks = INT32_MIN;
+    snapshot.motion.distance_mm = UINT32_MAX;
+    snapshot.line.b_is_valid = true;
+    snapshot.line.b_is_simulated = true;
+    snapshot.line.captured_ms = UINT32_MAX;
+    snapshot.line.ir_left = UINT16_MAX;
+    snapshot.line.ir_middle = UINT16_MAX;
+    snapshot.line.ir_right = UINT16_MAX;
+    snapshot.line.b_is_on_line = true;
+    snapshot.line.barcode = 'D';
+    snapshot.terrain.b_is_valid = true;
+    snapshot.terrain.b_is_simulated = true;
+    snapshot.terrain.captured_ms = UINT32_MAX;
+    snapshot.terrain.motion = TELEMETRY_MOTION_ACCELERATING;
+    snapshot.terrain.hump_mm = INT32_MIN;
+    snapshot.terrain.highest_hump_mm = INT32_MIN;
+    snapshot.obstacle.b_is_valid = true;
+    snapshot.obstacle.b_is_simulated = true;
+    snapshot.obstacle.captured_ms = UINT32_MAX;
+    snapshot.obstacle.scan_id = UINT32_MAX;
+    snapshot.obstacle.closest_mm = UINT32_MAX;
+    snapshot.obstacle.width_mm = UINT32_MAX;
+    snapshot.obstacle.left_clearance_mm = UINT32_MAX;
+    snapshot.obstacle.right_clearance_mm = UINT32_MAX;
+
+    event.kind = TELEMETRY_EVENT_SCAN_POINT;
+    event.captured_ms = UINT32_MAX;
+    event.scan_id = UINT32_MAX;
+    event.value = INT32_MIN;
+    event.angle_mdeg = INT32_MIN;
+
+    b_is_snapshot_ok = telemetry_format_snapshot(
+        &snapshot, UINT32_MAX, UINT32_MAX, UINT32_MAX, output,
+        sizeof(output));
+    if (true == b_is_snapshot_ok)
+    {
+        printf("LONGEST_SNAPSHOT: %u of %u bytes\n",
+               (unsigned)(strlen(output) + 1U),
+               (unsigned)TELEMETRY_JSON_SIZE);
+    }
+    b_is_event_ok = telemetry_format_event(&event, UINT32_MAX, UINT32_MAX,
+                                           output, sizeof(output));
+    if ((false == b_is_snapshot_ok) || (false == b_is_event_ok))
+    {
+        fprintf(stderr, "TELEMETRY_JSON_SIZE (%u) is too small for the "
+                "longest message; enlarge it in include/telemetry.h.\n",
+                (unsigned)TELEMETRY_JSON_SIZE);
+    }
+    assert(true == b_is_snapshot_ok);
+    assert(true == b_is_event_ok);
 }
 
 static void

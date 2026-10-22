@@ -20,8 +20,9 @@
 #define COMM_EVENT_MAX_AGE_MS 5000U
 #define COMM_KEEPALIVE_SECONDS 15U
 #define COMM_MQTT_PORT 1883U
-#define COMM_TOPIC_SIZE 80U
-#define COMM_CLIENT_ID_SIZE 48U
+#define COMM_TOPIC_SIZE 64U
+#define COMM_CLIENT_ID_SIZE 40U
+#define COMM_COMMAND_NAME_SIZE 16U
 
 typedef enum
 {
@@ -75,8 +76,8 @@ typedef struct
     char topic_set_period[COMM_TOPIC_SIZE];
     char topic_result[COMM_TOPIC_SIZE];
     char client_id[COMM_CLIENT_ID_SIZE];
-    char inbound_topic[COMMAND_PAYLOAD_SIZE];
-    char pending_command[COMMAND_PAYLOAD_SIZE];
+    char inbound_topic[COMM_COMMAND_NAME_SIZE];
+    char pending_command[COMM_COMMAND_NAME_SIZE];
     command_frame_t inbound_frame;
     command_request_t command;
     char output[TELEMETRY_JSON_SIZE];
@@ -91,6 +92,7 @@ static bool comm_make_topic(char *p_output, size_t capacity,
                             char const *p_suffix);
 static void comm_set_state(comm_state_t state);
 static void comm_record_drop(void);
+static void comm_record_format_error(void);
 static void comm_expire_events(uint32_t now_ms);
 static void comm_fail(uint32_t now_ms, uint32_t error_code);
 static void comm_on_connection(mqtt_client_t *p_client, void *p_arg,
@@ -442,6 +444,17 @@ comm_record_drop(void)
     if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, true))
     {
         g_comm.status.dropped_count++;
+        mtk_bridge_unlock_mutex(g_comm.mutex_id);
+    }
+}
+
+/* Error 10: a message did not fit TELEMETRY_JSON_SIZE; enlarge it. */
+static void
+comm_record_format_error(void)
+{
+    if (true == mtk_bridge_lock_mutex(g_comm.mutex_id, true))
+    {
+        g_comm.status.last_error = 10U;
         mtk_bridge_unlock_mutex(g_comm.mutex_id);
     }
 }
@@ -872,14 +885,20 @@ comm_publish_event(void)
         mtk_bridge_unlock_mutex(g_comm.mutex_id);
     }
 
-    if ((true == b_has_event) &&
-        (true == telemetry_format_event(
-                     &event, g_comm.status.boot_id,
-                     ++g_comm.sequence, g_comm.output,
-                     sizeof(g_comm.output))))
+    if (true == b_has_event)
     {
-        (void)comm_publish(g_comm.topic_event, g_comm.output,
-                           1U, 0U, COMM_PUBLISH_EVENT);
+        if (true == telemetry_format_event(
+                        &event, g_comm.status.boot_id,
+                        ++g_comm.sequence, g_comm.output,
+                        sizeof(g_comm.output)))
+        {
+            (void)comm_publish(g_comm.topic_event, g_comm.output,
+                               1U, 0U, COMM_PUBLISH_EVENT);
+        }
+        else
+        {
+            comm_record_format_error();
+        }
     }
 }
 
@@ -912,6 +931,12 @@ comm_publish_telemetry(uint32_t now_ms)
             {
                 g_comm.last_telemetry_ms = now_ms;
             }
+        }
+        else
+        {
+            /* Wait a full period instead of failing on every poll. */
+            comm_record_format_error();
+            g_comm.last_telemetry_ms = now_ms;
         }
     }
 }

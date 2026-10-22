@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define TELEMETRY_JSON_SIZE 1024U
+#define TELEMETRY_JSON_SIZE 768U
 #define TELEMETRY_WHEEL_HISTORY_CAPACITY 26U
 #define TELEMETRY_WHEEL_CAPTURE_MAX_MS 1800000U
 

@@ -34,7 +34,8 @@ duplicates; identify distinct events by `boot_id` and `sequence`.
 
 ## Payloads
 
-Telemetry is JSON, at most 1024 bytes. This example has simulated producers;
+Telemetry is JSON, at most 767 characters (a 768-byte buffer). This example
+has simulated producers;
 `null` means a buddy has not supplied a valid sample:
 
 ```json
@@ -45,7 +46,9 @@ All times are milliseconds since boot. Speeds are millimetres/second,
 distances and hump estimates are millimetres, line readings are raw sensor
 values, and encoder counts are ticks. Each valid producer record has its own
 capture time. Status includes `state`, `boot_id`, `uptime_ms`, `reconnects`,
-`dropped`, `last_error`, `period_ms`, `queue_peak`, and `task_ticks`. An
+`dropped`, `last_error`, `period_ms`, `queue_peak`, and `task_ticks`.
+`last_error` 10 means a telemetry or event message did not fit
+`TELEMETRY_JSON_SIZE`; enlarge it in `include/telemetry.h`. An
 unexpected disconnect causes the broker to
 publish the retained plain text `offline` Last Will.
 
@@ -55,7 +58,7 @@ its angle is millidegrees. A hump event's value is millimetres. A barcode
 event's value is the ASCII code for `A` through `D`. An obstacle event's value
 is the closest measured distance in millimetres. Events expire after five
 seconds while the network is unavailable. The oldest queued event remains
-queued until publication succeeds; a full 16-event queue rejects a new event
+queued until publication succeeds; a full 24-event queue rejects a new event
 and increments `dropped`.
 
 Diagnostic command examples:
