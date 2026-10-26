@@ -358,6 +358,7 @@ int main(void)
 
         if (!barcode_scanning && now_us >= next_range_us) {
             range_valid = ultrasonic_read_cm(&distance_cm);
+            robot_fault_update(ROBOT_FAULT_NO_ECHO, !range_valid);
             next_range_us = time_us_64() + RANGE_INTERVAL_US;
             if (range_valid && distance_cm < OBSTACLE_STOP_CM) {
                 if (close_readings < 2u) {
@@ -453,6 +454,10 @@ int main(void)
         if (running) {
             terrain_poll();
         }
+        } 
+        else {
+            terrain_suspend();
+        }
 
         if (now_us >= next_report_us) {
             printf("Run=%u State=%s Line=%s L=%4u(%4ld) C=%4u(%4ld) R=%4u(%4ld) Drive=%+.2f/%+.2f",
@@ -467,7 +472,7 @@ int main(void)
             if (terrain.calibrated) {
                 printf(" Humps=%lu HighestTilt=%.1fdeg",
                        (unsigned long)terrain.hump_count,
-                       terrain.highest_peak_angle_deg);
+                       (double)terrain.highest_peak_angle_cdeg / 100.0);
             } else {
                 printf(" Terrain=UNAVAILABLE");
             }
