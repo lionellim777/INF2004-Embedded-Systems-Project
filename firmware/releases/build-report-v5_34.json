@@ -1,0 +1,10 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_34_wireless.uf2",
+  "bytes": 924160,
+  "blocks": 1805,
+  "sha256": "3f12def79c2961d4438417d3e90c1e6a0454f6cfced7d9115104afce3abb3568",
+  "linked_text_bytes": 461880,
+  "linked_bss_bytes": 108704,
+  "physical_validation": "pending; no car operated or firmware flashed",
+  "software_checks": "sanitized barcode/motion tests; 34 centre-main scenarios including production decoding during LOST/TURN/SEEK/BRAKE; 18 legacy-main scenarios; mocked wireless core/HTTP; actual lwIP DHCP; strict Pico W build; UF2 blocks/family/address/version/UI verified"
+}

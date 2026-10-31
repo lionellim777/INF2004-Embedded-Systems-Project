@@ -17,6 +17,7 @@ compile_commands.json
 *.hex
 *.map
 *.uf2
+!firmware/releases/*.uf2
 
 # Editors and operating systems
 .vscode/
@@ -28,6 +29,9 @@ Thumbs.db
 # Local logs, captures and secrets
 *.log
 serial-output/
+/tmp/
+__pycache__/
+*.pyc
 .env
 .env.*
 !.env.example

@@ -7,6 +7,10 @@
 typedef struct {
     bool available;
     bool calibrated;
+    bool pitch_valid;
+    float current_pitch_deg;
+    uint32_t pitch_sequence;
+    uint32_t read_errors;
     uint32_t hump_count;
     uint32_t highest_hump_number;
     float highest_peak_angle_deg;

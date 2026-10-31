@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "pico/stdlib.h"
+#include "hardware/sync.h"
 
 enum {
     LEFT_A_PIN = 2,
@@ -11,7 +12,8 @@ enum {
     RIGHT_B_PIN = 17,
 };
 
-static volatile int32_t counts[2];
+static volatile uint32_t counts[2];
+static volatile uint32_t invalid[2];
 static uint8_t previous_state[2];
 
 static uint8_t read_state(uint pin_a, uint pin_b)
@@ -45,7 +47,10 @@ static void encoder_gpio_callback(uint gpio, uint32_t events)
          0, -1,  1,  0,
     };
     uint8_t current = read_state(pin_a, pin_b);
-    counts[index] += transition[(previous_state[index] << 2u) | current];
+    if ((previous_state[index] ^ current) == 3u) {
+        ++invalid[index];
+    }
+    counts[index] += (uint32_t)(int32_t)transition[(previous_state[index] << 2u) | current];
     previous_state[index] = current;
 }
 
@@ -70,10 +75,22 @@ void encoders_init(void)
 
 int32_t encoder_left_count(void)
 {
-    return counts[0];
+    uint32_t value = counts[0];
+    return value <= INT32_MAX ? (int32_t)value :
+        (int32_t)((int64_t)value - INT64_C(4294967296));
 }
 
 int32_t encoder_right_count(void)
 {
-    return counts[1];
+    uint32_t value = counts[1];
+    return value <= INT32_MAX ? (int32_t)value :
+        (int32_t)((int64_t)value - INT64_C(4294967296));
+}
+
+encoder_sample_t encoders_snapshot(void)
+{
+    uint32_t saved = save_and_disable_interrupts();
+    encoder_sample_t sample = {counts[0], counts[1], invalid[0], invalid[1]};
+    restore_interrupts(saved);
+    return sample;
 }

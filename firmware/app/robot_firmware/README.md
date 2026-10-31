@@ -1,3 +1,9 @@
+> Current calibration build: **v5.3**. GP26 is the dedicated offset barcode input;
+> GP28/GP27 are the central line-left/line-right pair. Browser Line check is bounded
+> to two seconds or a wheel-count limit and records barcodes without executing turns.
+> See [current guide](../../../docs/wireless-calibration.md). Historical behaviour
+> described below is not a claim of full-course readiness.
+
 # Robot firmware: line following, terrain, range, and wheel encoders
 
 ## Wheel encoder wiring
@@ -35,8 +41,9 @@ After flashing, leave the car stopped and turn each wheel slowly by hand.
 `EncL` should change only for the left wheel, and `EncR` only for the right.
 These are raw quadrature counts. Forward wheel travel gives negative left and
 positive right counts on the tested robot. The standalone Buddy 2 motion test
-uses this calibration; this integrated firmware reports counts but does not yet
-use them to control speed or turns.
+uses this calibration. The main firmware now also uses it for selected
+distance/turn manoeuvres. See [motion integration](../../../docs/motion-integration.md)
+for controls, completed software checks and pending physical integration tests.
 
 ## Line following and other functions
 
@@ -71,9 +78,11 @@ This is an emergency stop, **not** obstacle bypass. The three IR sensors also
 capture full-width Code 39 bars using a two-of-three majority. Valid A-D
 symbols generate left, right, straight or U-turn requests; duplicate symbols
 are suppressed for three seconds. Straight continues, while turn requests
-stop safely until Buddy 2's encoder-motion API is connected. Barcode timing
+stop for a three-second countdown, execute the calibrated encoder turn and
+stop again. GP20 is required to resume. Barcode timing
 still requires physical validation. Encoder-based turns are calibrated in a
-standalone test but not yet integrated here. Obstacle bypass and WiFi telemetry
+standalone test and now ported into the main loop; physical integration testing
+remains pending. Obstacle bypass and WiFi telemetry
 are not implemented.
 
 The GY-511 accelerometer now also calibrates for about two seconds at startup,
@@ -86,8 +95,28 @@ Open the USB serial monitor to see `Run`, `State`, `Line`, the three sensor
 readings, distance, hump count and highest climb angle.
 The robot starts stopped on every power-up or reset.
 
+In VS Code serial at 115200 baud, send `f`, `l`, `r` or `u` while stopped to
+select straight 30 cm, left 90, right 90 or right 180 respectively. Selection
+never starts movement: GP20 starts a three-second countdown. Every manoeuvre
+stops on completion and prints a settled result. `n` restores line-follow mode,
+`x` stops/disarms when processed by the main loop, and `?` prints help.
+GP21 retains stopped-only terrain calibration. No repeat encoder calibration
+is needed before using this build.
+
 The initial 23% motor command was too weak to start the loaded car on the
 styrofoam. This build commands 55% for straight travel and reports both motor
 commands as `Drive=left/right` in the serial output. If `Run=1 Line=SEEN` and
 both commands are above zero but the car still does not move, check its power
 source and whether the wheels or front caster are binding.
+
+
+## Wireless calibration continuation (v5.3)
+
+The optional `ROBOCAR_WIRELESS_CALIBRATION=ON` build adds an isolated Wi-Fi
+access point and HTTP calibration page, with a narrow right-90 trim, combined
+sensor diagnostics and an independent motor-service timeout. It is a
+foreground diagnostic transport, not the Buddy 1 MQTT/RTOS application.
+See [the operating guide](../../../docs/wireless-calibration.md) for flashing,
+network credentials, first run and limits. The default build remains USB-only.
+The wireless build defaults to the stopped 30 cm diagnostic selection after boot;
+only GP20 starts movement. USB still accepts the original selection commands.

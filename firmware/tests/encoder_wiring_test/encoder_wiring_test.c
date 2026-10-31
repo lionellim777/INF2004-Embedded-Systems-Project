@@ -21,6 +21,7 @@ enum {
     RIGHT_A_PIN = 16,
     RIGHT_B_PIN = 17,
     REPORT_INTERVAL_MS = 500,
+    ZERO_BUTTON_PIN = 20,
 };
 
 typedef struct {
@@ -41,6 +42,39 @@ typedef struct {
 
 static encoder_t left_encoder;
 static encoder_t right_encoder;
+static uint8_t read_ab(uint a_pin, uint b_pin);
+
+static void print_help(void)
+{
+    printf("\n=== AAI10 ENCODER INSPECTION v2 | %s %s ===\n", __DATE__, __TIME__);
+    printf("MOTOR OUTPUTS OFF: GP8/9/10/11 are held LOW. No powered movement.\n");
+    printf("Left encoder: Grove 2 A=GP2 B=GP3. Right: Grove 4 A=GP16 B=GP17.\n");
+    printf("1. Raise wheels. Turn LEFT wheel forward by hand; only LEFT should count.\n");
+    printf("2. Turn it backward; the count direction should reverse. Repeat RIGHT.\n");
+    printf("3. Mark a wheel, press GP20 to zero, turn ONE full revolution slowly.\n");
+    printf("4. Record the count magnitude; repeat each wheel three times.\n");
+    printf("Previous calibration reference: about 2543 quadrature counts/revolution.\n");
+    printf("Raw polarity reference: forward LEFT negative; forward RIGHT positive.\n");
+    printf("These are references to check, not measured results from this test.\n");
+    printf("A/B=channel edge totals; d=new position counts since previous report.\n");
+    printf("pins=instantaneous A/B levels, not a revolution counter.\n");
+    printf("invalid=skipped A/B transitions; a rising value needs investigation.\n");
+    printf("No edges can mean no movement OR missing encoder power/wiring.\n");
+    printf("GP20 ONLY zeros diagnostics; it never starts a motor in this firmware.\n");
+    printf("USB serial: 115200 baud. Reports every 500 ms, even while idle.\n\n");
+}
+
+static void reset_encoders(void)
+{
+    uint32_t saved = save_and_disable_interrupts();
+    left_encoder.a_edges = left_encoder.b_edges = 0u;
+    right_encoder.a_edges = right_encoder.b_edges = 0u;
+    left_encoder.invalid_transitions = right_encoder.invalid_transitions = 0u;
+    left_encoder.position = right_encoder.position = 0;
+    left_encoder.previous_ab = read_ab(LEFT_A_PIN, LEFT_B_PIN);
+    right_encoder.previous_ab = read_ab(RIGHT_A_PIN, RIGHT_B_PIN);
+    restore_interrupts(saved);
+}
 
 static uint8_t read_ab(uint a_pin, uint b_pin)
 {
@@ -139,19 +173,49 @@ int main(void)
 {
     hold_motors_stopped();
     init_encoders();
+    gpio_init(ZERO_BUTTON_PIN);
+    gpio_set_dir(ZERO_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(ZERO_BUTTON_PIN);
     stdio_init_all();
-    sleep_ms(1500);
-
-    printf("\nENCODER WIRING TEST: motors are OFF. Turn ONE raised wheel by hand.\n");
-    printf("Left: Grove 2 GP2/GP3. Right: Grove 4 GP16/GP17.\n");
-    printf("Each wheel should change BOTH of its own A/B edge counts.\n\n");
 
     snapshot_t last_left = take_snapshot(&left_encoder, LEFT_A_PIN, LEFT_B_PIN);
     snapshot_t last_right = take_snapshot(&right_encoder, RIGHT_A_PIN,
                                           RIGHT_B_PIN);
+    bool usb_was_connected = false;
+    bool button_candidate = false;
+    bool button_pressed = false;
+    uint64_t button_changed_us = time_us_64();
+    uint64_t next_report_us = time_us_64();
+    uint32_t report_number = 0u;
 
     while (true) {
-        sleep_ms(REPORT_INTERVAL_MS);
+        sleep_ms(10u);
+        bool connected = stdio_usb_connected();
+        if (connected && !usb_was_connected) {
+            print_help();
+        }
+        usb_was_connected = connected;
+
+        uint64_t now_us = time_us_64();
+        bool pressed = !gpio_get(ZERO_BUTTON_PIN);
+        if (pressed != button_candidate) {
+            button_candidate = pressed;
+            button_changed_us = now_us;
+        }
+        if (now_us - button_changed_us >= 30000u &&
+            button_pressed != button_candidate) {
+            button_pressed = button_candidate;
+            if (button_pressed) {
+                reset_encoders();
+                last_left = take_snapshot(&left_encoder, LEFT_A_PIN, LEFT_B_PIN);
+                last_right = take_snapshot(&right_encoder, RIGHT_A_PIN, RIGHT_B_PIN);
+                printf("\n[ZERO] Both diagnostic counts cleared. Motors remain OFF.\n");
+            }
+        }
+        if (now_us < next_report_us) {
+            continue;
+        }
+        next_report_us = now_us + REPORT_INTERVAL_MS * 1000u;
         snapshot_t left = take_snapshot(&left_encoder, LEFT_A_PIN, LEFT_B_PIN);
         snapshot_t right = take_snapshot(&right_encoder, RIGHT_A_PIN,
                                           RIGHT_B_PIN);
@@ -169,19 +233,35 @@ int main(void)
             activity = "RIGHT";
         }
 
-        printf("Activity=%s | L A/B=%lu/%lu (+%lu/+%lu) pos=%ld d=%ld invalid=%lu pins=%u%u"
-               " | R A/B=%lu/%lu (+%lu/+%lu) pos=%ld d=%ld invalid=%lu pins=%u%u\n",
-               activity,
+        printf("\n[%llu ms #%lu] MOTOR=OFF Activity=%s\n",
+               (unsigned long long)(now_us / 1000u),
+               (unsigned long)++report_number, activity);
+        printf(" LEFT  A/B edges=%lu/%lu (+%lu/+%lu) raw_count=%ld d=%lld invalid=%lu pins=%u%u\n",
                (unsigned long)left.a_edges, (unsigned long)left.b_edges,
                (unsigned long)left_a_new, (unsigned long)left_b_new,
-               (long)left.position, (long)(left.position - last_left.position),
+               (long)left.position, (long long)left.position - last_left.position,
                (unsigned long)left.invalid_transitions,
-               (unsigned)(left.ab >> 1u), (unsigned)(left.ab & 1u),
+               (unsigned)(left.ab >> 1u), (unsigned)(left.ab & 1u));
+        printf(" RIGHT A/B edges=%lu/%lu (+%lu/+%lu) raw_count=%ld d=%lld invalid=%lu pins=%u%u\n",
                (unsigned long)right.a_edges, (unsigned long)right.b_edges,
                (unsigned long)right_a_new, (unsigned long)right_b_new,
-               (long)right.position, (long)(right.position - last_right.position),
+               (long)right.position, (long long)right.position - last_right.position,
                (unsigned long)right.invalid_transitions,
                (unsigned)(right.ab >> 1u), (unsigned)(right.ab & 1u));
+
+        if (left.invalid_transitions != last_left.invalid_transitions ||
+            right.invalid_transitions != last_right.invalid_transitions) {
+            printf(" CHECK: new invalid transitions. Turn slowly; inspect signal/power/wiring.\n");
+        }
+        if ((left.a_edges >= 8u && left.b_edges == 0u) ||
+            (left.b_edges >= 8u && left.a_edges == 0u) ||
+            (right.a_edges >= 8u && right.b_edges == 0u) ||
+            (right.b_edges >= 8u && right.a_edges == 0u)) {
+            printf(" CHECK: one channel has edges while its partner has none. Check A/B wiring.\n");
+        }
+        if (report_number % 20u == 0u) {
+            printf(" TIP: GP20 zeroes counts. One marked wheel revolution, then read raw_count.\n");
+        }
 
         last_left = left;
         last_right = right;

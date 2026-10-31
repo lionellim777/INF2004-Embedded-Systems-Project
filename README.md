@@ -6,18 +6,25 @@ The goal is an autonomous two-wheel robot that follows a line, decodes navigatio
 
 ## Current status
 
+Latest checkpoint: **v5.34 wireless calibration**, published 31 October 2026.
+The [ready-to-flash UF2 and build record](firmware/releases/README.md) are included.
+This is a Pico SDK calibration prototype; the final µT-Kernel port and full mission
+integration remain pending. Route completion does not establish barcode success:
+the latest two v5.34 runs accepted no letters. See the
+[raised-height investigation](docs/testing/barcode-v5_34-raised-height-analysis.md).
+
 | Subsystem | Status |
 | --- | --- |
 | Motor direction and basic PWM | Bench tested |
 | Servo safe range | Bench tested: 45-130 degrees; scans use 50-125 degrees |
 | Ultrasonic coarse/fine scanning | Bench tested with broad, front-facing targets |
 | IMU level calibration and multi-hump state machine | Bench tested |
-| Three IR sensors | Light/dark calibration recorded for all three; straight-line bench testing underway |
-| Line following | Three-sensor control, local lost-line recovery, GP20 start/stop, and diagnostics implemented; full-course testing pending |
-| Wheel encoders and PID motion | Both channels verified; about 2543 counts/revolution. The standalone floor test completed 30 cm straight, right/left 90-degree turns, and a right 180-degree turn; all looked correct to the operator, with zero invalid encoder transitions. Main-firmware integration pending. |
-| Barcode navigation | Three-sensor Code 39 capture, A-D commands and duplicate suppression implemented; physical validation pending |
-| Obstacle bypass and line recovery | Not started |
-| Wi-Fi/MQTT telemetry | Not started |
+| Three IR sensors | Current mounting: GP26 dedicated barcode sensor; GP28 directly over route tape; GP27 to its right. Half barcode narrow/wide elements are 3/9 mm; reported GP26 clearance is 2 mm. Optical separation remains unresolved. |
+| Line following | Centre-sensor control, encoder feedback, bounded recovery, GP20 start/stop, crossing handling and diagnostics implemented. Operator reports completed home routes; frequent recovery and final line-loss stops remain in logs. |
+| Wheel encoders and motion | About 2543 counts/revolution; 30 cm and 90/180-degree calibration incorporated into moving firmware. Recovery non-response has occurred; v5.34 adds bounded per-wheel assistance. |
+| Barcode navigation | Dedicated GP26 acquisition at 2 kHz; framed Code 39 A-Z decoder; independent course capture and configurable Y/Z actions. Earlier complete A/Z captures pass replay. Latest moving half-A/Z reads fail; no claim of reliable half-size or turning acceptance. |
+| Obstacle bypass and line recovery | Sonar stopping and bounded line recovery are implemented in calibration mode. Integrated autonomous obstacle bypass remains pending. |
+| Wi-Fi/MQTT telemetry | Local Wi-Fi access point, browser controls and downloadable logs implemented. This calibration page is not the final MQTT subsystem. |
 
 Detailed evidence and limitations are recorded in [docs/development-status.md](docs/development-status.md).
 
@@ -25,16 +32,21 @@ Detailed evidence and limitations are recorded in [docs/development-status.md](d
 
 ```text
 docs/                         Project requirements, design and wiring records
-firmware/app/robot_firmware/  Current three-sensor integration firmware and modules
-firmware/tests/               Standalone hardware test programs
+firmware/app/robot_firmware/  Moving firmware, acquisition, control and local web UI
+firmware/tests/               Hardware diagnostics and host regression tests
+firmware/releases/            Published calibration UF2 and verification record
+tools/                        Build, replay, test and data-budget helpers
+output/pdf/                   Printable barcode calibration sheet
 ```
 
-Each test folder is an independent Raspberry Pi Pico SDK CMake project and produces its own UF2 file. Build products are intentionally excluded from Git.
+Standalone hardware test folders contain Pico SDK CMake projects. Host tests use
+the scripts in `tools/`. Build caches, toolchain downloads and intermediate files
+are excluded from Git; the selected release UF2 is included explicitly.
 
 ## Toolchain
 
 - Raspberry Pi Pico W (RP2040)
-- Raspberry Pi Pico SDK 2.3.0 or compatible
+- Raspberry Pi Pico SDK (v5.34 verified with 2.1.1)
 - CMake and Ninja
 - ARM GNU toolchain
 - USB serial monitor
