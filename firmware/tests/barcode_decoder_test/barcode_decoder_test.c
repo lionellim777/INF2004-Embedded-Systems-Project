@@ -3,6 +3,7 @@
 
 #include "barcode_decoder.h"
 #include "barcode_reader.h"
+#include "ir_fault.h"
 #include "navigation_commands.h"
 
 static const uint32_t barcode_a[BARCODE_CODE39_RUN_COUNT] = {
@@ -69,7 +70,8 @@ static bool feed_reader(barcode_reader_t *reader, const uint32_t *runs,
 
     for (unsigned int index = 0u; index < BARCODE_CODE39_RUN_COUNT;
          ++index) {
-        *now_us += runs[index] * 100u;
+        /* 20 ms per unit: a 3 mm narrow bar at 150 mm/s. */
+        *now_us += runs[index] * 20000u;
         black = !black;
         ready = barcode_reader_update(reader, black, *now_us, decoded) || ready;
     }
@@ -125,6 +127,42 @@ int main(void)
     if (barcode_reader_update(&reader, true, 750001u, &decoded) ||
         barcode_reader_active(&reader)) {
         puts("FAIL junction rejected as barcode");
+        ++failures;
+    }
+
+    /* 3-bit telemetry value: 0 none, 1-4 A-D, 5 E-Z, 6 unreadable. */
+    const struct { char letter; bool unreadable; barcode_value_t value; }
+    values[] = {
+        {'\0', false, BARCODE_VALUE_NONE},
+        {'A', false, BARCODE_VALUE_A}, {'B', false, BARCODE_VALUE_B},
+        {'C', false, BARCODE_VALUE_C}, {'D', false, BARCODE_VALUE_D},
+        {'E', false, BARCODE_VALUE_UNUSED_LETTER},
+        {'Y', false, BARCODE_VALUE_UNUSED_LETTER},
+        {'Z', false, BARCODE_VALUE_UNUSED_LETTER},
+        {'\0', true, BARCODE_VALUE_UNREADABLE},
+        {'A', true, BARCODE_VALUE_UNREADABLE},
+        {'*', false, BARCODE_VALUE_NONE},
+    };
+    for (unsigned int i = 0u; i < sizeof(values) / sizeof(values[0]); ++i) {
+        barcode_value_t value =
+            navigation_barcode_value(values[i].letter, values[i].unreadable);
+        if (value != values[i].value ||
+            (unsigned int)value >= (1u << BARCODE_VALUE_BITS)) {
+            printf("FAIL barcode value %u\n", i);
+            ++failures;
+        }
+    }
+
+    /* IR fault is bit 6 and follows the capture integrity flag. */
+    barcode_capture_t capture = {0};
+    if (FAULT_MASK_IR != 0x40u || ir_fault_bits(&capture) != 0u ||
+        ir_fault_bits(NULL) != 0u) {
+        puts("FAIL IR fault clear");
+        ++failures;
+    }
+    capture.integrity_fault = true;
+    if (ir_fault_bits(&capture) != FAULT_MASK_IR) {
+        puts("FAIL IR fault set");
         ++failures;
     }
 

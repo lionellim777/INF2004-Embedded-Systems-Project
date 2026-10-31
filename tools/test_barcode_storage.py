@@ -34,8 +34,8 @@ def main():
         probe = build / "arm_layout.c"
         probe.write_text(
             '#include "barcode_reader.h"\n'
-            '_Static_assert(sizeof(barcode_reader_t) == 88, "ARM reader size");\n'
-            '_Static_assert(sizeof(barcode_runs_t) == 73, "ARM run size");\n')
+            '_Static_assert(sizeof(barcode_reader_t) == 52, "ARM reader size");\n'
+            '_Static_assert(sizeof(barcode_runs_t) == 37, "ARM run size");\n')
         run(compiler, "--target=arm-none-eabi", "-mcpu=cortex-m0plus", "-mthumb",
             "-ffreestanding", "-std=c11", "-Wall", "-Wextra", "-Werror",
             "-I", APP, "-fsyntax-only", probe)
@@ -43,8 +43,9 @@ def main():
         run(compiler, "--target=arm-none-eabi", "-mcpu=cortex-m0plus", "-mthumb",
             "-ffreestanding", "-std=c11", "-Wall", "-Wextra", "-Werror", "-Os",
             "-I", APP, "-c", APP / "barcode_decoder.c", "-o", build / "decoder.o")
-        print("PASS Cortex-M0+ layout: runs 116 -> 73 B; reader 132 -> 88 B "
-              "(44 B saved); decoder cross-compiled. Full Pico link is a separate check.")
+        print("PASS Cortex-M0+ layout: runs 116 -> 73 -> 37 B (10-bit, 1 ms); "
+              "reader 132 -> 88 -> 52 B; decoder cross-compiled. "
+              "Full Pico link is a separate check.")
 
 
 if __name__ == "__main__":

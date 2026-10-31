@@ -33,6 +33,23 @@ navigation_command_t navigation_decode_symbol(char symbol)
     return command;
 }
 
+barcode_value_t navigation_barcode_value(char letter, bool unreadable)
+{
+    barcode_value_t value;
+
+    if (unreadable) {
+        value = BARCODE_VALUE_UNREADABLE;
+    } else if ((letter >= 'A') && (letter <= 'D')) {
+        value = (barcode_value_t)(BARCODE_VALUE_A + (letter - 'A'));
+    } else if ((letter >= 'E') && (letter <= 'Z')) {
+        value = BARCODE_VALUE_UNUSED_LETTER;
+    } else {
+        value = BARCODE_VALUE_NONE;
+    }
+
+    return value;
+}
+
 navigation_manoeuvre_t navigation_create_manoeuvre(
     navigation_command_t command)
 {

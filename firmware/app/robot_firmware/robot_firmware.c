@@ -32,6 +32,7 @@
 #include "run_diagnostics.h"
 #include "line_check.h"
 #include "barcode_acquisition.h"
+#include "ir_fault.h"
 #include "barcode_optical.h"
 #include "barcode_signal.h"
 #include "barcode_drive.h"
@@ -378,8 +379,9 @@ static void barcode_drain(bool end)
                  * logging. The course controller applies subsequent outputs. */
                 if(course.phase==COURSE_BRAKE||course.phase==COURSE_FAILED)motors_stop();
             }
-            printf("[BARCODE EVENT] seq=%u letter=%c at_ms=%lu action=%s\n",
-                   stream_logged+1,letter,(unsigned long)(barcode_capture.events[stream_logged].us/1000u),disposition);
+            printf("[BARCODE EVENT] seq=%u letter=%c value=%u at_ms=%lu action=%s\n",
+                   stream_logged+1,letter,(unsigned)navigation_barcode_value(letter,false),
+                   (unsigned long)(barcode_capture.events[stream_logged].us/1000u),disposition);
             if(course_run && !end && (letter=='Y'||letter=='Z')){
                 char action=letter=='Y'?course.config.y_action:course.config.z_action;
                 printf("[ROUTE BARCODE] source=%c selected=%s prior_waiting=%c remaining=%u deferred=%u.\n",
@@ -388,8 +390,10 @@ static void barcode_drain(bool end)
             stream_logged++;
         }
         if(stream_rejected_logged!=barcode_capture.rejected || stream_timeouts_logged!=barcode_capture.timeouts){
-            printf("[BARCODE RETRY] rejected=%lu timeouts=%lu; %s.\n",
+            printf("[BARCODE RETRY] rejected=%lu timeouts=%lu value=%u ir_fault=0x%02x; %s.\n",
                    (unsigned long)barcode_capture.rejected,(unsigned long)barcode_capture.timeouts,
+                   (unsigned)navigation_barcode_value('\0',stream_rejected_logged!=barcode_capture.rejected),
+                   (unsigned)ir_fault_bits(&barcode_capture),
                    barcode_capture.independent_optical?"searching for next complete framed letter":"wait250ms white before rearming");
             printf("[BARCODE PARTIAL] completed_runs=%u expected=29 widths_%s=",barcode_capture.saved_runs,barcode_capture.distance_mode?"sumcounts_x1000":"us");
             for(unsigned i=0;i<barcode_capture.saved_runs;i++)
