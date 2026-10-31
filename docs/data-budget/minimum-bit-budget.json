@@ -1,0 +1,1771 @@
+{
+  "scope": "PROPOSED integrated application storage, not a linked firmware measurement",
+  "source_revisions": {
+    "origin/main": "692f6ed6f278e282541bea0c2ded680693c4f24a",
+    "origin/buddy-5": "4b8ad62b9d14b02dab632fd693661488aae7e747",
+    "origin/buddy3-barcode": "20496abc082b2d133fad09c054af903b6c800fb4",
+    "origin/wifi-buddy-1": "d2643d3d329f46b935ea67811ad2596af623e85c"
+  },
+  "bounds": {
+    "session_ms": 1800000,
+    "counts_per_revolution": 2543,
+    "wheel_diameter_mm": 60,
+    "relative_count_max": 81284,
+    "cumulative_count_max": 12141931
+  },
+  "records": {
+    "mission_snapshot": {
+      "owner": "Safety / Mission",
+      "fields": [
+        {
+          "name": "captured_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "30-minute session in wifi-buddy-1",
+          "status": "derived"
+        },
+        {
+          "name": "mission_state",
+          "minimum": 0,
+          "maximum": 8,
+          "unit": "",
+          "count": 1,
+          "bits_each": 4,
+          "logical_bits": 4,
+          "reason": "nine states in docs/architecture.md",
+          "status": "derived"
+        },
+        {
+          "name": "fault_mask",
+          "minimum": 0,
+          "maximum": 65535,
+          "unit": "",
+          "count": 1,
+          "bits_each": 16,
+          "logical_bits": 16,
+          "reason": "16 independently settable causes, listed in report",
+          "status": "derived"
+        },
+        {
+          "name": "stop_latched",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 42,
+      "bytes": 6,
+      "copies": 1,
+      "note": ""
+    },
+    "motion_snapshot": {
+      "owner": "Buddy 2",
+      "fields": [
+        {
+          "name": "captured_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "30-minute session in wifi-buddy-1",
+          "status": "derived"
+        },
+        {
+          "name": "wheel_speed",
+          "minimum": -500,
+          "maximum": 500,
+          "unit": "mm/s",
+          "count": 2,
+          "bits_each": 10,
+          "logical_bits": 20,
+          "reason": "Tribunal measured-speed proposal; reject invalid/overspeed samples",
+          "status": "provisional physical envelope"
+        },
+        {
+          "name": "cumulative_count",
+          "minimum": -12141931,
+          "maximum": 12141931,
+          "unit": "ticks",
+          "count": 2,
+          "bits_each": 25,
+          "logical_bits": 50,
+          "reason": "ceil(500 mm/s * 1800 s * 2543/(pi*60)); counted travel, not displacement",
+          "status": "provisional physical envelope"
+        },
+        {
+          "name": "motion_state",
+          "minimum": 0,
+          "maximum": 5,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "IDLE/RUNNING/PAUSED/DONE/ABORTED/FAULT",
+          "status": "proposed enum"
+        },
+        {
+          "name": "command_id",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "generation",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "valid",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "moving",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "slipping",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 133,
+      "bytes": 17,
+      "copies": 1,
+      "note": ""
+    },
+    "line_snapshot": {
+      "owner": "Buddy 3",
+      "fields": [
+        {
+          "name": "captured_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "30-minute session in wifi-buddy-1",
+          "status": "derived"
+        },
+        {
+          "name": "raw_adc",
+          "minimum": 0,
+          "maximum": 4095,
+          "unit": "ADC counts",
+          "count": 3,
+          "bits_each": 12,
+          "logical_bits": 36,
+          "reason": "12-bit ADC input; preserve full sensor output",
+          "status": "derived"
+        },
+        {
+          "name": "position",
+          "minimum": -1000,
+          "maximum": 1000,
+          "unit": "normalised",
+          "count": 1,
+          "bits_each": 11,
+          "logical_bits": 11,
+          "reason": "proposed bounded line-position interface",
+          "status": "proposed numeric contract"
+        },
+        {
+          "name": "sensor_pattern",
+          "minimum": 0,
+          "maximum": 7,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "three independently thresholded sensors",
+          "status": "derived"
+        },
+        {
+          "name": "barcode",
+          "minimum": 0,
+          "maximum": 27,
+          "unit": "",
+          "count": 1,
+          "bits_each": 5,
+          "logical_bits": 5,
+          "reason": "NONE, A-Z, UNREADABLE: preserve existing A-Z decoder",
+          "status": "derived"
+        },
+        {
+          "name": "valid",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "junction_candidate",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 78,
+      "bytes": 10,
+      "copies": 1,
+      "note": ""
+    },
+    "terrain_snapshot": {
+      "owner": "Buddy 4",
+      "fields": [
+        {
+          "name": "captured_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "30-minute session in wifi-buddy-1",
+          "status": "derived"
+        },
+        {
+          "name": "pitch_tenths",
+          "minimum": -1800,
+          "maximum": 1800,
+          "unit": "0.1 degree",
+          "count": 1,
+          "bits_each": 12,
+          "logical_bits": 12,
+          "reason": "calibrated tilt is difference of two +/-90 degree angles",
+          "status": "proposed quantisation"
+        },
+        {
+          "name": "rise_mm",
+          "minimum": -5000,
+          "maximum": 5000,
+          "unit": "mm",
+          "count": 1,
+          "bits_each": 14,
+          "logical_bits": 14,
+          "reason": "10 s event * 500 mm/s bounds absolute integrated rise",
+          "status": "proposed numeric contract"
+        },
+        {
+          "name": "highest_rise_mm",
+          "minimum": 0,
+          "maximum": 5000,
+          "unit": "mm",
+          "count": 1,
+          "bits_each": 13,
+          "logical_bits": 13,
+          "reason": "same bound as current completed event",
+          "status": "proposed numeric contract"
+        },
+        {
+          "name": "yaw_tenths",
+          "minimum": -4983,
+          "maximum": 4983,
+          "unit": "0.1 degree/s",
+          "count": 1,
+          "bits_each": 14,
+          "logical_bits": 14,
+          "reason": "(vR-vL)/115 mm; each wheel +/-500 mm/s",
+          "status": "provisional physical envelope"
+        },
+        {
+          "name": "motion_class",
+          "minimum": 0,
+          "maximum": 6,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "seven values in telemetry_motion_state_t",
+          "status": "derived"
+        },
+        {
+          "name": "hump_count",
+          "minimum": 0,
+          "maximum": 3000,
+          "unit": "",
+          "count": 2,
+          "bits_each": 12,
+          "logical_bits": 24,
+          "reason": "count and highest index; 30 min / (300 ms climb + 300 ms descent)",
+          "status": "requires enforcement in integrated state machine"
+        },
+        {
+          "name": "validity",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 6,
+          "bits_each": 1,
+          "logical_bits": 6,
+          "reason": "available/calibrated/pitch/rise/yaw/class",
+          "status": "derived"
+        },
+        {
+          "name": "phase",
+          "minimum": 0,
+          "maximum": 2,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "WAITING/CLIMBING/DESCENDING",
+          "status": "derived"
+        }
+      ],
+      "bits": 109,
+      "bytes": 14,
+      "copies": 1,
+      "note": ""
+    },
+    "obstacle_snapshot": {
+      "owner": "Buddy 5",
+      "fields": [
+        {
+          "name": "captured_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "30-minute session in wifi-buddy-1",
+          "status": "derived"
+        },
+        {
+          "name": "scan_id",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "generation",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "closest_mm",
+          "minimum": 0,
+          "maximum": 1000,
+          "unit": "mm",
+          "count": 1,
+          "bits_each": 10,
+          "logical_bits": 10,
+          "reason": "existing obstacle_data.h",
+          "status": "derived"
+        },
+        {
+          "name": "width_mm",
+          "minimum": 0,
+          "maximum": 1218,
+          "unit": "mm",
+          "count": 1,
+          "bits_each": 11,
+          "logical_bits": 11,
+          "reason": "maximum endpoint chord for 1 m ranges spanning 50..125 degrees; projected width <= chord",
+          "status": "geometry envelope; physical width remains estimated"
+        },
+        {
+          "name": "side_clearance_mm",
+          "minimum": 0,
+          "maximum": 1000,
+          "unit": "mm",
+          "count": 2,
+          "bits_each": 10,
+          "logical_bits": 20,
+          "reason": "same radial range envelope; no-echo remains unavailable",
+          "status": "derived"
+        },
+        {
+          "name": "coverage_edge_index",
+          "minimum": 0,
+          "maximum": 15,
+          "unit": "",
+          "count": 2,
+          "bits_each": 4,
+          "logical_bits": 8,
+          "reason": "first and last covered fine angle",
+          "status": "derived"
+        },
+        {
+          "name": "nearest_index",
+          "minimum": 0,
+          "maximum": 15,
+          "unit": "",
+          "count": 1,
+          "bits_each": 4,
+          "logical_bits": 4,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "status",
+          "minimum": 0,
+          "maximum": 3,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "scan_state",
+          "minimum": 0,
+          "maximum": 4,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "idle/settling/waiting/coarse/fine",
+          "status": "proposed enum"
+        }
+      ],
+      "bits": 115,
+      "bytes": 15,
+      "copies": 1,
+      "note": ""
+    },
+    "barcode_capture": {
+      "owner": "Buddy 3",
+      "fields": [
+        {
+          "name": "stripe_us",
+          "minimum": 0,
+          "maximum": 750000,
+          "unit": "us",
+          "count": 29,
+          "bits_each": 20,
+          "logical_bits": 580,
+          "reason": "existing 750 ms timeout, unchanged microsecond precision",
+          "status": "derived"
+        },
+        {
+          "name": "edge_us",
+          "minimum": 0,
+          "maximum": 1800000000,
+          "unit": "us",
+          "count": 1,
+          "bits_each": 31,
+          "logical_bits": 31,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "last_emit_us",
+          "minimum": 0,
+          "maximum": 1800000000,
+          "unit": "us",
+          "count": 1,
+          "bits_each": 31,
+          "logical_bits": 31,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "run_count",
+          "minimum": 0,
+          "maximum": 29,
+          "unit": "",
+          "count": 1,
+          "bits_each": 5,
+          "logical_bits": 5,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "last_letter",
+          "minimum": 0,
+          "maximum": 26,
+          "unit": "",
+          "count": 1,
+          "bits_each": 5,
+          "logical_bits": 5,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "black_active_armed",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 3,
+          "bits_each": 1,
+          "logical_bits": 3,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 655,
+      "bytes": 82,
+      "copies": 1,
+      "note": ""
+    },
+    "acceleration_filter": {
+      "owner": "Buddy 4",
+      "fields": [
+        {
+          "name": "raw_acceleration",
+          "minimum": -2048,
+          "maximum": 2047,
+          "unit": "sensor LSB",
+          "count": 24,
+          "bits_each": 12,
+          "logical_bits": 288,
+          "reason": "eight samples x three signed 12-bit axes; existing right-shift by four is lossless",
+          "status": "derived"
+        }
+      ],
+      "bits": 288,
+      "bytes": 36,
+      "copies": 1,
+      "note": ""
+    },
+    "terrain_working_state": {
+      "owner": "Buddy 4",
+      "fields": [
+        {
+          "name": "filter_next",
+          "minimum": 0,
+          "maximum": 7,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "filter_count",
+          "minimum": 0,
+          "maximum": 8,
+          "unit": "",
+          "count": 1,
+          "bits_each": 4,
+          "logical_bits": 4,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "level_pitch_hundredths",
+          "minimum": -9000,
+          "maximum": 9000,
+          "unit": "0.01 degree",
+          "count": 1,
+          "bits_each": 15,
+          "logical_bits": 15,
+          "reason": "atan2 pitch +/-90 degrees; <=0.005 degree stored-offset rounding",
+          "status": "proposed quantisation"
+        },
+        {
+          "name": "next_event_phase_level_ms",
+          "minimum": 0,
+          "maximum": 1810000,
+          "unit": "ms",
+          "count": 4,
+          "bits_each": 21,
+          "logical_bits": 84,
+          "reason": "next sample / event start / phase start / level-since; explicit active flags replace zero sentinels",
+          "status": "derived"
+        },
+        {
+          "name": "level_timer_active",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "climb_descent_tenths",
+          "minimum": -1800,
+          "maximum": 1800,
+          "unit": "0.1 degree",
+          "count": 2,
+          "bits_each": 12,
+          "logical_bits": 24,
+          "reason": "",
+          "status": "proposed quantisation"
+        },
+        {
+          "name": "rise_hundredths_mm",
+          "minimum": -500000,
+          "maximum": 500000,
+          "unit": "0.01 mm",
+          "count": 1,
+          "bits_each": 20,
+          "logical_bits": 20,
+          "reason": "10 s x 500 mm/s; <=500 updates x 0.005 mm = 2.5 mm rounding bound",
+          "status": "proposed accumulator precision"
+        }
+      ],
+      "bits": 151,
+      "bytes": 19,
+      "copies": 1,
+      "note": ""
+    },
+    "motion_working_state": {
+      "owner": "Buddy 2",
+      "fields": [
+        {
+          "name": "baseline_count",
+          "minimum": -12141931,
+          "maximum": 12141931,
+          "unit": "ticks",
+          "count": 2,
+          "bits_each": 25,
+          "logical_bits": 50,
+          "reason": "subtract stable cumulative baselines; do not reset counters in the ISR",
+          "status": "derived"
+        },
+        {
+          "name": "relative_count",
+          "minimum": -81284,
+          "maximum": 81284,
+          "unit": "ticks",
+          "count": 2,
+          "bits_each": 18,
+          "logical_bits": 36,
+          "reason": "12 s manoeuvre plus proposed 50 ms stop allowance at +/-500 mm/s; overflow guard required",
+          "status": "provisional physical envelope"
+        },
+        {
+          "name": "previous_control_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "integral_millicounts",
+          "minimum": -2500000,
+          "maximum": 2500000,
+          "unit": "0.001 count",
+          "count": 2,
+          "bits_each": 23,
+          "logical_bits": 46,
+          "reason": "existing integral clamp +/-2500; <=1200 steps x 0.0005 count x Ki 0.000015 is <0.06 PWM tick at 6250 ticks",
+          "status": "proposed quantisation; PI tests required"
+        },
+        {
+          "name": "motor_pwm_level",
+          "minimum": 0,
+          "maximum": 6250,
+          "unit": "PWM ticks",
+          "count": 2,
+          "bits_each": 13,
+          "logical_bits": 26,
+          "reason": "125 MHz / 20 kHz = 6250 levels; pin/check clock before applying",
+          "status": "derived"
+        },
+        {
+          "name": "motor_direction",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 2,
+          "bits_each": 1,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "next_motor_release_ms",
+          "minimum": 0,
+          "maximum": 1800010,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 202,
+      "bytes": 26,
+      "copies": 1,
+      "note": ""
+    },
+    "encoder_isr_wheel": {
+      "owner": "Buddy 2 ISR",
+      "fields": [
+        {
+          "name": "count",
+          "minimum": -12141931,
+          "maximum": 12141931,
+          "unit": "ticks",
+          "count": 1,
+          "bits_each": 25,
+          "logical_bits": 25,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "previous_ab",
+          "minimum": 0,
+          "maximum": 3,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "invalid_seen",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "last_edge_us",
+          "minimum": 0,
+          "maximum": 1800000000,
+          "unit": "us",
+          "count": 1,
+          "bits_each": 31,
+          "logical_bits": 31,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 59,
+      "bytes": 8,
+      "copies": 2,
+      "note": "Allocate 8 B per wheel: count/AB/flag word and edge-time word; snapshot under short ISR-safe exclusion. Diagnostic transition totals need a separate optional debug counter."
+    },
+    "scan_points": {
+      "owner": "Buddy 5",
+      "fields": [
+        {
+          "name": "distance_mm",
+          "minimum": 0,
+          "maximum": 1000,
+          "unit": "mm",
+          "count": 16,
+          "bits_each": 10,
+          "logical_bits": 160,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "range_status",
+          "minimum": 0,
+          "maximum": 3,
+          "unit": "",
+          "count": 16,
+          "bits_each": 2,
+          "logical_bits": 32,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 192,
+      "bytes": 24,
+      "copies": 1,
+      "note": "Index is implicit: angle=50+5*index. 16 x 12 bits = 24 B. A transmitted individual point carries its index and uses 16 bits / 2 B."
+    },
+    "sonar_transaction": {
+      "owner": "Buddy 5 ISR / task",
+      "fields": [
+        {
+          "name": "echo_start_us",
+          "minimum": 0,
+          "maximum": 1800000000,
+          "unit": "us",
+          "count": 1,
+          "bits_each": 31,
+          "logical_bits": 31,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "echo_width_us",
+          "minimum": 0,
+          "maximum": 30000,
+          "unit": "us",
+          "count": 1,
+          "bits_each": 15,
+          "logical_bits": 15,
+          "reason": "existing hard timeout, not the shorter 25 ms design target",
+          "status": "derived"
+        },
+        {
+          "name": "transaction_state",
+          "minimum": 0,
+          "maximum": 3,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "close_readings",
+          "minimum": 0,
+          "maximum": 2,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "point_count",
+          "minimum": 0,
+          "maximum": 16,
+          "unit": "",
+          "count": 1,
+          "bits_each": 5,
+          "logical_bits": 5,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "servo_index",
+          "minimum": 0,
+          "maximum": 15,
+          "unit": "",
+          "count": 1,
+          "bits_each": 4,
+          "logical_bits": 4,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "next_range_settle_deadline_ms",
+          "minimum": 0,
+          "maximum": 1830000,
+          "unit": "ms",
+          "count": 3,
+          "bits_each": 21,
+          "logical_bits": 63,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 122,
+      "bytes": 16,
+      "copies": 1,
+      "note": ""
+    },
+    "mission_working_state": {
+      "owner": "Safety / Mission",
+      "fields": [
+        {
+          "name": "active_id",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "generation",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "lease_deadline_ms",
+          "minimum": 0,
+          "maximum": 1800100,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "last_line_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "previous_buttons",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 2,
+          "bits_each": 1,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "last_seen_side",
+          "minimum": 0,
+          "maximum": 2,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "line_ever_seen",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "recovery_attempt",
+          "minimum": 0,
+          "maximum": 3,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "proposed maximum three attempts; each still needs a time/distance bound",
+          "status": "proposed enforced policy"
+        }
+      ],
+      "bits": 85,
+      "bytes": 11,
+      "copies": 1,
+      "note": ""
+    },
+    "wheel_history": {
+      "owner": "Buddy 1",
+      "fields": [
+        {
+          "name": "speed",
+          "minimum": -500,
+          "maximum": 500,
+          "unit": "mm/s",
+          "count": 26,
+          "bits_each": 10,
+          "logical_bits": 260,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "capture_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 26,
+          "bits_each": 21,
+          "logical_bits": 546,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "head",
+          "minimum": 0,
+          "maximum": 25,
+          "unit": "",
+          "count": 1,
+          "bits_each": 5,
+          "logical_bits": 5,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "count",
+          "minimum": 0,
+          "maximum": 26,
+          "unit": "",
+          "count": 1,
+          "bits_each": 5,
+          "logical_bits": 5,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "recovery_pending",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 1,
+          "bits_each": 1,
+          "logical_bits": 1,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 817,
+      "bytes": 103,
+      "copies": 2,
+      "note": "Existing capacity and behaviour preserved; 26 x 31 + 11 = 817 bits -> 103 B each. Existing word-array implementation is 108 B each on ARM."
+    },
+    "comm_working_state": {
+      "owner": "Buddy 1",
+      "fields": [
+        {
+          "name": "state",
+          "minimum": 0,
+          "maximum": 5,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "publish_kind",
+          "minimum": 0,
+          "maximum": 3,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "flags",
+          "minimum": 0,
+          "maximum": 1,
+          "unit": "",
+          "count": 11,
+          "bits_each": 1,
+          "logical_bits": 11,
+          "reason": "eleven booleans in comm_runtime_t",
+          "status": "derived"
+        },
+        {
+          "name": "sequence",
+          "minimum": 0,
+          "maximum": 360000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 19,
+          "logical_bits": 19,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "absolute_deadlines",
+          "minimum": 0,
+          "maximum": 1830000,
+          "unit": "ms",
+          "count": 6,
+          "bits_each": 21,
+          "logical_bits": 126,
+          "reason": "deadline/retry/online-since/status/telemetry timestamps plus receive expiry",
+          "status": "derived"
+        },
+        {
+          "name": "retry_stage",
+          "minimum": 0,
+          "maximum": 5,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "1,2,4,8,16,30 second backoff: six values",
+          "status": "derived"
+        },
+        {
+          "name": "current_and_pending_period",
+          "minimum": 200,
+          "maximum": 5000,
+          "unit": "ms",
+          "count": 2,
+          "bits_each": 13,
+          "logical_bits": 26,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "subscription_count",
+          "minimum": 0,
+          "maximum": 2,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "reconnect_count",
+          "minimum": 0,
+          "maximum": 1801,
+          "unit": "",
+          "count": 1,
+          "bits_each": 11,
+          "logical_bits": 11,
+          "reason": "one-second minimum backoff during 30 min plus initial attempt",
+          "status": "derived"
+        },
+        {
+          "name": "dropped_count",
+          "minimum": 0,
+          "maximum": 837000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 20,
+          "logical_bits": 20,
+          "reason": "proposed <=465 producer records/s x 1800 s; reject above envelope",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "last_error",
+          "minimum": 0,
+          "maximum": 9,
+          "unit": "",
+          "count": 1,
+          "bits_each": 4,
+          "logical_bits": 4,
+          "reason": "actual comm_fail codes 1..9 and zero",
+          "status": "derived"
+        },
+        {
+          "name": "task_ticks",
+          "minimum": 0,
+          "maximum": 360000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 19,
+          "logical_bits": 19,
+          "reason": "at most one release per 5 ms",
+          "status": "derived"
+        },
+        {
+          "name": "event_head",
+          "minimum": 0,
+          "maximum": 15,
+          "unit": "",
+          "count": 1,
+          "bits_each": 4,
+          "logical_bits": 4,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "event_count_and_peak",
+          "minimum": 0,
+          "maximum": 16,
+          "unit": "",
+          "count": 2,
+          "bits_each": 5,
+          "logical_bits": 10,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "boot_id",
+          "minimum": 0,
+          "maximum": 4294967295,
+          "unit": "",
+          "count": 1,
+          "bits_each": 32,
+          "logical_bits": 32,
+          "reason": "retain existing get_rand_32 full-domain boot identity",
+          "status": "derived"
+        },
+        {
+          "name": "rx_received_and_expected",
+          "minimum": 0,
+          "maximum": 12,
+          "unit": "bytes",
+          "count": 2,
+          "bits_each": 4,
+          "logical_bits": 8,
+          "reason": "new largest binary command size; reject bigger frames before copying",
+          "status": "proposed protocol"
+        }
+      ],
+      "bits": 300,
+      "bytes": 38,
+      "copies": 1,
+      "note": ""
+    },
+    "motion_command": {
+      "owner": "Safety -> Motion",
+      "fields": [
+        {
+          "name": "operation",
+          "minimum": 0,
+          "maximum": 7,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "NONE/FORWARD/REVERSE/LEFT/RIGHT/UTURN/PAUSE/STOP; parse failure is a separate result",
+          "status": "derived"
+        },
+        {
+          "name": "distance_mm",
+          "minimum": 0,
+          "maximum": 1000,
+          "unit": "mm",
+          "count": 1,
+          "bits_each": 10,
+          "logical_bits": 10,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "speed_mm_s",
+          "minimum": -150,
+          "maximum": 150,
+          "unit": "mm/s",
+          "count": 1,
+          "bits_each": 9,
+          "logical_bits": 9,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "angle_deg",
+          "minimum": 0,
+          "maximum": 180,
+          "unit": "degree",
+          "count": 1,
+          "bits_each": 8,
+          "logical_bits": 8,
+          "reason": "retain arbitrary bypass turns, not only barcode 90/180; direction in operation",
+          "status": "proposed precision"
+        },
+        {
+          "name": "id",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "generation",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "issued_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "",
+          "status": "derived"
+        }
+      ],
+      "bits": 87,
+      "bytes": 11,
+      "copies": 1,
+      "note": ""
+    },
+    "scan_command": {
+      "owner": "Safety -> Scan",
+      "fields": [
+        {
+          "name": "id",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "generation",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "captured_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "30-minute session in wifi-buddy-1",
+          "status": "derived"
+        }
+      ],
+      "bits": 57,
+      "bytes": 8,
+      "copies": 1,
+      "note": ""
+    },
+    "event_record": {
+      "owner": "Subsystems -> Safety / Comms",
+      "fields": [
+        {
+          "name": "kind",
+          "minimum": 0,
+          "maximum": 7,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "barcode/hump/scan-point/profile/fault/motion-done/line-lost/line-found",
+          "status": "derived"
+        },
+        {
+          "name": "source",
+          "minimum": 0,
+          "maximum": 4,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "captured_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "30-minute session in wifi-buddy-1",
+          "status": "derived"
+        },
+        {
+          "name": "id",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "generation",
+          "minimum": 0,
+          "maximum": 180000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 18,
+          "logical_bits": 18,
+          "reason": "one allocation per 10 ms Safety release; stop before session expiry",
+          "status": "proposed enforced policy"
+        },
+        {
+          "name": "variant_payload",
+          "minimum": 0,
+          "maximum": 35184372088831,
+          "unit": "",
+          "count": 1,
+          "bits_each": 45,
+          "logical_bits": 45,
+          "reason": "largest variant: 10-bit closest + 11-bit width + two 10-bit clearances + four validity bits; other variants zero unused bits",
+          "status": "proposed discriminated union"
+        }
+      ],
+      "bits": 108,
+      "bytes": 14,
+      "copies": 1,
+      "note": ""
+    },
+    "mqtt_header": {
+      "owner": "Buddy 1 -> subscriber",
+      "fields": [
+        {
+          "name": "type",
+          "minimum": 0,
+          "maximum": 7,
+          "unit": "",
+          "count": 1,
+          "bits_each": 3,
+          "logical_bits": 3,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "boot_id",
+          "minimum": 0,
+          "maximum": 4294967295,
+          "unit": "",
+          "count": 1,
+          "bits_each": 32,
+          "logical_bits": 32,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "sequence",
+          "minimum": 0,
+          "maximum": 360000,
+          "unit": "",
+          "count": 1,
+          "bits_each": 19,
+          "logical_bits": 19,
+          "reason": "",
+          "status": "derived"
+        },
+        {
+          "name": "captured_ms",
+          "minimum": 0,
+          "maximum": 1800000,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 21,
+          "logical_bits": 21,
+          "reason": "30-minute session in wifi-buddy-1",
+          "status": "derived"
+        }
+      ],
+      "bits": 75,
+      "bytes": 10,
+      "copies": 1,
+      "note": "Version is fixed by a /v1/ topic, not repeated as an arbitrary integer. Explicit bytes and lengths, never strlen on binary data."
+    },
+    "mqtt_command_payload": {
+      "owner": "Subscriber -> Buddy 1",
+      "fields": [
+        {
+          "name": "kind",
+          "minimum": 0,
+          "maximum": 2,
+          "unit": "",
+          "count": 1,
+          "bits_each": 2,
+          "logical_bits": 2,
+          "reason": "STATUS / PERIOD / STOP; no remote steering",
+          "status": "derived"
+        },
+        {
+          "name": "period_offset",
+          "minimum": 0,
+          "maximum": 4800,
+          "unit": "ms",
+          "count": 1,
+          "bits_each": 13,
+          "logical_bits": 13,
+          "reason": "actual 200..5000 interval; encode period-200",
+          "status": "derived"
+        }
+      ],
+      "bits": 15,
+      "bytes": 2,
+      "copies": 1,
+      "note": ""
+    }
+  },
+  "arm_abi_current_types": {
+    "telemetry_wheel_history_t": 108,
+    "telemetry_mission_t": 12,
+    "telemetry_motion_t": 28,
+    "telemetry_line_t": 16,
+    "telemetry_terrain_t": 20,
+    "telemetry_obstacle_t": 28,
+    "telemetry_snapshot_t": 104,
+    "telemetry_sample_t": 32,
+    "telemetry_event_t": 20,
+    "command_request_t": 8,
+    "command_frame_t": 44,
+    "comm_config_t": 241,
+    "comm_status_t": 32,
+    "barcode_reader_t": 88,
+    "navigation_manoeuvre_t": 12,
+    "terrain_status_t": 16
+  },
+  "allocations": [
+    {
+      "name": "mission_snapshot",
+      "copies": 1,
+      "bytes_each": 6,
+      "total": 6,
+      "allocation": "application static"
+    },
+    {
+      "name": "motion_snapshot",
+      "copies": 1,
+      "bytes_each": 17,
+      "total": 17,
+      "allocation": "application static"
+    },
+    {
+      "name": "line_snapshot",
+      "copies": 1,
+      "bytes_each": 10,
+      "total": 10,
+      "allocation": "application static"
+    },
+    {
+      "name": "terrain_snapshot",
+      "copies": 1,
+      "bytes_each": 14,
+      "total": 14,
+      "allocation": "application static"
+    },
+    {
+      "name": "obstacle_snapshot",
+      "copies": 1,
+      "bytes_each": 15,
+      "total": 15,
+      "allocation": "application static"
+    },
+    {
+      "name": "barcode_capture",
+      "copies": 1,
+      "bytes_each": 82,
+      "total": 82,
+      "allocation": "application static"
+    },
+    {
+      "name": "acceleration_filter",
+      "copies": 1,
+      "bytes_each": 36,
+      "total": 36,
+      "allocation": "application static"
+    },
+    {
+      "name": "terrain_working_state",
+      "copies": 1,
+      "bytes_each": 19,
+      "total": 19,
+      "allocation": "application static"
+    },
+    {
+      "name": "motion_working_state",
+      "copies": 1,
+      "bytes_each": 26,
+      "total": 26,
+      "allocation": "application static"
+    },
+    {
+      "name": "encoder_isr_wheel",
+      "copies": 2,
+      "bytes_each": 8,
+      "total": 16,
+      "allocation": "application static"
+    },
+    {
+      "name": "scan_points",
+      "copies": 1,
+      "bytes_each": 24,
+      "total": 24,
+      "allocation": "application static"
+    },
+    {
+      "name": "sonar_transaction",
+      "copies": 1,
+      "bytes_each": 16,
+      "total": 16,
+      "allocation": "application static"
+    },
+    {
+      "name": "mission_working_state",
+      "copies": 1,
+      "bytes_each": 11,
+      "total": 11,
+      "allocation": "application static"
+    },
+    {
+      "name": "wheel_history",
+      "copies": 2,
+      "bytes_each": 103,
+      "total": 206,
+      "allocation": "application static"
+    },
+    {
+      "name": "comm_working_state",
+      "copies": 1,
+      "bytes_each": 38,
+      "total": 38,
+      "allocation": "application static"
+    },
+    {
+      "name": "motion_command_MBF",
+      "copies": 4,
+      "bytes_each": 16,
+      "total": 64,
+      "allocation": "inside kernel pool"
+    },
+    {
+      "name": "scan_command_MBF",
+      "copies": 4,
+      "bytes_each": 12,
+      "total": 48,
+      "allocation": "inside kernel pool"
+    },
+    {
+      "name": "event_record_MBF",
+      "copies": 8,
+      "bytes_each": 20,
+      "total": 160,
+      "allocation": "inside kernel pool"
+    },
+    {
+      "name": "network_event_ring",
+      "copies": 16,
+      "bytes_each": 14,
+      "total": 224,
+      "allocation": "application static"
+    },
+    {
+      "name": "network_configuration",
+      "copies": 1,
+      "bytes_each": 241,
+      "total": 241,
+      "allocation": "application static"
+    },
+    {
+      "name": "topic_scratch",
+      "copies": 1,
+      "bytes_each": 80,
+      "total": 80,
+      "allocation": "application static"
+    },
+    {
+      "name": "persistent_will_topic",
+      "copies": 1,
+      "bytes_each": 80,
+      "total": 80,
+      "allocation": "application static"
+    },
+    {
+      "name": "client_id",
+      "copies": 1,
+      "bytes_each": 48,
+      "total": 48,
+      "allocation": "application static"
+    },
+    {
+      "name": "mqtt_output",
+      "copies": 1,
+      "bytes_each": 69,
+      "total": 69,
+      "allocation": "application static"
+    },
+    {
+      "name": "mqtt_input",
+      "copies": 1,
+      "bytes_each": 12,
+      "total": 12,
+      "allocation": "application static"
+    },
+    {
+      "name": "kernel_handles",
+      "copies": 1,
+      "bytes_each": 60,
+      "total": 60,
+      "allocation": "application static"
+    }
+  ],
+  "application_static_bytes": 1352,
+  "application_field_allocation_bytes": 1350,
+  "aggregate_alignment_bytes": 2,
+  "kernel_message_buffers_bytes": 272,
+  "mqtt_snapshot_bytes": 69,
+  "mqtt_command_bytes": 12,
+  "checked_field_instances": 299
+}

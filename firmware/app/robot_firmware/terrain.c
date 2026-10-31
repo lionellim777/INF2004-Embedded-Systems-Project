@@ -46,15 +46,15 @@ static float peak_descent;
 static bool write_register(uint8_t reg, uint8_t value)
 {
     uint8_t message[2] = {reg, value};
-    return i2c_write_blocking(i2c0, ACCEL_ADDRESS, message, 2, false) == 2;
+    return i2c_write_timeout_us(i2c0, ACCEL_ADDRESS, message, 2, false, 2000u) == 2;
 }
 
 static bool read_registers(uint8_t reg, uint8_t *data, size_t length)
 {
-    if (i2c_write_blocking(i2c0, ACCEL_ADDRESS, &reg, 1, true) != 1) {
+    if (i2c_write_timeout_us(i2c0, ACCEL_ADDRESS, &reg, 1, true, 2000u) != 1) {
         return false;
     }
-    return i2c_read_blocking(i2c0, ACCEL_ADDRESS, data, length, false) ==
+    return i2c_read_timeout_us(i2c0, ACCEL_ADDRESS, data, length, false, 2000u) ==
            (int)length;
 }
 
@@ -128,6 +128,7 @@ bool terrain_calibrate(void)
         return false;
     }
     status.calibrated = false;
+    status.pitch_valid = false;
     printf("Terrain calibration: keep the car level and still for 2 seconds.\n");
     acceleration_t first;
     acceleration_t second;
@@ -193,6 +194,8 @@ void terrain_poll(void)
     acceleration_t reading;
     if (!read_acceleration(&reading)) {
         status.calibrated = false;
+        status.pitch_valid = false;
+        ++status.read_errors;
         printf("Terrain sensor read failed; hump monitoring paused.\n");
         return;
     }
@@ -217,6 +220,9 @@ void terrain_poll(void)
 
     /* The mounted GY-511 gives negative pitch when the front is raised. */
     float tilt = -(pitch(&average) - level_pitch);
+    status.current_pitch_deg = tilt;
+    status.pitch_valid = true;
+    ++status.pitch_sequence;
     const float threshold = 5.0f;
     const bool level = fabsf(tilt) < 2.0f;
 
