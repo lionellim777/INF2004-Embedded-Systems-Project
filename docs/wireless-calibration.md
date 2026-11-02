@@ -1,3 +1,9 @@
+> v5.42 moving builds run the radio/HTTP service on core 1 and motor/sensor/GP20 control on core 0. Shared logs and commands use short mutex-protected copies; network calls never hold that mutex. The 150 ms motor-service guard remains active. Browser updates/Stop may be delayed by a radio stall; GP20 is the local stop. Stationary diagnostics retain foreground networking. The right-turn trim applies only to obstacle bypass (1045 counts per wheel).
+
+## v5.47: obstacle test
+
+Use **Follow track + avoid obstacle** for the new right-side bypass mode. Barcode reading/actions are disabled only in that mode. Prepare run, then GP20 starts after the stopped countdown. Use a straight floor section with ample right-side space; do not use a table. It deliberately stops, scans and turns to inspect the side before trying to return. See [setup, limits and expected logs](testing/obstacle-v5_35-bypass.md). One v5.46 bend-bypass run successfully resumed following. v5.47 adds conditional faster cruise on stable tape and clear transit legs; faster operation and the full straight-strip bypass remain pending physical tests. The [release folder](../firmware/releases/README.md) includes both builds. Historical instructions below describe earlier calibration versions.
+
 # Wireless calibration — v5.4, 28 October 2026
 
 > Current next test: use the separate **v5.5 stationary diagnostic** on the short
