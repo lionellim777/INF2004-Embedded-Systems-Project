@@ -1,0 +1,8 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_46_wireless.uf2",
+  "bytes": 964096,
+  "blocks": 1883,
+  "sha256": "cf4e38954fca82ed0cede811d1253e858a0c420b4829128beced7762bb358e28",
+  "physical_validation": "One user-recorded bend-obstacle bypass completed and resumed line following on 2 November 2026. Full straight-strip bypass remains pending.",
+  "software_checks": "Sanitized obstacle and perpendicular geometry regressions; centred production-main scenarios; wireless core, transport and concurrent-radio tests; strict Pico W build. UF2 family, sequence, address and version reverified at publication."
+}

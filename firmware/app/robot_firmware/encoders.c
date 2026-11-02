@@ -18,8 +18,9 @@ static uint8_t previous_state[2];
 
 static uint8_t read_state(uint pin_a, uint pin_b)
 {
-    return (uint8_t)((gpio_get(pin_a) ? 2u : 0u) |
-                     (gpio_get(pin_b) ? 1u : 0u));
+    /* Read A/B from the same instant, rather than two separate GPIO reads. */
+    uint32_t pins=gpio_get_all();
+    return (uint8_t)(((pins>>pin_a)&1u)*2u | ((pins>>pin_b)&1u));
 }
 
 static void encoder_gpio_callback(uint gpio, uint32_t events)

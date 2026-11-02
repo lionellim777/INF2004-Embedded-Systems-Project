@@ -12,6 +12,7 @@ static void new_segment(course_control_t *c,int32_t l,int32_t r,uint64_t now)
     float left=barcode_clamp(0.157f*0.5f+c->drive.left_integral,0.12f,0.22f);
     float right=barcode_clamp(0.142f*0.5f+c->drive.right_integral,0.14f,0.22f);
     c->segment_l=l;c->segment_r=r;c->segment_us=now;
+    c->steady_line_us=0;
     c->drive=(barcode_progress_t){.center_profile=ROBOCAR_CENTER_LINE,
         .launch_left_pwm=left,.launch_right_pwm=right};
 }
@@ -33,6 +34,8 @@ void course_center_level(course_control_t *c,int32_t level)
 }
 void course_set_center_reference(course_control_t *c,int32_t level)
 {c->center_reference=level<400?400:level>1000?1000:level;}
+void course_set_cruise_limit(course_control_t *c,unsigned cps)
+{c->cruise_limit_cps=cps<600?600:cps>800?800:cps;}
 void course_note_barcode_activity(course_control_t *c,uint64_t now)
 {c->barcode_seen=true;c->barcode_activity_us=now;}
 #if ROBOCAR_CENTER_LINE
@@ -85,7 +88,10 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
 {
     if(c->phase==COURSE_FAILED)return stopped(c,c->fault);
     if(now<c->last_us || now-c->last_us>250000u)return stopped(c,"COURSE_CONTROL_LATE");
-    c->last_us=now;
+    uint64_t step_us=now-c->last_us;c->last_us=now;
+#if !ROBOCAR_CENTER_LINE
+    (void)step_us;
+#endif
     if(enc.left_invalid!=c->reference.start.left_invalid || enc.right_invalid!=c->reference.start.right_invalid)
         return stopped(c,"COURSE_ENCODER_FAULT");
     int32_t l=motion_left_position(&c->reference,enc),r=motion_right_position(&c->reference,enc);
@@ -94,6 +100,10 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         return stopped(c,"COURSE_TRAVEL_LIMIT");
 #if ROBOCAR_CENTER_LINE
     if(c->center_level_valid)ir.left=c->center_visible;
+    if(c->phase!=COURSE_FOLLOW||c->center_level<c->center_reference*90/100||
+       ir.right||c->cruise_limit_cps<=600){
+        c->steady_line_us=0;c->drive.center_cruise_cps=600;
+    }
 #endif
     bool both=ir.left&&ir.right;
     float center_steer=0;
@@ -255,6 +265,18 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         c->drive.balance_offset=(l-c->segment_l)-(r-c->segment_r);
     }
     c->drive.center_steer=(c->phase==COURSE_FOLLOW && !both)?center_steer:0;
+#if ROBOCAR_CENTER_LINE
+    bool steady=c->phase==COURSE_FOLLOW&&!both&&!ir.right&&c->center_level_valid&&
+        c->center_level>=c->center_reference*90/100&&!c->center_trim.active&&
+        c->drive.launch_complete&&c->cruise_limit_cps>600;
+    if(steady){
+        if(!c->steady_line_us)c->steady_line_us=now;
+        if(c->drive.center_cruise_cps<600)c->drive.center_cruise_cps=600;
+        if(now-c->steady_line_us>=1000000u)
+            c->drive.center_cruise_cps=barcode_clamp(c->drive.center_cruise_cps+
+                200.0f*(float)step_us/1000000.0f,600.0f,(float)c->cruise_limit_cps);
+    }else {c->steady_line_us=0;c->drive.center_cruise_cps=600;}
+#endif
     line_check_output_t out=barcode_drive_step_profile(ROBOCAR_CENTER_LINE?(ir_roles_t){0}:ir,now-c->segment_us,
         l-c->segment_l,r-c->segment_r,false,&c->drive,true,true);
     if(out.stop)return stopped(c,out.state);

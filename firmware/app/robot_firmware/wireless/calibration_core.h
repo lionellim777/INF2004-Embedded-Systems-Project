@@ -5,7 +5,8 @@
 #include <stdint.h>
 #include "course_config.h"
 
-/* Single foreground owner. Never call from an ISR or a second core. */
+/* Not internally thread safe. Transport serializes all access across cores.
+ * Never call from an ISR. */
 #define CAL_LOG_CAPACITY 16384u
 #define CAL_LINE_CAPACITY 768u
 typedef struct {

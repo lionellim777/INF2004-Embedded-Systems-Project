@@ -15,7 +15,7 @@ if(ROBOCAR_STATIONARY_BARCODE)
     target_compile_definitions(robot_firmware PRIVATE ROBOCAR_STATIONARY_BARCODE=1)
 else()
     add_executable(robot_firmware
-        robot_firmware.c terrain.c encoders.c motion_control.c run_diagnostics.c course_control.c
+        robot_firmware.c terrain.c encoders.c motion_control.c run_diagnostics.c course_control.c obstacle_bypass.c
         barcode_decoder.c barcode_reader.c barcode_acquisition.c navigation_commands.c)
 endif()
 
@@ -44,6 +44,10 @@ if(ROBOCAR_WIRELESS_CALIBRATION)
     )
     target_compile_definitions(robot_firmware PRIVATE ROBOCAR_WIRELESS_CALIBRATION=1)
     target_link_libraries(robot_firmware pico_cyw43_arch_lwip_poll pico_rand)
+    if(NOT ROBOCAR_STATIONARY_BARCODE)
+        target_compile_definitions(robot_firmware PRIVATE ROBOCAR_WIFI_CORE1=1)
+        target_link_libraries(robot_firmware pico_multicore)
+    endif()
     pico_configure_ip4_address(robot_firmware PRIVATE CYW43_DEFAULT_IP_AP_ADDRESS 192.168.4.1)
 endif()
 

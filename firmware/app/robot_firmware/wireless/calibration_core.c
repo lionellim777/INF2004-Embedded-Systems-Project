@@ -38,7 +38,7 @@ void calibration_capture(calibration_core_t *c, const char *data, size_t length)
                     memcpy(c->trace[0], c->line, c->line_length + 1u);
                 } else if (strncmp(c->line, "[SCAN EDGES 2]", 14u) == 0) {
                     memcpy(c->trace[1], c->line, c->line_length + 1u);
-                } else if (strncmp(c->line, "[COURSE RESULT]", 15u) == 0) {
+                } else if (strncmp(c->line, "[COURSE RESULT]", 15u) == 0 || strncmp(c->line,"[AVOID RESULT]",14u)==0) {
                     memcpy(c->course_result,c->line,c->line_length+1u);
                 } else if (strncmp(c->line, "[TIMING]", 8u) == 0) {
                     memcpy(c->timing, c->line, c->line_length + 1u);
@@ -68,7 +68,7 @@ bool calibration_command(calibration_core_t *c, char command)
 {
     if (command == 'x') { c->pending = 'x'; return true; }
     if (!c->selection_allowed || c->pending != 0) { return false; }
-    if (command != 'f' && command != 'l' && command != 'r' && command != 'u' && command != 't' && command != 'b' && command != 'c' && command != 's' && command != 'v') { return false; }
+    if (command != 'f' && command != 'l' && command != 'r' && command != 'u' && command != 't' && command != 'b' && command != 'c' && command != 's' && command != 'v' && command != 'o') { return false; }
     c->pending = command;
     return true;
 }

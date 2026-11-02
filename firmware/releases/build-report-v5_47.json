@@ -1,0 +1,8 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_47_wireless.uf2",
+  "bytes": 965632,
+  "blocks": 1886,
+  "sha256": "e4a109998344a6222e8ee952b2175d1e5c5468793711590ceee8fae9a6d6ea9c",
+  "physical_validation": "Pending: conditional higher-speed operation and full straight-strip bypass. No physical run or flash by agent.",
+  "software_checks": "Sanitized adaptive-speed, obstacle and geometry regressions; 44 centred production-main scenarios; shared drive, motion, recovery and barcode tests; wireless core, transport and concurrent-radio tests; strict Pico W build; embedded HTML verified. UF2 family, sequence, address and version reverified at publication."
+}

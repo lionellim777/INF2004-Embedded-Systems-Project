@@ -44,6 +44,7 @@ int main(void)
     assert(!c.barcode[0] && !c.trace[0][0] && !c.trace[1][0]);
     assert(!calibration_command(&c,'f'));
     c.selection_allowed=true;
+    assert(calibration_command(&c,'o'));assert(calibration_take_command(&c)=='o');
     assert(calibration_command(&c,'v'));assert(calibration_take_command(&c)=='v');
     const char *optical="[OPTICAL RESULT] samples=5000 sampling_ok=1\n";
     calibration_capture(&c,optical,strlen(optical));assert(strcmp(c.optical_result,optical)==0);
@@ -77,6 +78,8 @@ int main(void)
     c.selection_allowed=false;assert(!calibration_course_command(&c,"/mission/b/l/120"));
     const char *course_result="[COURSE RESULT] encounters=3 turns=1\n";
     calibration_capture(&c,course_result,strlen(course_result));assert(strcmp(c.course_result,course_result)==0);
+    const char *avoid_result="[AVOID RESULT] detected=1 completed=1 outcome=BUTTON_STOP\n";
+    calibration_capture(&c,avoid_result,strlen(avoid_result));assert(strcmp(c.course_result,avoid_result)==0);
     calibration_capture(&c,"[MOTION GO] next\n",17);assert(!c.course_result[0]);
     assert(calibration_parse_cursor("0",&value)&&value==0);
     assert(calibration_parse_cursor("4294967295",&value)&&value==UINT32_MAX);

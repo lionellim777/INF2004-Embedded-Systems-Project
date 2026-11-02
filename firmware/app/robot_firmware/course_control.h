@@ -21,6 +21,8 @@ typedef struct {
     center_search_t center_search;
     center_trim_t center_trim;
     int32_t center_reference;
+    unsigned cruise_limit_cps;
+    uint64_t steady_line_us;
     unsigned trim_attempts,trim_reversals,trim_no_responses;
     bool center_search_started;
     bool center_level_valid,center_visible,barcode_seen;
@@ -49,5 +51,8 @@ bool course_reads_barcodes(const course_control_t *c);
 void course_center_level(course_control_t *c,int32_t level);
 /* Set once from the stopped countdown; never adjusted by running samples. */
 void course_set_center_reference(course_control_t *c,int32_t level);
+/* Optional 600..800 cps straight cruise. Default remains 600; caller supplies
+ * clearance permission. Optical stability and recovery always take priority. */
+void course_set_cruise_limit(course_control_t *c,unsigned cps);
 void course_note_barcode_activity(course_control_t *c,uint64_t now);
 #endif
