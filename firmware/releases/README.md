@@ -1,8 +1,9 @@
-# Wireless calibration checkpoint v5.55
+# Wireless calibration checkpoint v5.56
 
 | Build | Firmware | Evidence |
 | --- | --- | --- |
-| v5.55 — latest | [Download UF2](robocar_motion_integration_v5_55_wireless.uf2) | Spatial ink check, approach-heading alignment and bounded endpoint assistance; physical retest pending. [Verification record](build-report-v5_55.json) |
+| v5.56 — latest | [Download UF2](robocar_motion_integration_v5_56_wireless.uf2) | Right-first rejoin, scan-planned departure, side checks and faster bounded following. Physical validation pending. [Verification record](build-report-v5_56.json) |
+| v5.55 — previous | [Download UF2](robocar_motion_integration_v5_55_wireless.uf2) | Spatial ink check, approach-heading alignment and bounded endpoint assistance; physical retest pending. [Verification record](build-report-v5_55.json) |
 | v5.54 — previous | [Download UF2](robocar_motion_integration_v5_54_wireless.uf2) | Recovery-direction handoff and slower, wider bounded rejoin verification; software checks passed, physical retest pending. [Verification record](build-report-v5_54.json) |
 | v5.53 — previous | [Download UF2](robocar_motion_integration_v5_53_wireless.uf2) | 25 cm initial detour, completed-no-return tape rejoin, loaded-turn effort and retained failure reports. Straight-strip bypass observed complete; bend rejoin subsequently lost tape. [Verification record](build-report-v5_53.json) |
 | v5.47 — historical | [Download UF2](robocar_motion_integration_v5_47_wireless.uf2) | Conditional faster cruise and transit; software checks passed, physical speed and straight-strip bypass tests pending. [Verification record](build-report-v5_47.json) |
@@ -18,12 +19,12 @@ open http://192.168.4.1/, select **Follow track + avoid obstacle**, prepare the 
 then use GP20 to start/stop. See [wireless instructions](../../docs/wireless-calibration.md)
 and [obstacle test procedure](../../docs/testing/obstacle-v5_35-bypass.md).
 
-v5.55 retains the 25 cm initial lateral target, 20 cm obstacle detection and
-bounded turn assistance. It checks 60 mm across candidate ink before accepting
-a crossing, chooses alignment towards the approach heading and can assist a
-loaded wheel near a slow forward endpoint up to 32% drive. Stall, sonar and
-travel limits remain. Recovery-direction memory and slower verification from
-v5.54 are retained. See the test procedure for acceptance and rejection markers.
+v5.56 restores right-first alignment and scans before choosing the exit angle.
+The leftmost servo check is followed by an optional10cm margin and full side
+confirmation. Unknown right edges use the previous90-degree/25cm departure.
+Known-edge plans include beam and chassis margins and may require a wider path.
+Stable straight cruise can reach1000cps; rolling bend corrections remain slower
+and bounded. Speed, obstacle clearance and rejoin behaviour need physical tests.
 
 The latest build is not physically validated. Half-size barcode reliability,
 the final mission and the µT-Kernel port remain incomplete. Barcodes are disabled

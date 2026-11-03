@@ -203,7 +203,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head><body>
 <div class="wrap">
-<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.55</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
+<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.56</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
 <main class="grid">
 
 <section id="controls" class="board" aria-label="Test controls">
@@ -320,7 +320,7 @@ const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 let lastData=0;
 function append(text,snapshot){if(snapshot)inspectSnapshot(text);else inspectOptical(text);transcript+=text;if(transcript.length>1048576)transcript='[BROWSER LOG TRIMMED: earlier text removed]\n'+transcript.slice(-1000000);el('log').textContent=transcript.slice(-50000);el('log').scrollTop=el('log').scrollHeight;}
 let opticalLines='',opticalBins=[];
-function updateMode(){const mode=el('test-mode').value;el('course-options').hidden=mode!=='course';el('optical-panel').hidden=mode!=='v';el('prepare').textContent=mode==='v'?'Record sensor · 5 seconds':'Prepare run';el('test-help').textContent=mode==='v'?'Keep the car still. Start on white, then slide the whole barcode underneath once during the five-second recording, finishing on white.':mode==='course'?'Centre GP28 over the tape; keep GP27 beside it. Default: follow the track, go straight through crossings and record barcodes.':mode==='o'?'Centre GP28 over the tape. Slow right-side bypass. It checks tape found during the detour and resumes following when the path ahead is clear. Otherwise, it continues around the object. Barcodes are disabled. Test on the floor with clear space to the right.':'Place the car on a clear, flat surface for the selected movement.';el('start-help').textContent=mode==='v'?'No GP20 start needed. GP20 cancels this sensor test.':'After confirmation, press GP20 on the car. Hold it still through the 3-second countdown. GP20 also stops it.';}
+function updateMode(){const mode=el('test-mode').value;el('course-options').hidden=mode!=='course';el('optical-panel').hidden=mode!=='v';el('prepare').textContent=mode==='v'?'Record sensor · 5 seconds':'Prepare run';el('test-help').textContent=mode==='v'?'Keep the car still. Start on white, then slide the whole barcode underneath once during the five-second recording, finishing on white.':mode==='course'?'Centre GP28 over the tape; keep GP27 beside it. Default: follow the track, go straight through crossings and record barcodes.':mode==='o'?'Centre GP28 over the tape. Scans and plans a right-side bypass, checks clearance, then rejoins right-first. Faster on stable straights; slower through bends. Barcodes are disabled. Test on the floor with clear space to the right.':'Place the car on a clear, flat surface for the selected movement.';el('start-help').textContent=mode==='v'?'No GP20 start needed. GP20 cancels this sensor test.':'After confirmation, press GP20 on the car. Hold it still through the 3-second countdown. GP20 also stops it.';}
 el('test-mode').onchange=()=>{updateMode();drawOptical();};
 window.addEventListener('resize',drawOptical);
 function drawOptical(){
@@ -366,7 +366,7 @@ function inspectOptical(text){
 }
 
 /* ---------- Log interpretation ---------- */
-const AVOID_LABELS={FOLLOW:'Following the tape.',SETTLE:'Pausing to settle before the next move.',TURN_RIGHT_OUT:'Turning right to leave the tape.',SCAN_RIGHT_PATH:'Checking space on the right.',MOVE_OUT:'Moving out beside the object.',FACE_FORWARD:'Turning back towards the original direction.',SCAN_FORWARD:'Checking the path ahead.',MOVE_ALONG:'Moving alongside the object.',FACE_OBJECT:'Turning to look towards the object.',SCAN_OBJECT_SIDE:'Checking whether the object has ended.',FACE_ALONG:'Turning to continue alongside.',SEEK_RETURN_LINE:'Moving towards the tape.',CHECK_FOUND_TAPE:'Found tape: stopping to check the path ahead.',PROBE_TAPE_HEADING:'Checking whether this is a single tape strip.',ADVANCE_AXLE_TO_TAPE:'Bringing the wheels to the tape.',ALIGN_WITH_TAPE:'Finding the tape heading towards the original direction of travel.',CONFIRM_TAPE_HEADING:'Checking the new heading.',VERIFY_LINE:'Trying to follow the recovered tape.',FAILED:'Stopped; download the log for the reason.'};
+const AVOID_LABELS={SCAN_OBJECT_WIDTH:'Scanning the object to plan the exit angle.',CHECK_LEFT_EDGE:'Checking the object with the leftmost sonar angle.',CLEAR_REAR_MARGIN:'Moving another 10 cm before checking the return path.',FOLLOW:'Following the tape.',SETTLE:'Pausing to settle before the next move.',TURN_RIGHT_OUT:'Turning right to leave the tape.',SCAN_RIGHT_PATH:'Checking space on the right.',MOVE_OUT:'Moving out beside the object.',FACE_FORWARD:'Turning back towards the original direction.',SCAN_FORWARD:'Checking the path ahead.',MOVE_ALONG:'Moving alongside the object.',FACE_OBJECT:'Turning to look towards the object.',SCAN_OBJECT_SIDE:'Checking whether the object has ended.',FACE_ALONG:'Turning to continue alongside.',SEEK_RETURN_LINE:'Moving towards the tape.',CHECK_FOUND_TAPE:'Found tape: stopping to check the path ahead.',PROBE_TAPE_HEADING:'Checking whether this is a single tape strip.',ADVANCE_AXLE_TO_TAPE:'Bringing the wheels to the tape.',ALIGN_WITH_TAPE:'Finding the tape heading: right first.',CONFIRM_TAPE_HEADING:'Checking the new heading.',VERIFY_LINE:'Trying to follow the recovered tape.',FAILED:'Stopped; download the log for the reason.'};
 const ACTIONS={STRAIGHT_CANCEL_PENDING:'Go straight, cancel pending turn',TURN_NOW:'Turn now',STOP_NOW:'Stop now',RECORD_ONLY:'Recorded only',WAIT_FOR_FUTURE_JUNCTION:'Turn at a coming junction',REPLACED_WAITING_INSTRUCTION:'Replaced the waiting turn',DEFERRED_UNTIL_MANOEUVRE_COMPLETE:'Held until the current manoeuvre ends',IGNORED_STOPPED:'Ignored: car stopped',IGNORED_UNMAPPED:'Ignored: letter has no action'};
 const OK_CODES=/^(MOTION_COMPLETE|COURSE_BARCODE_STOP|BARCODE_PASS|COMPLETE|PASS|NONE|OK)$/;
 const OP_CODES=/^(BUTTON_STOP|EXTERNAL_STOP|STOPPED)$/;
@@ -426,6 +426,7 @@ AVOID_SONAR_TOO_CLOSE_OR_BAD_PULSE:['Sonar pulse invalid','The sonar returned a 
 AVOID_RANGE_STALE:['Sonar readings went stale','No fresh range reading arrived in time.',sonar],
 AVOID_SCAN_STALE:['Sonar scan went stale','A servo scan did not finish in time.',sonar],
 AVOID_REJOIN_RANGE_UNAVAILABLE:['No range at rejoin','The sonar had no valid reading when the car tried to rejoin.',sonar],
+AVOID_LEFT_CHECK_STALE:['Left-edge sonar check went stale','The leftmost sonar check of the object did not get a fresh reading in time.',sonar],
 AVOID_BAD_PHASE:['Unexpected bypass state','The obstacle controller reached a state it does not expect.',['Download the log and share it; this points at a firmware issue.']]
 };
 function human(code){return String(code||'').replace(/_/g,' ').toLowerCase().replace(/^./,c=>c.toUpperCase());}
@@ -540,6 +541,8 @@ function describe(tag,rest,kv){
   case 'BARCODE':if(/rejected/i.test(rest)){sev='fault';title='Barcode start rejected';}else title='Barcode';break;
   case 'AVOID':{sev=kv.phase==='FAILED'?'fault':'info';title='Phase: '+human(kv.phase);sub=AVOID_LABELS[kv.phase]||'';keys=['next','offset_mm','along_mm','tape_checks','rejected','align_rejected'];break;}
   case 'AVOID BEGIN':title='Bypass started';keys=[];break;
+  case 'AVOID PLAN':title='Bypass planned: turn right '+kv.turn_right_deg+'°';keys=['turn_right_deg','lateral_mm','forward_mm','observed_span_mm','right_edge_known','width_bounded'];break;
+  case 'AVOID LEFT':title='Left-edge check: '+(kv.far||'?')+' far readings';sub='Next: '+human(kv.next)+'. An oblique ray alone does not prove clearance.';keys=['far','side_seen','next'];break;
   case 'AVOID COMPLETE':sev='ok';title='Obstacle passed, following resumed';break;
   case 'AVOID APPROACH':title='Approach: nearest '+kv.nearest_cm+' cm';keys=['nearest_cm','hits','detected'];break;
   case 'AVOID SCAN':title='Scan: nearest '+kv.nearest_cm+' cm';keys=['phase','nearest_cm','blocked','no_echo','center_clear','side_seen'];break;
@@ -652,7 +655,7 @@ el('prepare').onclick=()=>{
 };
 el('stop').onclick=()=>command('x');
 async function recover(){resultPending=true;try{const r=await request('/result');if(!r.ok)throw Error();const recovered=await r.text();if(recovered!==downloadedResult)append('\n[RETAINED SNAPSHOT]\n'+recovered,true);downloadedResult=recovered;resultPending=false;el('result').textContent=downloadedResult;}catch(e){el('result').textContent=downloadedResult||'Could not reach the car. Retrying while stopped.';}}
-el('download').onclick=async()=>{await recover();const metadata='AAI10 v5.55 wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';const blob=new Blob([metadata,'RECOVERED RESULT (may duplicate log):\n',downloadedResult||'Current result unavailable; see captured live log.\n','\nLIVE LOG:\n',transcript],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-motion-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+el('download').onclick=async()=>{await recover();const metadata='AAI10 v5.56 wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';const blob=new Blob([metadata,'RECOVERED RESULT (may duplicate log):\n',downloadedResult||'Current result unavailable; see captured live log.\n','\nLIVE LOG:\n',transcript],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-motion-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 updateMode();
 setPhase('IDLE','Choose a test and prepare it. The car starts only when GP20 is pressed.');
 flap(el('bc-letter'),'–');

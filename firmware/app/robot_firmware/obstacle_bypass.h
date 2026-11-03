@@ -1,6 +1,7 @@
 #ifndef OBSTACLE_BYPASS_H
 #define OBSTACLE_BYPASS_H
 #include "course_control.h"
+#include "obstacle_plan.h"
 /* Supervised floor test, right-side bypass. No reverse and no cliff sensing.
  * Servo remains within the measured 50..125 degree mechanical envelope.
  * Side observations use chassis turns, not an unverified 180-degree servo arc. */
@@ -8,7 +9,7 @@ typedef enum {
     AVOID_FOLLOW, AVOID_WAIT, AVOID_TURN_OUT, AVOID_SCAN_OUT, AVOID_MOVE_OUT,
     AVOID_TURN_FORWARD, AVOID_SCAN_FORWARD, AVOID_MOVE_ALONG, AVOID_TURN_LOOK,
     AVOID_SCAN_SIDE, AVOID_TURN_ALONG, AVOID_RETURN_LINE, AVOID_VERIFY, AVOID_CHECK_TAPE,
-    AVOID_TAPE_PROBE, AVOID_AXLE_ADVANCE, AVOID_ALIGN_TURN, AVOID_ALIGN_CONFIRM, AVOID_FAILED
+    AVOID_TAPE_PROBE, AVOID_AXLE_ADVANCE, AVOID_ALIGN_TURN, AVOID_ALIGN_CONFIRM, AVOID_SCAN_INITIAL, AVOID_CHECK_LEFT, AVOID_CLEAR_TAIL, AVOID_FAILED
 } avoid_phase_t;
 typedef struct {
     course_control_t line;
@@ -16,6 +17,11 @@ typedef struct {
     bool probe_black, probe_gap;
     unsigned probe_first_black_mm;
     int route_heading_deg;
+    obstacle_plan_t plan;
+    float plan_cm[5];
+    unsigned plan_good[5], departure_deg, departure_travel_mm, departure_forward_mm;
+    unsigned left_samples, left_far;
+    bool tail_margin_done, left_near;
     unsigned axle_mm;
     int align_direction;
     bool align_reversed;

@@ -1,3 +1,28 @@
+## v5.56 retest — 3 November 2026
+
+Flash `firmware/releases/robocar_motion_integration_v5_56_wireless.uf2`, refresh
+http://192.168.4.1/ and confirm v5.56. Select **Follow track + avoid obstacle**,
+prepare the run, then GP20. Keep the existing GP28-centred/GP27-right mounting.
+
+1. Straight-strip bottle: expect a stopped width scan, a calculated right exit
+   (or90degrees if the edge is unknown), a diagonal move, and a turn parallel to
+   the original route. Observe actual clearance; calculations are provisional.
+2. The car checks left between parallel legs, may add10cm rear margin, then
+   turns to scan towards the object. It must verify clearance before returning.
+   Confirm125degrees physically points left; a servo mounting reversal changes
+   the scan geometry and must be corrected before interpreting the planner.
+3. At perpendicular tape rejoin, it selects right first. It must resume following
+   without hitting the bottle. Repeat with the bottle on a bend.
+4. On a clear straight, check the faster cruise. Through a bend, check continuous
+   correction and no repeated departure. Unknown direction still triggers search.
+5. Download one combined log and record video for each setup. AVOID PLAN gives
+   angle, lateral/diagonal/forward distances, observed span and edge confidence;
+   AVOID LEFT records the oblique check. Report contact or wrong-direction rejoin
+   even if it later completes. GP20 is the local stop.
+
+This is a new physical-test build. Scan estimates cannot guarantee exact width,
+object depth or empty space, and faster cruise remains unverified on the foam.
+
 ## v5.55 retest — 3 November 2026
 
 Flash `firmware/releases/robocar_motion_integration_v5_55_wireless.uf2`, refresh

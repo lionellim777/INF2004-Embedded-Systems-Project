@@ -54,7 +54,7 @@ static void advance(uint64_t us)
             in_alarm=false;
         }
         if(stop_us&&clock_us-stop_us>650000)longjmp(done,1);
-        if(clock_us>22000000)longjmp(done,1);
+        if(clock_us>28000000)longjmp(done,1);
     }
 }
 void pwm_set_chan_level(uint s,uint c,uint16_t v){assert(s<8&&c<2);pwm[s][c]=v;if(s==4||s==5){if(v)assert(start_us);}}
@@ -157,7 +157,7 @@ int calibration_wifi_getchar(void){
     if(scenario==29 && optical_pending && clock_us>4000000 && !input_count++){return 'x';}
     if((scenario>=29&&scenario<=31))return -1;
     if(scenario==36&&avoidance.phase==AVOID_SCAN_OUT&&!input_count++)return 'x';
-    if(start_us&&clock_us-start_us>(scenario>=7?10000000u:4500000u)&&!input_count++){return 'x';}
+    if(start_us&&clock_us-start_us>(scenario>=41?15000000u:scenario>=7?10000000u:4500000u)&&!input_count++){return 'x';}
     return -1;
 }
 course_config_t calibration_wifi_course_config(void){return (course_config_t){scenario>=16?'s':scenario==11?'b':scenario==12?'R':scenario==13?'x':(scenario==14||scenario==15)?'l':scenario>=7?'r':'s',scenario==14?'R':scenario==15?'x':'s',120};}
@@ -233,12 +233,13 @@ int main(int argc,char **argv)
             assert(strstr(output,"EXTERNAL_STOP")&&!strstr(output,"[SONAR RETRY]"));
             assert(!avoidance.sonar_retries&&left_count>1000&&right_count>1000&&avoidance.no_echo>0);
         }else if(scenario==41){
+            if(!strstr(output,"AVOID_RIGHT_PATH_BLOCKED"))fputs(output,stderr);
             assert(strstr(output,"AVOID_RIGHT_PATH_BLOCKED")&&!avoidance.sonar_retries&&avoidance.no_echo>0);
         }
         else if(scenario==42){
             assert(strstr(output,"AVOID_RIGHT_PATH_BLOCKED")&&strstr(output,"[ENCODER NOTE]")&&strstr(output,"[AVOID SCAN]"));
             assert(avoidance.encoder_skips[1]==1&&injected_right_invalid==1);
-        }else if(scenario==43){assert(strstr(output,"AVOID_ENCODER_INVALID")&&!avoidance.scans);}
+        }else if(scenario==43){assert(strstr(output,"AVOID_ENCODER_INVALID")&&avoidance.scans==1);}
         else assert(strstr(output,"AVOID_RIGHT_PATH_BLOCKED"));
         puts("PASS production obstacle main: mode selection, barcode disabled, sonar dispatch, stop PWM, servo recenter and result.");return 0;
     }
