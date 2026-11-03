@@ -7,7 +7,7 @@
 
 typedef enum {
     MOTION_NONE, MOTION_STRAIGHT_30CM, MOTION_LEFT_90,
-    MOTION_RIGHT_90, MOTION_RIGHT_180, MOTION_BARCODE, MOTION_CONTINUOUS, MOTION_COURSE
+    MOTION_RIGHT_90, MOTION_RIGHT_180, MOTION_BARCODE, MOTION_CONTINUOUS, MOTION_COURSE, MOTION_AVOID
 } motion_kind_t;
 
 typedef enum {
@@ -23,6 +23,10 @@ typedef struct {
     float integral;
     float throttle;
     float cps;
+    float applied_pwm; /* Last controller output, retained after fault/abort. */
+    float requested_cps;
+    uint32_t no_progress_ms;
+    bool held; /* Deliberately held to let the other wheel catch up. */
     int32_t target;
     int32_t position;
     int32_t previous;
@@ -44,11 +48,20 @@ typedef struct {
     motion_kind_t kind;
     motion_phase_t phase;
     motion_fault_t fault;
+    uint8_t stalled_wheels; /* bit0 left, bit1 right; captured before zeroing outputs. */
+    bool slow_distance;
+    bool transit_drive; /* Optional clear bypass leg: 800 cps, slowing near endpoint. */
+    bool alignment_drive; /* Probe/axle advance: adaptive low-speed effort, max32%. */
+    bool slow_turn; /* Bypass only; standalone calibrated turns keep their profile. */
 } motion_control_t;
 
 void motion_init(motion_control_t *motion);
 bool motion_begin(motion_control_t *motion, motion_kind_t kind,
                   encoder_sample_t sample, uint64_t now_us);
+/* Nominal wheel geometry, 1..700 mm. Separate from the calibrated 30 cm test.
+ * Slow bounded straight legs for bypass; physical distance still needs checking. */
+bool motion_begin_distance(motion_control_t *motion, unsigned mm,
+                           encoder_sample_t sample, uint64_t now_us);
 /* No PWM, GPIO, printing, waiting or counter resets. Main applies outputs and
  * may override them with STOP at any time. Call frequently from the main loop. */
 void motion_poll(motion_control_t *motion, encoder_sample_t sample, uint64_t now_us);

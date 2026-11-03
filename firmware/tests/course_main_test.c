@@ -8,6 +8,7 @@
 static uint64_t clock_us,start_us,stop_us,echo_us;
 static uint32_t ir_period_us;
 static unsigned scenario,input_count,adc_channel;
+static uint32_t injected_right_invalid;
 static bool irq_disabled,in_alarm,command_sent,block_done,ever_center;
 static unsigned pwm[8][2];static double left_count,right_count;
 static char output[150000];static size_t output_n;
@@ -34,6 +35,7 @@ static void advance(uint64_t us)
 {
     uint64_t end=clock_us+us;
     while(clock_us<end){
+        if(start_us&&avoid_run&&avoidance.sonar_wait){assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);}
         if(start_us&&course_run){
             if(course.phase==COURSE_CENTER)ever_center=true;
             if(course.phase==COURSE_BRAKE||course.phase==COURSE_FAILED)
@@ -64,9 +66,22 @@ void gpio_put(uint p,bool v){if(p==0&&!v)echo_us=clock_us+100;}
 bool gpio_get(uint p)
 {
     if(p==20 && (scenario>=29&&scenario<=31) && scenario!=30)return true;
-    if(p==20)return !((clock_us>=3000000&&clock_us<3100000)||((scenario==1&&start_us&&clock_us-start_us>=3000000&&clock_us-start_us<3100000)||(scenario==8&&course.phase==COURSE_TURN)));
+    if(p==20)return !((clock_us>=3000000&&clock_us<3100000)||((scenario==1&&start_us&&clock_us-start_us>=3000000&&clock_us-start_us<3100000)||((scenario==8&&course.phase==COURSE_TURN)||(scenario==35&&avoidance.phase==AVOID_TURN_OUT))));
     if(p==21)return true;
-    if(p==1){uint64_t width=scenario==2&&start_us&&clock_us-start_us>500000?1000:6000;return clock_us>=echo_us&&clock_us<echo_us+width;}
+    if(p==1&&scenario==37&&start_us&&clock_us-start_us>500000)return true;
+    if(p==1&&scenario==41&&start_us&&clock_us-start_us>500000){
+        uint64_t width=clock_us-start_us<2000000?60000:1100;
+        return clock_us>=echo_us&&clock_us<echo_us+width;
+    }
+    if(p==1&&scenario==40&&start_us&&clock_us-start_us>500000){
+        uint64_t width=echo_us>start_us+500000 && echo_us<start_us+650000?60000:6000;
+        return clock_us>=echo_us&&clock_us<echo_us+width;
+    }
+    if(p==1&&(scenario==38||scenario==39)&&start_us&&clock_us-start_us>500000){
+        uint64_t width=scenario==39?60000:(echo_us/200000%2?38000:6000);
+        return clock_us>=echo_us&&clock_us<echo_us+width;
+    }
+    if(p==1){uint64_t width=(scenario==2||scenario>=34)&&start_us&&clock_us-start_us>500000?(scenario==44?600:1000):6000;return clock_us>=echo_us&&clock_us<echo_us+width;}
     return false;
 }
 void adc_init(void){}void adc_gpio_init(uint p){(void)p;}void adc_select_input(uint p){adc_channel=p;}
@@ -138,15 +153,18 @@ void stdio_init_all(void){}bool stdio_usb_connected(void){return false;}int getc
 void calibration_wifi_capture_init(void){}bool calibration_wifi_init(void){return true;}
 void calibration_wifi_poll(bool allowed){(void)allowed;if(scenario==4&&!block_done&&start_us&&clock_us-start_us>500000){block_done=true;advance(200000);assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);}}
 int calibration_wifi_getchar(void){
-    if(!command_sent){command_sent=true;return (scenario>=29&&scenario<=31)?'v':'q';}
+    if(!command_sent){command_sent=true;return scenario>=34?'o':(scenario>=29&&scenario<=31)?'v':'q';}
     if(scenario==29 && optical_pending && clock_us>4000000 && !input_count++){return 'x';}
     if((scenario>=29&&scenario<=31))return -1;
+    if(scenario==36&&avoidance.phase==AVOID_SCAN_OUT&&!input_count++)return 'x';
     if(start_us&&clock_us-start_us>(scenario>=7?10000000u:4500000u)&&!input_count++){return 'x';}
     return -1;
 }
 course_config_t calibration_wifi_course_config(void){return (course_config_t){scenario>=16?'s':scenario==11?'b':scenario==12?'R':scenario==13?'x':(scenario==14||scenario==15)?'l':scenario>=7?'r':'s',scenario==14?'R':scenario==15?'x':'s',120};}
 uint32_t calibration_wifi_max_poll_us(void){return 0;}void calibration_wifi_help(void){}void calibration_wifi_reset_timing(void){}
-void encoders_init(void){}encoder_sample_t encoders_snapshot(void){return (encoder_sample_t){(uint32_t)-(int32_t)left_count,(uint32_t)(int32_t)right_count,scenario==5&&start_us&&clock_us-start_us>500000,0};}
+void encoders_init(void){}encoder_sample_t encoders_snapshot(void){
+    if((scenario==42||scenario==43)&&avoidance.phase==AVOID_TURN_OUT&&motion_left_position(&avoidance.leg,(encoder_sample_t){(uint32_t)-(int32_t)left_count,(uint32_t)(int32_t)right_count,0,0})>400)injected_right_invalid=scenario==42?1:3;
+    return (encoder_sample_t){(uint32_t)-(int32_t)left_count,(uint32_t)(int32_t)right_count,scenario==5&&start_us&&clock_us-start_us>500000,injected_right_invalid};}
 int32_t encoder_left_count(void){return -(int32_t)left_count;}int32_t encoder_right_count(void){return (int32_t)right_count;}
 bool terrain_init(void){return false;}bool terrain_calibrate(void){return false;}void terrain_poll(void){}terrain_status_t terrain_get_status(void){return (terrain_status_t){0};}
 #if ROBOCAR_CENTER_LINE
@@ -195,6 +213,35 @@ int main(int argc,char **argv)
     if(scenario==33){independent_phase_test();return 0;}
 #endif
     if(!setjmp(done))firmware_main();
+    if(scenario>=34){
+        assert(start_us&&stop_us);
+        assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);
+        assert(pwm[6][0]==1500); /* recentered on every abort */
+        assert(avoid_run&&!course_run&&!barcode_sampler.enabled&&!barcode_capture.event_count);
+        assert(avoidance.detected==((scenario>=37&&scenario<=40)||scenario==44?0u:1u)&&!avoidance.completed);
+        assert(strstr(output,"[AVOID RESULT]")&&!strstr(output,"result=OBSTACLE_STOP"));
+        if(scenario==44)assert(strstr(output,"AVOID_APPROACH_TOO_CLOSE")&&!avoidance.scans);
+        else if(scenario==35)assert(strstr(output,"GP20 abort"));
+        else if(scenario==36)assert(strstr(output,"USB/browser stop"));
+        else if(scenario==37)assert(strstr(output,"AVOID_SONAR_RECOVERY_FAILED")&&avoidance.sonar_retries==1&&!avoidance.sonar_resumes);
+        else if(scenario==38){
+            if(strstr(output,"AVOID_SONAR_ECHO_STUCK_HIGH")){fputs("Normal 38 ms no-return pulse falsely latched a stop.\n",stderr);assert(0);}
+            assert(strstr(output,"EXTERNAL_STOP")&&left_count>1000&&right_count>1000);
+            assert(avoidance.no_echo>0);
+        }else if(scenario==39||scenario==40){
+            if(!strstr(output,"EXTERNAL_STOP"))fputs(output,stderr);
+            assert(strstr(output,"EXTERNAL_STOP")&&!strstr(output,"[SONAR RETRY]"));
+            assert(!avoidance.sonar_retries&&left_count>1000&&right_count>1000&&avoidance.no_echo>0);
+        }else if(scenario==41){
+            assert(strstr(output,"AVOID_RIGHT_PATH_BLOCKED")&&!avoidance.sonar_retries&&avoidance.no_echo>0);
+        }
+        else if(scenario==42){
+            assert(strstr(output,"AVOID_RIGHT_PATH_BLOCKED")&&strstr(output,"[ENCODER NOTE]")&&strstr(output,"[AVOID SCAN]"));
+            assert(avoidance.encoder_skips[1]==1&&injected_right_invalid==1);
+        }else if(scenario==43){assert(strstr(output,"AVOID_ENCODER_INVALID")&&!avoidance.scans);}
+        else assert(strstr(output,"AVOID_RIGHT_PATH_BLOCKED"));
+        puts("PASS production obstacle main: mode selection, barcode disabled, sonar dispatch, stop PWM, servo recenter and result.");return 0;
+    }
 #if ROBOCAR_CENTER_LINE
     if((scenario>=29&&scenario<=31)){assert(!start_us&&!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);assert(strstr(output,"[OPTICAL RESULT]")&&strstr(output,"[OPTICAL END]"));assert(strstr(output,scenario==31?"aborted=0 sampling_ok=1":"aborted=1 sampling_ok=0"));puts("PASS optical capture: no motor start, GP20/browser cancel and timed completion.");return 0;}
     if(scenario==20||scenario==28){assert(!start_us&&!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);assert(strstr(output,"CENTER_BASELINE_NOT_READY"));puts("PASS centre start alignment gate.");return 0;}

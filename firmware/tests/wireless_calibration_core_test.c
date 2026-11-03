@@ -23,6 +23,11 @@ int main(void)
     for (size_t i=0;i<strlen(stop);i++) calibration_capture(&c,stop+i,1);
     calibration_capture(&c,settled,strlen(settled));
     assert(strcmp(c.stop,stop)==0 && strcmp(c.settled,settled)==0);
+    const char *detail="[MOTION DETAIL] stalled_mask=2 last_pwm=0.12/-0.45 no_progress_ms=0/1000\n";
+    calibration_capture(&c,detail,strlen(detail));
+    for(unsigned i=0;i<CAL_LOG_CAPACITY+100;i++)calibration_capture(&c,"x",1);
+    assert(strcmp(c.motion_detail,detail)==0);
+    calibration_capture(&c,"\n",1);
     const char *check="[CHECK] samples=4 IR_L=190..3100 edges=2\n";
     const char *timing="[TIMING] max_loop_us=35000 wifi_max_poll_us=4000\n";
     calibration_capture(&c,check,strlen(check));calibration_capture(&c,timing,strlen(timing));
@@ -35,7 +40,8 @@ int main(void)
     assert(strcmp(c.stop,stop)==0 && strcmp(c.settled,settled)==0);
     assert(strcmp(c.barcode,stream)==0);
     calibration_capture(&c,"\n[MOTION GO] next\n",18);
-    assert(c.stop[0]==0 && c.settled[0]==0 && c.summary[0]==0 && c.timing[0]==0 && c.barcode[0]==0);
+    assert(!strcmp(c.previous_stop,stop)&&!strcmp(c.previous_detail,detail));
+    assert(c.motion_detail[0]==0 && c.stop[0]==0 && c.settled[0]==0 && c.summary[0]==0 && c.timing[0]==0 && c.barcode[0]==0);
     const char *trace1="[SCAN EDGES 1] total=30 time_ms:level=10:B,20:W\n";
     const char *trace2="[SCAN EDGES 2] total=30 time_ms:level=\n";
     calibration_capture(&c,trace1,strlen(trace1));calibration_capture(&c,trace2,strlen(trace2));
@@ -44,6 +50,7 @@ int main(void)
     assert(!c.barcode[0] && !c.trace[0][0] && !c.trace[1][0]);
     assert(!calibration_command(&c,'f'));
     c.selection_allowed=true;
+    assert(calibration_command(&c,'o'));assert(calibration_take_command(&c)=='o');
     assert(calibration_command(&c,'v'));assert(calibration_take_command(&c)=='v');
     const char *optical="[OPTICAL RESULT] samples=5000 sampling_ok=1\n";
     calibration_capture(&c,optical,strlen(optical));assert(strcmp(c.optical_result,optical)==0);
@@ -77,6 +84,8 @@ int main(void)
     c.selection_allowed=false;assert(!calibration_course_command(&c,"/mission/b/l/120"));
     const char *course_result="[COURSE RESULT] encounters=3 turns=1\n";
     calibration_capture(&c,course_result,strlen(course_result));assert(strcmp(c.course_result,course_result)==0);
+    const char *avoid_result="[AVOID RESULT] detected=1 completed=1 outcome=BUTTON_STOP\n";
+    calibration_capture(&c,avoid_result,strlen(avoid_result));assert(strcmp(c.course_result,avoid_result)==0);
     calibration_capture(&c,"[MOTION GO] next\n",17);assert(!c.course_result[0]);
     assert(calibration_parse_cursor("0",&value)&&value==0);
     assert(calibration_parse_cursor("4294967295",&value)&&value==UINT32_MAX);

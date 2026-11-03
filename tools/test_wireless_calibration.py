@@ -14,6 +14,14 @@ stub=build/'stubs';stub.mkdir(exist_ok=True)
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
+#if ROBOCAR_WIFI_CORE1
+#include <pthread.h>
+typedef pthread_mutex_t mutex_t;
+typedef struct {pthread_mutex_t mutex;unsigned count;} semaphore_t;
+void mutex_init(mutex_t*);void mutex_enter_blocking(mutex_t*);void mutex_exit(mutex_t*);
+void sem_init(semaphore_t*,int,int);void sem_release(semaphore_t*);bool sem_acquire_timeout_ms(semaphore_t*,uint32_t);
+void multicore_launch_core1_with_stack(void(*)(void),uint32_t*,size_t);void sleep_ms(uint32_t);
+#endif
 typedef int err_t; typedef uint16_t u16_t;
 #define ERR_OK 0
 #define ERR_MEM -1
@@ -60,7 +68,7 @@ err_t udp_sendto(struct udp_pcb*,struct pbuf*,const ip_addr_t*,u16_t);
 struct netif *ip_current_input_netif(void);uint32_t cyw43_hal_ticks_ms(void);
 #endif
 ''')
-for name in ['pico/cyw43_arch.h','pico/stdlib.h','pico/stdio/driver.h','pico/rand.h','lwip/tcp.h','lwip/ip_addr.h','lwip/udp.h','cyw43_config.h']:
+for name in ['pico/multicore.h','pico/sync.h','pico/cyw43_arch.h','pico/stdlib.h','pico/stdio/driver.h','pico/rand.h','lwip/tcp.h','lwip/ip_addr.h','lwip/udp.h','cyw43_config.h']:
     p=stub/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('#include "mock.h"\n')
 env=dict(os.environ,SDKROOT='/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk')
 app=root/'firmware/app/robot_firmware'
@@ -70,3 +78,7 @@ for name in ['core','transport','stationary_transport']:
     defines=['-DROBOCAR_STATIONARY_BARCODE=1'] if name=='stationary_transport' else []
     command=flags+defines+['-DROBOCAR_WIRELESS_CALIBRATION=1',str(app/'wireless/calibration_core.c'),str(root/f'firmware/tests/wireless_calibration_{test_name}_test.c'),'-o',str(build/name)]
     subprocess.run(command,check=True,env=env);subprocess.run([str(build/name)],check=True,env=env)
+
+# Same transport built with the production second-core path and real host threads.
+command=flags+['-DROBOCAR_WIRELESS_CALIBRATION=1','-DROBOCAR_WIFI_CORE1=1','-DTEST_NETWORK_CORE1=1','-pthread',str(app/'wireless/calibration_core.c'),str(root/'firmware/tests/wireless_core1_test.c'),'-o',str(build/'core1')]
+subprocess.run(command,check=True,env=env);subprocess.run([str(build/'core1')],check=True,env=env)

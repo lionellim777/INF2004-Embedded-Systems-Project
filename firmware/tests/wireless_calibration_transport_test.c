@@ -12,11 +12,21 @@ static struct udp_pcb fake_udp;
 static struct pbuf udp_packet;
 static char udp_payload[600];
 static unsigned udp_sent;
-uint64_t time_us_64(void){return now;}uint32_t get_rand_32(void){return 123;}
+#ifdef TEST_NETWORK_CORE1
+static void radio_poll_hook(void);
+uint64_t time_us_64(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000+t.tv_nsec/1000;}
+#else
+uint64_t time_us_64(void){return now;}
+#endif
+uint32_t get_rand_32(void){return 123;}
 void stdio_set_driver_enabled(stdio_driver_t*d,bool v){(void)d;(void)v;}
 int cyw43_arch_init_with_country(int x){(void)x;return 0;}
 void cyw43_arch_enable_ap_mode(const char*a,const char*b,int c){(void)a;(void)b;(void)c;}
-void cyw43_arch_disable_ap_mode(void){}void cyw43_arch_deinit(void){}void cyw43_arch_poll(void){}
+void cyw43_arch_disable_ap_mode(void){}void cyw43_arch_deinit(void){}void cyw43_arch_poll(void){
+#ifdef TEST_NETWORK_CORE1
+    radio_poll_hook();
+#endif
+}
 void tcp_arg(struct tcp_pcb*p,void*a){(void)p;(void)a;}
 void tcp_sent(struct tcp_pcb*p,err_t(*f)(void*,struct tcp_pcb*,u16_t)){(void)p;(void)f;}
 void tcp_recv(struct tcp_pcb*p,err_t(*f)(void*,struct tcp_pcb*,struct pbuf*,err_t)){(void)p;(void)f;}
@@ -56,11 +66,11 @@ static void http_tests(void){
     core.selection_allowed=false;c=open_client();req="POST /command/r HTTP/1.1\r\nx-calibrate: 1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"409"));
     c=open_client();req="POST /command/x HTTP/1.1\r\nX-Calibrate: 1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"202"));assert(calibration_wifi_getchar()=='x');
     c=open_client();req="GET /logs?since=0 HTTP/1.1\r\n\r\n";capture("test log\n",9);feed(c,req,strlen(req));drain(c);assert(strstr(wire,"test log\n"));assert(strstr(wire,"X-Next: 9\r\n"));
-    /* Eight maximum retained lines still fit and survive the HTTP result. */
-    char *fields[]={core.stop,core.settled,core.summary,core.timing,core.barcode,core.trace[0],core.trace[1],core.course_result};
-    for(unsigned i=0;i<8;i++){memset(fields[i],'A'+i,CAL_LINE_CAPACITY-1);fields[i][CAL_LINE_CAPACITY-2]='\n';fields[i][CAL_LINE_CAPACITY-1]=0;}
+    /* Eleven maximum retained lines still fit and survive the HTTP result. */
+    char *fields[]={core.stop,core.settled,core.summary,core.timing,core.barcode,core.trace[0],core.trace[1],core.course_result,core.motion_detail,core.previous_stop,core.previous_detail};
+    for(unsigned i=0;i<11;i++){memset(fields[i],'A'+i,CAL_LINE_CAPACITY-1);fields[i][CAL_LINE_CAPACITY-2]='\n';fields[i][CAL_LINE_CAPACITY-1]=0;}
     c=open_client();req="GET /result HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);
-    for(unsigned i=0;i<8;i++)assert(strstr(wire,fields[i]));
+    for(unsigned i=0;i<11;i++)assert(strstr(wire,fields[i]));
     strcpy(core.optical_result,"[OPTICAL RESULT] samples=5000\n");
     c=open_client();req="GET /result HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,core.optical_result));
     core.selection_allowed=true;c=open_client();req="POST /command/v HTTP/1.1\r\nX-Calibrate: 1\r\n\r\n";

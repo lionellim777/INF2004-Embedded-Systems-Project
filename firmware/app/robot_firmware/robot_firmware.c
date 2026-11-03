@@ -4,7 +4,7 @@
  * Wiring:
  *   Motor 1 (left):  M1A GP8,  M1B GP9
  *   Motor 2 (right): M2A GP10, M2B GP11
- *   Servo signal: GP12 (held at centre)
+ *   Servo signal: GP12 (50..125 degree scans in obstacle test)
  *   Offset left barcode sensor AO: GP26 via Grove 5
  *   Central pair left sensor AO:   GP28 via Grove 7
  *   Central pair right sensor AO:  GP27 via Grove 6
@@ -37,6 +37,7 @@
 #include "barcode_signal.h"
 #include "barcode_drive.h"
 #include "course_control.h"
+#include "obstacle_bypass.h"
 #include "terrain.h"
 #include "calibration_wifi.h"
 
@@ -179,6 +180,13 @@ static void motors_init(void)
                    RIGHT_FORWARD_SIGN);
 }
 
+static void servo_set_test_angle(unsigned degrees)
+{
+    if(degrees<50)degrees=50;
+    if(degrees>125)degrees=125;
+    pwm_set_chan_level(servo_slice,servo_channel,(uint16_t)(500u+degrees*2000u/180u));
+}
+
 static void servo_init_centred(void)
 {
     gpio_set_function(SERVO_PIN, GPIO_FUNC_PWM);
@@ -209,8 +217,19 @@ static void ultrasonic_init(void)
     gpio_set_dir(ULTRASONIC_ECHO_PIN, GPIO_IN);
 }
 
+static const char *sonar_error;
+static const char *sonar_status = "NOT_READ";
+static uint32_t sonar_pulse_us, sonar_max_pulse_us;
 static bool ultrasonic_read_cm(float *distance_cm)
 {
+    sonar_error=NULL;
+    sonar_pulse_us=0;
+    sonar_status="NO_RISE";
+    if(gpio_get(ULTRASONIC_ECHO_PIN)){
+        sonar_error="AVOID_SONAR_ECHO_HIGH_BEFORE_TRIGGER";
+        sonar_status="HIGH_BEFORE_TRIGGER";
+        return false;
+    }
     gpio_put(ULTRASONIC_TRIG_PIN, 0);
     sleep_us(2);
     gpio_put(ULTRASONIC_TRIG_PIN, 1);
@@ -225,14 +244,25 @@ static bool ultrasonic_read_cm(float *distance_cm)
         tight_loop_contents();
     }
     uint64_t start = time_us_64();
-    deadline = start + 30000u;
+    /* Bound this measurement, not the module's no-return pulse duration.
+     * A timeout supplies no distance; it is not proof of a broken sensor.
+     * Before the NEXT trigger, require ECHO low: a line still high between
+     * measurements is separately reported and handled by the stopped retry. */
+    deadline = start + 45000u;
     while (gpio_get(ULTRASONIC_ECHO_PIN)) {
         if (time_us_64() >= deadline) {
+            sonar_pulse_us=(uint32_t)(time_us_64()-start);
+            if(sonar_pulse_us>sonar_max_pulse_us)sonar_max_pulse_us=sonar_pulse_us;
+            sonar_status="NO_RETURN_WITHIN_WINDOW";
             return false;
         }
         tight_loop_contents();
     }
-    *distance_cm = (float)(time_us_64() - start) * 0.01715f;
+    sonar_pulse_us=(uint32_t)(time_us_64()-start);
+    if(sonar_pulse_us>sonar_max_pulse_us)sonar_max_pulse_us=sonar_pulse_us;
+    *distance_cm = (float)sonar_pulse_us * 0.01715f;
+    sonar_status=*distance_cm<2.0f?"SHORT_PULSE":*distance_cm>400.0f?"OUT_OF_RANGE":"VALID";
+    if(*distance_cm<2.0f)sonar_error="AVOID_SONAR_TOO_CLOSE_OR_BAD_PULSE";
     return *distance_cm >= 2.0f && *distance_cm <= 400.0f;
 }
 
@@ -327,6 +357,8 @@ static void optical_finish(bool aborted, bool driving)
 static course_control_t course;
 static center_baseline_t center_baseline;
 static bool course_run;
+static bool avoid_run;
+static obstacle_bypass_t avoidance;
 static int32_t blackness(uint16_t raw,int32_t white,int32_t black);
 static void barcode_drain(bool end)
 {
@@ -487,9 +519,9 @@ static bool button_fell(button_t *button, uint pin, uint64_t now_us)
 static void print_controls(void)
 {
 #ifdef ROBOCAR_WIRELESS_CALIBRATION
-    printf("\nAAI10 MOTION INTEGRATION v5.34 WIRELESS | independent optical barcode | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.54 WIRELESS | obstacle bypass test | %s %s\n", __DATE__, __TIME__);
 #else
-    printf("\nAAI10 MOTION INTEGRATION v5.34 USB | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.54 USB | %s %s\n", __DATE__, __TIME__);
 #endif
     printf("Starts STOPPED. Existing IR, sonar, servo and terrain settings retained.\n");
     printf("Batch 5: CPR2543 wheel60mm track115mm; turn early290 L90+65 R180-60.\n");
@@ -518,7 +550,11 @@ static void print_controls(void)
     printf("GP26 barcode BLACK filtered>=%u / WHITE filtered<=%u; 12-sample mean at2kHz, provisional low-contrast calibration. Raw optical test unchanged.\n",BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
     printf("GP21=level calibration while stopped. Initial level calibration is automatic.\n");
     printf("IR order: barcode GP26 / line-left GP28 / line-right GP27. Barcode record-only in line check.\n");
-    printf("No obstacle bypass. No-echo is UNKNOWN, not clear.\n\n");
+    printf("o: obstacle bypass test, barcode actions OFF. Right-side floor test; GP20 start/abort.\n");
+    printf("Bypass uses repeated scans; NO_ECHO remains unverified out-of-range evidence, not proof of clearance.\n\n");
+#if ROBOCAR_WIFI_CORE1
+    printf("[WIFI CONTROL] radio/HTTP on core1; sensors/control/GP20 on core0; motor guard remains 150ms. Bypass-only R90 target=1045 counts/wheel.\n");
+#endif
     calibration_wifi_help();
 }
 
@@ -632,6 +668,10 @@ int main(void)
                 }
              } else if(optical_pending && ch!='?') {
                 printf("[SELECT] Wait for optical capture to finish.\n");
+             } else if(ch=='o') {
+                if(!ROBOCAR_CENTER_LINE)printf("[SELECT] Obstacle mode requires the GP28 centre layout.\n");
+                else if(running||settling_until_us)printf("[SELECT] Rejected while running/settling.\n");
+                else {selected=MOTION_AVOID;printf("[SELECT] OBSTACLE_BYPASS; right-side bypass; barcodes disabled; floor only; GP20 starts.\n");}
              } else if(ch=='q') {
                 if(running || settling_until_us!=0u)printf("[SELECT] Rejected while running/settling.\n");
                 else {
@@ -683,7 +723,10 @@ int main(void)
                 motion_init(&motion);
                 pending = selected;
                 course_run = selected==MOTION_COURSE;
+                avoid_run = selected==MOTION_AVOID;
+                servo_set_test_angle(90);
                 max_loop_us = 0u;
+                sonar_max_pulse_us = 0u;
                 calibration_wifi_reset_timing();
                 arming_until_us = now_us + 3000000u;
                 center_baseline=(center_baseline_t){0};
@@ -752,7 +795,7 @@ int main(void)
         bool line_visible = roles.left || roles.right;
         float left_throttle = 0.0f, right_throttle = 0.0f;
 
-        if (running && close_readings >= 2u) {
+        if (running && !avoid_run && close_readings >= 2u) {
             motors_stop();
             if (motion.phase == MOTION_ACTIVE) { settling_until_us = now_us + 500000u; }
             motion_abort(&motion);
@@ -763,12 +806,23 @@ int main(void)
         } else if (running && arming_until_us != 0u) {
             motors_stop();
             motion_state = "MOTION_COUNTDOWN";
-            if(ROBOCAR_CENTER_LINE && pending==MOTION_COURSE)
+            if(ROBOCAR_CENTER_LINE && (pending==MOTION_COURSE||pending==MOTION_AVOID))
                 center_baseline_add(&center_baseline,centre_blackness,now_us);
             if (now_us >= arming_until_us) {
                 arming_until_us = 0u;
                 bool began;
-                if (pending == MOTION_NONE || scan_kind(pending)) {
+                if(pending==MOTION_AVOID){
+                    int32_t baseline=0,spread=0;
+                    bool ready=center_baseline_value(&center_baseline,now_us,&baseline,&spread);
+                    bool fresh=(uint32_t)(time_us_32()-ir_last_us)<=BARCODE_SAMPLE_GAP_US;
+                    began=ready&&fresh;
+                    if(began){
+                        motion_init(&motion);motion.kind=MOTION_AVOID;motion.phase=MOTION_ACTIVE;
+                        motion.start=enc;motion.start_us=now_us;
+                        obstacle_bypass_begin(&avoidance,enc,now_us,baseline);
+                        printf("[AVOID BEGIN] barcode=DISABLED direction=RIGHT rejoin=RIGHT_FIRST align_window_deg=60..115 stable_ms=80 baseline=%ld sensor_lead_mm=120 offset_initial_mm=250 warning_cm=45 approach_cm=20 min_pivot_cm=12 max_offset_mm=600 max_along_mm=1200 outward_step_mm=100 along_step_mm=200 speed_target_cps=600 cruise_max_cps=800 cruise_stable_ms=1000 cruise_ramp_cps_s=200 cruise_clear_cm=60 transit_max_cps=800 transit_pwm_cap=0.28 straight_pwm_cap=0.24 alignment_pwm_cap=0.32 turn_assist_cap=0.60 turn_skew_hold_counts=120 bypass_R90_counts=1100 bypass_L90_counts=1090 side_confirmation=REPEAT_SWEEP.\n",(long)baseline);
+                    }else motion_state=ready?"IR_SAMPLING_UNAVAILABLE":"CENTER_BASELINE_NOT_READY";
+                } else if (pending == MOTION_NONE || scan_kind(pending)) {
                     motion_init(&motion);
                     motion.kind = pending;
                     motion.start = enc;
@@ -851,6 +905,62 @@ int main(void)
                     last_countdown = countdown;
                 }
             }
+        } else if(running && motion.phase==MOTION_ACTIVE && motion.kind==MOTION_AVOID){
+            /* ADC acquisition stays live; GP26 decoding is deliberately disabled.
+             * A single owner supplies PWM, so STOP overrides every bypass phase. */
+            uint32_t irq=save_and_disable_interrupts();
+            centre_raw=ir_latest[1];right_raw=ir_latest[2];
+            bool fresh_ir=(uint32_t)(time_us_32()-ir_last_us)<=BARCODE_SAMPLE_GAP_US;
+            restore_interrupts(irq);
+            centre_blackness=blackness(centre_raw,CENTRE_IR_WHITE,CENTRE_IR_BLACK);
+            right_blackness=blackness(right_raw,RIGHT_IR_WHITE,RIGHT_IR_BLACK);
+            roles=(ir_roles_t){false,centre_blackness>=IR_BLACK_LEVEL,right_blackness>=IR_BLACK_LEVEL};
+            avoid_phase_t before=avoidance.phase;
+            unsigned completed=avoidance.completed,scan=avoidance.scan_serial;
+            unsigned detected=avoidance.detected;bool approach_pending=avoidance.approach_pending, approach_warning=avoidance.approach_warning;
+            unsigned retry=avoidance.sonar_retries,resume=avoidance.sonar_resumes;
+            unsigned skips=avoidance.encoder_skips[0]+avoidance.encoder_skips[1];
+            line_check_output_t out=fresh_ir?
+                obstacle_bypass_guarded_step(&avoidance,roles,centre_blackness,enc,now_us,range_fresh,range_valid,distance_cm,sonar_error,!strcmp(sonar_status,"NO_RETURN_WITHIN_WINDOW")||!strcmp(sonar_status,"OUT_OF_RANGE")):
+                (line_check_output_t){0,0,true,"AVOID_IR_STALE"};
+            if((!approach_warning&&avoidance.approach_warning)||(!approach_pending&&avoidance.approach_pending)||detected!=avoidance.detected)
+                printf("[AVOID APPROACH] nearest_cm=%.1f budget_cm=%.1f hits=%u pending=%u detected=%u; warning_slow=45cm bypass=20cm minimum_pivot=12cm offset=250mm.\n",avoidance.approach_min_cm,avoidance.approach_estimate_cm,avoidance.approach_hits,avoidance.approach_pending,avoidance.detected);
+            if(retry!=avoidance.sonar_retries)printf("[SONAR RETRY] motors=STOPPED phase=%s status=%s pulse_us=%lu; waiting for two valid readings, limit=1000ms.\n",obstacle_bypass_phase(before),sonar_status,(unsigned long)sonar_pulse_us);
+            if(resume!=avoidance.sonar_resumes)printf("[SONAR RESUME] phase=%s range_cm=%.1f retries=%u resumes=%u.\n",obstacle_bypass_phase(before),distance_cm,avoidance.sonar_retries,avoidance.sonar_resumes);
+            if(skips!=avoidance.encoder_skips[0]+avoidance.encoder_skips[1])printf("[ENCODER NOTE] isolated invalid transition discarded; accepted_L=%u accepted_R=%u raw_invalid=%lu/%lu phase=%s; max2/wheel/run, min250ms apart.\n",avoidance.encoder_skips[0],avoidance.encoder_skips[1],(unsigned long)enc.left_invalid,(unsigned long)enc.right_invalid,obstacle_bypass_phase(before));
+            servo_set_test_angle(avoidance.servo_angle);
+            motion_state=out.state;
+            if(out.stop){
+                motors_stop();motion_abort(&motion);running=false;settling_until_us=now_us+500000u;
+                printf("[MOTION STOP] OBSTACLE_BYPASS result=%s phase=%s detected=%u completed=%u offset_mm=%u along_mm=%u.\n",
+                    out.state,obstacle_bypass_phase(before),avoidance.detected,avoidance.completed,avoidance.offset_mm,avoidance.along_mm);
+                printf("[MOTION DETAIL] phase=%s fault=%s stalled_mask=%u L_target_pos=%ld/%ld R_target_pos=%ld/%ld no_progress_ms=%lu/%lu last_pwm=%.3f/%.3f target_cps=%.0f/%.0f measured_cps=%.0f/%.0f integral=%.0f/%.0f held=%u/%u finished=%u/%u slow_turn=%u sonar=%s range=%.1f valid=%u IR=%u/%u/%u invalid=%lu/%lu tape_decision=%s.\n",
+                    obstacle_bypass_phase(before),out.state,avoidance.leg.stalled_wheels,
+                    (long)avoidance.leg.left.target,(long)avoidance.leg.left.position,(long)avoidance.leg.right.target,(long)avoidance.leg.right.position,
+                    (unsigned long)avoidance.leg.left.no_progress_ms,(unsigned long)avoidance.leg.right.no_progress_ms,
+                    avoidance.leg.left.applied_pwm,avoidance.leg.right.applied_pwm,avoidance.leg.left.requested_cps,avoidance.leg.right.requested_cps,
+                    avoidance.leg.left.cps,avoidance.leg.right.cps,avoidance.leg.left.integral,avoidance.leg.right.integral,
+                    avoidance.leg.left.held,avoidance.leg.right.held,avoidance.leg.left.finished,avoidance.leg.right.finished,
+                    avoidance.leg.slow_turn,sonar_status,distance_cm,range_valid,left_raw,centre_raw,right_raw,
+                    (unsigned long)enc.left_invalid,(unsigned long)enc.right_invalid,avoidance.tape_decision?avoidance.tape_decision:"NONE");
+                printf("[ALIGNMENT AT STOP] drive_profile=%u targets=%ld/%ld positions=%ld/%ld cps=%.1f/%.1f integral=%.1f/%.1f; white tape crossing is allowed during axle advance.\n",avoidance.leg.alignment_drive,(long)avoidance.leg.left.target,(long)avoidance.leg.right.target,(long)avoidance.leg.left.position,(long)avoidance.leg.right.position,avoidance.leg.left.cps,avoidance.leg.right.cps,avoidance.leg.left.integral,avoidance.leg.right.integral);
+                printf("[ENCODER AT STOP] raw_invalid=%lu/%lu accepted=%u/%u last_error_age_us=%llu/%llu.\n",(unsigned long)enc.left_invalid,(unsigned long)enc.right_invalid,avoidance.encoder_skips[0],avoidance.encoder_skips[1],(unsigned long long)(avoidance.active_us-avoidance.encoder_error_us[0]),(unsigned long long)(avoidance.active_us-avoidance.encoder_error_us[1]));
+                printf("[SENSOR AT STOP] status=%s pulse_us=%lu max_pulse_us=%lu measurement_window_us=45000.\n",sonar_status,(unsigned long)sonar_pulse_us,(unsigned long)sonar_max_pulse_us);
+            }else{
+                left_throttle=out.left;right_throttle=out.right;motors_drive(left_throttle,right_throttle);
+            }
+            if(avoidance.phase!=before)printf("[AVOID] phase=%s next=%s offset_mm=%u along_mm=%u side_seen=%u clear_checks=%u servo=%u tape_checks=%u rejected=%u axle_mm=%u align_dir=%d reverse_sweep=%u align_rejected=%u.\n",
+                obstacle_bypass_phase(avoidance.phase),obstacle_bypass_phase(avoidance.next),avoidance.offset_mm,avoidance.along_mm,avoidance.side_seen,avoidance.clear_checks,avoidance.servo_angle,avoidance.rejoin_attempts,avoidance.rejoin_rejected,avoidance.axle_mm,avoidance.align_direction,avoidance.align_reversed,avoidance.align_rejected);
+            if(avoidance.phase!=before&&(before==AVOID_CHECK_TAPE||before==AVOID_ALIGN_CONFIRM))
+                printf("[AVOID TAPE] from=%s to=%s decision=%s center=%ld reference=%ld samples=%u no_return=%u sonar=%s.\n",obstacle_bypass_phase(before),obstacle_bypass_phase(avoidance.phase),avoidance.tape_decision?avoidance.tape_decision:"NONE",(long)centre_blackness,(long)avoidance.reference,avoidance.rejoin_good,avoidance.no_return,sonar_status);
+            if(avoidance.phase!=before&&(before==AVOID_ALIGN_TURN||before==AVOID_ALIGN_CONFIRM))
+                printf("[AVOID ALIGN] heading_deg=%ld direction=%d rejected=%u center=%ld reference=%ld.\n",
+                    (long)(((int64_t)motion_left_position(&avoidance.align_origin,enc)-motion_right_position(&avoidance.align_origin,enc))*90/2000),
+                    avoidance.align_direction,avoidance.align_rejected,(long)centre_blackness,(long)avoidance.reference);
+            if((avoidance.phase!=before||out.stop)&&avoidance.leg.kind!=MOTION_NONE)printf("[AVOID LEG] phase=%s L=%ld/%ld R=%ld/%ld invalid=%lu/%lu.\n",obstacle_bypass_phase(before),(long)motion_left_position(&avoidance.leg,enc),(long)avoidance.leg.left.target,(long)motion_right_position(&avoidance.leg,enc),(long)avoidance.leg.right.target,(unsigned long)enc.left_invalid,(unsigned long)enc.right_invalid);
+            if(scan!=avoidance.scan_serial)printf("[AVOID SCAN] phase=%s nearest_cm=%.1f blocked=%u no_echo=%u/15 center_clear=%u side_seen=%u clear_checks=%u nearest_angle=%u blocked_angle=%u far_rays=%u far_samples=%u last_side_mm=%u. NO_ECHO alone is not clearance.\n",
+                obstacle_bypass_phase(before),avoidance.scan_min_cm,avoidance.scan_blocked,avoidance.scan_no_echo,avoidance.scan_center_clear,avoidance.side_seen,avoidance.clear_checks,avoidance.scan_nearest_angle,avoidance.scan_blocked_angle,avoidance.scan_far_rays,avoidance.scan_far_samples,avoidance.last_side_seen_mm);
+            if(completed!=avoidance.completed)printf("[AVOID COMPLETE] count=%u GP28 tape confirmed; following resumed.\n",avoidance.completed);
         } else if (running && motion.phase == MOTION_ACTIVE &&
                    (motion.kind == MOTION_NONE || scan_kind(motion.kind))) {
             /* Consume any new barcode BEFORE choosing this loop's output.
@@ -955,6 +1065,7 @@ int main(void)
             motors_stop();
         }
 
+        if(!running && avoid_run)servo_set_test_angle(90);
         if (!running && barcode_sampler.enabled) { barcode_drain(true); }
         /* Freeze before settling/lifting can contaminate a driving trace.
          * Nothing is printed until PWM is off and settling has finished. */
@@ -980,7 +1091,7 @@ int main(void)
             enc = encoders_snapshot();
             int32_t left = motion_left_position(&motion, enc);
             int32_t right = motion_right_position(&motion, enc);
-            if (motion.kind == MOTION_NONE || scan_kind(motion.kind)) {
+            if (motion.kind == MOTION_NONE || motion.kind==MOTION_AVOID || scan_kind(motion.kind)) {
                 printf("[MOTION SETTLED] %s L=%ld R=%ld invalid=%lu/%lu outcome=%s.\n",
                        motion_name(motion.kind), (long)left, (long)right,
                        (unsigned long)(enc.left_invalid-motion.start.left_invalid),
@@ -1009,10 +1120,17 @@ int main(void)
                    (unsigned long)(final.hump_count - diagnostics.start_humps),
                    (unsigned long)(final.read_errors - diagnostics.start_errors), motion_state);
             if (scan_kind(motion.kind)) { barcode_result(); }
+            if(avoid_run)printf("[AVOID RESULT] detected=%u completed=%u phase=%s offset_mm=%u along_mm=%u scans=%u no_echo=%u sonar_retries=%u sonar_resumes=%u encoder_skips=%u/%u tape_checks=%u rejected=%u axle_mm=%u align_dir=%d reverse_sweep=%u align_rejected=%u fault=%s outcome=%s; geometry provisional, physical clearance requires observation.\n",
+                avoidance.detected,avoidance.completed,obstacle_bypass_phase(avoidance.phase),avoidance.offset_mm,avoidance.along_mm,avoidance.scans,avoidance.no_echo,avoidance.sonar_retries,avoidance.sonar_resumes,avoidance.encoder_skips[0],avoidance.encoder_skips[1],avoidance.rejoin_attempts,avoidance.rejoin_rejected,avoidance.axle_mm,avoidance.align_direction,avoidance.align_reversed,avoidance.align_rejected,avoidance.fault?avoidance.fault:"NONE",motion_state);
+            if(avoid_run)printf("[SONAR RESULT] last_status=%s last_pulse_us=%lu max_pulse_us=%lu measurement_window_us=45000.\n",sonar_status,(unsigned long)sonar_pulse_us,(unsigned long)sonar_max_pulse_us);
             if(course_run)printf("[COURSE RESULT] encounters=%u turns=%u Y=%s Z=%s advance_mm=%u updates=%u replacements=%u deferred_replacements=%u pending=%c remaining=%u deferred=%c recoveries=%u trims=%u trim_reversals=%u trim_no_response=%u fixed_ref=%ld settle_coast=%ld/%ld sensor_layout=%s outcome=%s.\n",
                 course.junctions,course.turns,course_action_name(course.config.y_action),course_action_name(course.config.z_action),course.config.advance_mm,
                 course.route_updates,course.replacements,course.deferred_replacements,course.pending_source?course.pending_source:'-',course.remaining_junctions,
                 course.deferred?course.deferred_source:'-',course.recoveries,course.trim_attempts,course.trim_reversals,course.trim_no_responses,(long)course.center_reference,(long)course.center_search.coast_l,(long)course.center_search.coast_r,ROBOCAR_CENTER_LINE?"GP28_CENTER":"STRADDLE",motion_state);
+            if(course_run||avoid_run){
+                const course_control_t *bc=avoid_run?&avoidance.line:&course;
+                printf("[BEND RESULT] attempts=%u rolling_rejoins=%u fallback_searches=%u active=%u; counts belong to current course segment.\n",bc->bend_attempts,bc->bend_completed,bc->bend_fallbacks,bc->bend_active);
+            }
             diagnostics.active = false;
             printf("[TIMING] max_loop_us=%lu wifi_max_poll_us=%lu",
                    (unsigned long)max_loop_us, (unsigned long)calibration_wifi_max_poll_us());
@@ -1050,6 +1168,11 @@ int main(void)
                    left_throttle, right_throttle);
             printf(ROBOCAR_CENTER_LINE?" Roles=Barcode:%u/LineCenter:%u/LineRight:%u":" Roles=Barcode:%u/LineLeft:%u/LineRight:%u", roles.barcode, roles.left, roles.right);
             if(ROBOCAR_CENTER_LINE && course_run)printf(" Recoveries=%u Trims=%u TrimReversals=%u TrimNoResponse=%u Ref=%ld SteerCPS=%.0f YawError=%.1f YawPWM=%.3f",course.recoveries,course.trim_attempts,course.trim_reversals,course.trim_no_responses,(long)course.center_reference,course.drive.center_steer,course.drive.yaw_error,course.drive.yaw_pwm);
+            if(avoid_run)printf(" Avoid=%s Next=%s Servo=%u Completed=%u SideSeen=%u CruiseCps=%.0f TransitFast=%u ApproachWarn=%u ApproachBudget=%.1f",obstacle_bypass_phase(avoidance.phase),obstacle_bypass_phase(avoidance.next),avoidance.servo_angle,avoidance.completed,avoidance.side_seen,avoidance.line.drive.center_cruise_cps,avoidance.leg.transit_drive,avoidance.approach_warning,avoidance.approach_estimate_cm);
+            if(course_run||avoid_run){
+                const course_control_t *bc=avoid_run?&avoidance.line:&course;
+                printf(" BendActive=%u BendDir=%d BendTries=%u BendOK=%u BendFallback=%u",bc->bend_active,bc->bend_direction,bc->bend_attempts,bc->bend_completed,bc->bend_fallbacks);
+            }
             if(course_run)printf(" Junctions=%u Turns=%u CoursePhase=%u Pending=%c Remaining=%u Deferred=%c",course.junctions,course.turns,(unsigned)course.phase,course.pending_source?course.pending_source:'-',course.remaining_junctions,course.deferred?course.deferred_source:'-');
             if(scan_kind(motion.kind)){
                 printf(" BarcodeRawBlack=%u BarcodeCPS=%.0f/%.0f BaseTargetCPS=%u TargetCPS=%.0f/%.0f Edges=%lu Frames=%lu Rejected=%lu",
@@ -1066,11 +1189,12 @@ int main(void)
                    terrain.calibrated ? "READY" : "UNAVAILABLE");
             if (range_valid) { printf(" Range=%.1fcm", distance_cm); }
             else { printf(" Range=NO_ECHO"); }
+            if(avoid_run)printf(" Sonar=%s PulseUs=%lu",sonar_status,(unsigned long)sonar_pulse_us);
             printf(" Enc=%ld/%ld Invalid=%lu/%lu Barcode=%s Nav=%s\n",
                    (long)encoder_left_count(), (long)encoder_right_count(),
                    (unsigned long)enc.left_invalid, (unsigned long)enc.right_invalid,
                    barcode_scanning ? "CAPTURE" : "IDLE", navigation_command_name(last_navigation_command));
-            if (motion.phase == MOTION_ACTIVE && motion.kind != MOTION_NONE && !scan_kind(motion.kind)) {
+            if (motion.phase == MOTION_ACTIVE && motion.kind != MOTION_NONE && motion.kind!=MOTION_AVOID && !scan_kind(motion.kind)) {
                 printf("  Motion=%s L=%ld/%ld %.0fcps R=%ld/%ld %.0fcps peakSkew=%ld\n",
                        motion_name(motion.kind), (long)motion.left.position, (long)motion.left.target,
                        motion.left.cps, (long)motion.right.position, (long)motion.right.target,

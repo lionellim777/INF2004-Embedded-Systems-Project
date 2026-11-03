@@ -1,13 +1,38 @@
-# Wireless calibration checkpoint v5.34
+# Wireless calibration checkpoint v5.54
 
-- Firmware: [robocar_motion_integration_v5_34_wireless.uf2](robocar_motion_integration_v5_34_wireless.uf2)
-- Target: Raspberry Pi Pico W / RP2040 on Robo Pico; centred GP28 sensor arrangement.
-- SHA-256: `3f12def79c2961d4438417d3e90c1e6a0454f6cfced7d9115104afce3abb3568`
-- [Verification record](build-report-v5_34.json)
+| Build | Firmware | Evidence |
+| --- | --- | --- |
+| v5.54 — latest | [Download UF2](robocar_motion_integration_v5_54_wireless.uf2) | Recovery-direction handoff and slower, wider bounded rejoin verification; software checks passed, physical retest pending. [Verification record](build-report-v5_54.json) |
+| v5.53 — previous | [Download UF2](robocar_motion_integration_v5_53_wireless.uf2) | 25 cm initial detour, completed-no-return tape rejoin, loaded-turn effort and retained failure reports. Straight-strip bypass observed complete; bend rejoin subsequently lost tape. [Verification record](build-report-v5_53.json) |
+| v5.47 — historical | [Download UF2](robocar_motion_integration_v5_47_wireless.uf2) | Conditional faster cruise and transit; software checks passed, physical speed and straight-strip bypass tests pending. [Verification record](build-report-v5_47.json) |
+| v5.46 — baseline | [Download UF2](robocar_motion_integration_v5_46_wireless.uf2) | One observed bend-obstacle bypass completed and resumed following. Full straight-strip return not yet demonstrated. [Verification record](build-report-v5_46.json) |
+| v5.34 — historical | [Download UF2](robocar_motion_integration_v5_34_wireless.uf2) | Earlier barcode calibration checkpoint. [Verification record](build-report-v5_34.json) |
 
-Hold BOOTSEL while connecting USB, then copy the UF2 to RPI-RP2. The robot starts stopped. Join the documented AAI10-Calibrate access point, open http://192.168.4.1/, prepare a test, and use GP20 to start/stop. See [wireless instructions](../../docs/wireless-calibration.md). This is the existing v5.34 build, not a new barcode fix.
+Target: Raspberry Pi Pico W / RP2040 on Robo Pico; GP28 centred over route tape,
+GP27 to its right, GP26 dedicated to barcodes.
 
-Current limitation: the latest moving half-A/Z tests produced zero accepted letters, despite reliable sampling. The [optical investigation](../../docs/testing/barcode-v5_34-raised-height-analysis.md) distinguishes this from decoder replay success. Do not describe the final mission, obstacle bypass, µT-Kernel port or half-barcode acceptance as complete.
+Hold BOOTSEL while connecting USB, then copy the chosen UF2 to RPI-RP2.
+The robot starts stopped. Join the documented AAI10-Calibrate access point,
+open http://192.168.4.1/, select **Follow track + avoid obstacle**, prepare the run,
+then use GP20 to start/stop. See [wireless instructions](../../docs/wireless-calibration.md)
+and [obstacle test procedure](../../docs/testing/obstacle-v5_35-bypass.md).
+
+v5.54 retains a 25 cm initial lateral target and right-first tape alignment. It accepts
+fresh completed no-return measurements for a bounded, monitored rejoin, while
+keeping close-obstacle and sensor-fault handling. Turns can build up to 60% drive
+under load without increasing their speed targets. Latest/previous run failure
+snapshots survive rolling-log overwrite; power cycling clears them.
+
+v5.54 adds timed recovery-direction memory, 450 cps rejoin verification and a
+240-count initial verification search leg (normal following remains 120). Moving
+bend continuation is still disabled during verification; search/time/fault limits
+remain. Keep GP28 centred and GP27 to its right.
+
+The latest build is not physically validated. Half-size barcode reliability,
+the final mission and the µT-Kernel port remain incomplete. Barcodes are disabled
+in obstacle mode. Historical successful home tests do not establish real-course
+acceptance. See [progress](../../docs/development-status.md) for observed failures
+and the distinction between simulations and physical tests.
 
 ## Build from source
 
@@ -23,4 +48,4 @@ Set PICO_SDK_PATH and the toolchain path for your installation. `build/release/r
 
 ## Validation
 
-Host checks: `tools/test_barcode_calibration.py`, `tools/test_course_main.py --center`, `tools/test_course_main.py`, `tools/test_wireless_calibration.py`, `tools/test_wireless_dhcp_lwip.py`. These scripts currently contain local macOS SDK assumptions; adjust SDKROOT for another host. They test software and simulated inputs, not physical track acceptance.
+Available host checks (the verification record lists those run for each release): `tools/test_obstacle_bypass.py`, `tools/test_center_bend.py`, `tools/test_barcode_calibration.py`, `tools/test_course_main.py --center`, `tools/test_course_main.py`, `tools/test_wireless_calibration.py`, `tools/test_wireless_dhcp_lwip.py`. These scripts currently contain local macOS SDK assumptions; adjust SDKROOT for another host. They test software and simulated inputs, not physical track acceptance.

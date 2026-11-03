@@ -1,0 +1,9 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_54_wireless.uf2",
+  "bytes": 982528,
+  "blocks": 1919,
+  "sha256": "b10c0e4926500bbb60279e51cec9de1fddf41fbce6d458b99f8ff0d0bf339d16",
+  "physical_validation": "Pending for v5.54. v5.53 straight-strip bypass completed; bend run stopped with CENTER_LINE_NOT_REACQUIRED during VERIFY_LINE. No all-course acceptance claimed.",
+  "software_checks": "Sanitized centre bend/steering tests including new direction and wider rejoin regressions; obstacle tests and 11 geometry cases; 45 production-main centre scenarios; Pico W build; UF2 magic, numbering, family and v5.54 payload checked.",
+  "limitations": "Top cruise speed unchanged. Rolling bend correction remains disabled during obstacle rejoin verification. Current centre/right sensor mounting required."
+}

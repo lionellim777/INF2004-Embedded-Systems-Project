@@ -1,4 +1,4 @@
-/* Diagnostic HTTP transport; all callbacks execute in foreground poll mode.
+/* Diagnostic HTTP transport; callbacks stay on the core owning the polled radio.
  * No network callback can touch motors, start a move, or wait for a client.
  */
 #include "calibration_wifi.h"
@@ -8,7 +8,7 @@
 #define CAL_RESULT_TITLE "v5.7 stationary barcode / motors OFF / black>250 white<=220"
 #else
 #include "calibration_page.h"
-#define CAL_RESULT_TITLE "v5.34 wireless / independent optical course capture / course test available / diagnostics retained / filtered black>=226 white<=220 mean12 2kHz / GP28=center GP27=right GP26=barcode / follow600cps bounded-search"
+#define CAL_RESULT_TITLE "v5.54 wireless / obstacle bypass test, barcode disabled in avoidance mode / course test available / diagnostics retained / filtered black>=226 white<=220 mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..800cps bounded-search"
 #endif
 #include "dhcpserver.h"
 #include "pico/cyw43_arch.h"
@@ -18,12 +18,36 @@
 #include "lwip/tcp.h"
 #include <stdio.h>
 #include <string.h>
+#ifndef ROBOCAR_WIFI_CORE1
+#define ROBOCAR_WIFI_CORE1 0
+#endif
+#if ROBOCAR_WIFI_CORE1
+#include "pico/multicore.h"
+#include "pico/sync.h"
+/* Core 0 only copies bounded shared data. Never hold this lock across radio,
+ * TCP, sleeping or printf calls. A mutex keeps encoder interrupts enabled
+ * during copies. The network owns every lwIP PCB on core 1. */
+static mutex_t shared_lock;
+static semaphore_t network_started;
+_Alignas(8) static uint32_t network_stack[2048];
+static bool shared_initialized;
+static void shared_init(void){
+    if(!shared_initialized){mutex_init(&shared_lock);shared_initialized=true;}
+}
+static void shared_enter(void){mutex_enter_blocking(&shared_lock);}
+static void shared_exit(void){mutex_exit(&shared_lock);}
+#else
+static void shared_init(void){}
+static void shared_enter(void){}
+static void shared_exit(void){}
+#endif
 
 #define AP_NAME "AAI10-Calibrate"
 #define AP_PASSWORD "AAI10-drive"
 #define CLIENT_COUNT 3u
 #define REQUEST_CAPACITY 1536u
-#define BODY_CAPACITY 7168u
+#define BODY_CAPACITY 10240u
+_Static_assert(BODY_CAPACITY > 11u*CAL_LINE_CAPACITY+256u+sizeof(CAL_RESULT_TITLE)+180u, "retained results must fit HTTP body");
 #define CLIENT_TIMEOUT_US 5000000u
 
 typedef struct {
@@ -42,6 +66,7 @@ typedef struct {
 } client_t;
 static client_t clients[CLIENT_COUNT];
 static calibration_core_t core;
+static course_config_t selected_course;
 static dhcp_server_t dhcp;
 static bool ready;
 static uint32_t boot_id;
@@ -49,18 +74,25 @@ static uint32_t max_poll_us;
 
 static void capture(const char *data, int length)
 {
-    if (length > 0) { calibration_capture(&core, data, (size_t)length); }
+    /* Limit each lock hold even when stdio supplies a long optical dump. */
+    while(length>0){
+        int n=length>128?128:length;
+        shared_enter();calibration_capture(&core,data,(size_t)n);shared_exit();
+        data+=n;length-=n;
+    }
 }
 static stdio_driver_t log_driver = {.out_chars = capture};
 
 void calibration_wifi_capture_init(void)
 {
+    shared_init();
     stdio_set_driver_enabled(&log_driver, true);
 }
 void calibration_wifi_help(void)
 {
+    shared_enter();bool available=ready;shared_exit();
     printf("[WIFI] %s | network=%s password=%s | http://192.168.4.1\n",
-           ready ? "READY" : "OFFLINE (USB still available)", AP_NAME, AP_PASSWORD);
+           available ? "READY" : "OFFLINE (USB still available)", AP_NAME, AP_PASSWORD);
     printf("[WIFI] Browser selects only; GP20 starts/aborts. Network loss does not restart motion.\n");
 }
 
@@ -127,12 +159,13 @@ static void response(client_t *c, const char *status, const char *type,
 {
     c->body = body;
     c->body_length = length;
+    shared_enter();bool allowed=core.selection_allowed;shared_exit();
     int n = snprintf(c->header, sizeof(c->header),
         "HTTP/1.1 %s\r\nContent-Type: %s; charset=utf-8\r\nContent-Length: %u\r\n"
         "Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n"
         "X-Boot: %08lx\r\nX-Next: %lu\r\nX-Gap: %u\r\nX-Idle: %u\r\n\r\n",
         status, type, (unsigned)length, (unsigned long)boot_id, (unsigned long)next,
-        gap ? 1u : 0u, core.selection_allowed ? 1u : 0u);
+        gap ? 1u : 0u, allowed ? 1u : 0u);
     c->header_length = (size_t)n;
     c->responding = true;
 }
@@ -182,27 +215,33 @@ static void handle_request(client_t *c)
         if (!calibration_parse_cursor(path + 12u, &cursor)) {
             plain(c, "400 Bad Request", "Invalid cursor.\n"); return;
         }
+        shared_enter();
         size_t n = calibration_read(&core, cursor, c->data, sizeof(c->data), &next, &gap);
+        shared_exit();
         response(c, "200 OK", "text/plain", c->data, n, next, gap);
     } else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0) {
-        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n%s%s%s%s%s%s%s%s%s",
-                         (unsigned long)boot_id, core.stop, core.settled, core.summary, core.timing, core.barcode, core.trace[0], core.trace[1], core.course_result, core.optical_result);
+        shared_enter();
+        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n[PREVIOUS RUN]\n%s%s[CURRENT RUN]\n%s%s%s%s%s%s%s%s%s%s",
+                         (unsigned long)boot_id, core.previous_stop, core.previous_detail, core.stop, core.settled, core.summary, core.timing, core.barcode, core.trace[0], core.trace[1], core.course_result, core.optical_result, core.motion_detail);
         if (core.stop[0] == '\0' && core.settled[0] == '\0' && core.optical_result[0] == '\0') {
             n += snprintf(c->data + n, sizeof(c->data) - (size_t)n,
                           "No completed/aborted test result retained in this boot yet.\n");
         }
+        shared_exit();
         response(c, "200 OK", "text/plain", c->data, (size_t)n, 0u, false);
     } else if (strcmp(method,"POST")==0 && strncmp(path,"/mission/",9u)==0) {
         if(!control_header(c->request)){plain(c,"403 Forbidden","Use the calibration page.\n");return;}
 #ifdef ROBOCAR_STATIONARY_BARCODE
         plain(c,"409 Conflict","Stationary build: course driving unavailable.\n");
 #else
-        if(calibration_course_command(&core,path))plain(c,"202 Accepted","Barcode mission queued. Wait for [SELECT Y/Z], then GP20.\n");
+        shared_enter();bool accepted=calibration_course_command(&core,path);shared_exit();
+        if(accepted)plain(c,"202 Accepted","Barcode mission queued. Wait for [SELECT Y/Z], then GP20.\n");
         else plain(c,"409 Conflict","Course selection rejected: stop first; check settings and pending request.\n");
 #endif
     } else if (strcmp(method, "POST") == 0 && strncmp(path, "/command/", 9u) == 0 && strlen(path) == 10u) {
         if (!control_header(c->request)) { plain(c, "403 Forbidden", "Use the calibration page.\n"); return; }
-        if (calibration_command(&core, path[9])) {
+        shared_enter();bool accepted=calibration_command(&core,path[9]);shared_exit();
+        if (accepted) {
             plain(c, "202 Accepted", path[9] == 'x' ? "Stop queued; check [STOP] in the log. GP20 aborts locally.\n" :
                   path[9]=='v' ? "Optical capture queued: motors stay off. Wait for [OPTICAL START], then slide paper for 5 seconds.\n" :
                   "Selection queued. Wait for [SELECT] in the log, then press GP20 on the car.\n");
@@ -257,7 +296,7 @@ static err_t accept_client(void *arg, struct tcp_pcb *pcb, err_t err)
     tcp_abort(pcb);
     return ERR_ABRT;
 }
-bool calibration_wifi_init(void)
+static bool network_init(void)
 {
     boot_id = get_rand_32();
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0) { return false; }
@@ -271,8 +310,7 @@ bool calibration_wifi_init(void)
         struct tcp_pcb *listener = tcp_listen_with_backlog(pcb, CLIENT_COUNT);
         if (listener != NULL) {
             tcp_accept(listener, accept_client);
-            core.selection_allowed = true;
-            ready = true;
+            shared_enter();core.selection_allowed = true;ready = true;shared_exit();
             return true;
         }
     }
@@ -282,10 +320,9 @@ bool calibration_wifi_init(void)
     cyw43_arch_deinit();
     return false;
 }
-void calibration_wifi_poll(bool selection_allowed)
+static void network_poll(void)
 {
     if (!ready) { return; }
-    core.selection_allowed = selection_allowed;
     uint64_t start = time_us_64();
     cyw43_arch_poll();
     /* One bounded chunk per connection per application iteration. */
@@ -296,11 +333,42 @@ void calibration_wifi_poll(bool selection_allowed)
         }
     }
     uint32_t elapsed = (uint32_t)(time_us_64() - start);
+    shared_enter();
     if (elapsed > max_poll_us) { max_poll_us = elapsed; }
+    shared_exit();
 }
-int calibration_wifi_getchar(void) { return calibration_take_command(&core); }
-uint32_t calibration_wifi_max_poll_us(void) { return max_poll_us; }
-
-void calibration_wifi_reset_timing(void) { max_poll_us = 0u; }
-
-course_config_t calibration_wifi_course_config(void) { return core.course; }
+#if ROBOCAR_WIFI_CORE1
+static void network_main(void)
+{
+    (void)network_init();
+    sem_release(&network_started);
+    for(;;){network_poll();sleep_ms(1);}
+}
+#endif
+bool calibration_wifi_init(void)
+{
+    shared_init();
+#if ROBOCAR_WIFI_CORE1
+    sem_init(&network_started,0,1);
+    multicore_launch_core1_with_stack(network_main,network_stack,sizeof(network_stack));
+    if(!sem_acquire_timeout_ms(&network_started,10000))return false;
+    shared_enter();bool available=ready;shared_exit();return available;
+#else
+    return network_init();
+#endif
+}
+void calibration_wifi_poll(bool selection_allowed)
+{
+    shared_enter();core.selection_allowed=selection_allowed;shared_exit();
+#if !ROBOCAR_WIFI_CORE1
+    network_poll();
+#endif
+}
+int calibration_wifi_getchar(void)
+{shared_enter();int ch=calibration_take_command(&core);if(ch=='q')selected_course=core.course;shared_exit();return ch;}
+uint32_t calibration_wifi_max_poll_us(void)
+{shared_enter();uint32_t n=max_poll_us;shared_exit();return n;}
+void calibration_wifi_reset_timing(void)
+{shared_enter();max_poll_us=0;shared_exit();}
+course_config_t calibration_wifi_course_config(void)
+{shared_enter();course_config_t c=selected_course;shared_exit();return c;}
