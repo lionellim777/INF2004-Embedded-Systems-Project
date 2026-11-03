@@ -21,7 +21,7 @@ const char *obstacle_bypass_phase(avoid_phase_t p)
     const char *names[]={"FOLLOW","SETTLE","TURN_RIGHT_OUT","SCAN_RIGHT_PATH","MOVE_OUT",
         "FACE_FORWARD","SCAN_FORWARD","MOVE_ALONG","FACE_OBJECT","SCAN_OBJECT_SIDE",
         "FACE_ALONG","SEEK_RETURN_LINE","VERIFY_LINE","CHECK_FOUND_TAPE",
-        "PROBE_TAPE_HEADING","ADVANCE_AXLE_TO_TAPE","ALIGN_WITH_TAPE","CONFIRM_TAPE_HEADING","FAILED"};
+        "PROBE_TAPE_HEADING","ADVANCE_AXLE_TO_TAPE","ALIGN_WITH_TAPE","CONFIRM_TAPE_HEADING","SCAN_OBJECT_WIDTH","CHECK_LEFT_EDGE","CLEAR_REAR_MARGIN","FAILED"};
     return p<=AVOID_FAILED?names[p]:"INVALID";
 }
 static line_check_output_t quiet(obstacle_bypass_t *a)
@@ -45,9 +45,9 @@ static bool encoder_health_ok(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t
     return true;
 }
 static bool scan_phase(avoid_phase_t p)
-{return p==AVOID_SCAN_OUT||p==AVOID_SCAN_FORWARD||p==AVOID_SCAN_SIDE;}
+{return p==AVOID_SCAN_INITIAL||p==AVOID_SCAN_OUT||p==AVOID_SCAN_FORWARD||p==AVOID_SCAN_SIDE;}
 static bool forward_phase(avoid_phase_t p)
-{return p==AVOID_MOVE_OUT||p==AVOID_MOVE_ALONG||p==AVOID_RETURN_LINE||p==AVOID_TAPE_PROBE||p==AVOID_AXLE_ADVANCE;}
+{return p==AVOID_MOVE_OUT||p==AVOID_MOVE_ALONG||p==AVOID_RETURN_LINE||p==AVOID_TAPE_PROBE||p==AVOID_AXLE_ADVANCE||p==AVOID_CLEAR_TAIL;}
 static void wait_for(obstacle_bypass_t *a,avoid_phase_t next,uint64_t now)
 {
     a->phase=AVOID_WAIT;a->next=next;a->phase_us=now;a->servo_angle=90;
@@ -58,7 +58,9 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
 {
     a->phase=p;a->phase_us=now;a->hit_us=0;a->close_count=0;
     motion_init(&a->leg);
+    if(p==AVOID_CHECK_LEFT){a->servo_angle=125;a->left_samples=a->left_far=0;a->left_near=false;return;}
     if(scan_phase(p)){
+        if(p==AVOID_SCAN_INITIAL){for(unsigned i=0;i<5;i++){a->plan_cm[i]=401;a->plan_good[i]=0;}}
         a->scan_index=a->samples=a->scan_no_echo=a->scan_center_clear=0;a->scan_min_cm=401;
         a->scan_ray_far=a->scan_far_rays=a->scan_far_samples=0;
         a->scan_nearest_angle=a->scan_blocked_angle=0;
@@ -73,18 +75,23 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
         motion_begin(&a->leg,turn,enc,now);a->leg.slow_turn=true;
         if(turn==MOTION_RIGHT_90){a->leg.left.target=BYPASS_RIGHT_COUNTS;a->leg.right.target=-BYPASS_RIGHT_COUNTS;}
         else {a->leg.left.target=-BYPASS_LEFT_COUNTS;a->leg.right.target=BYPASS_LEFT_COUNTS;}
+        if(p==AVOID_TURN_OUT||p==AVOID_TURN_FORWARD){
+            unsigned degrees=a->departure_deg?a->departure_deg:90;
+            a->leg.left.target=a->leg.left.target*(int)degrees/90;
+            a->leg.right.target=a->leg.right.target*(int)degrees/90;
+        }
         if(p==AVOID_ALIGN_TURN){
             if(!a->align_reversed)a->align_origin.start=enc;
             a->align_hit_us=0;a->align_armed=true;
-            /* Choose the sweep toward the recorded approach heading. The
-             * opposite sweep remains bounded and cannot accept backward tape. */
+            /* Operator-selected right-first rejoin. The opposite sweep is
+             * only a bounded fallback if the right sweep finds no tape. */
             int degrees=a->align_reversed?220:110;
             a->leg.left.target=a->align_direction*1000*degrees/90;
             a->leg.right.target=-a->leg.left.target;
         }
     }
     else if(forward_phase(p)){
-        unsigned mm=p==AVOID_MOVE_OUT?a->outward_mm:p==AVOID_MOVE_ALONG?ALONG_STEP_MM:
+        unsigned mm=p==AVOID_MOVE_OUT?(a->departure_travel_mm?a->departure_travel_mm:a->outward_mm):p==AVOID_MOVE_ALONG?ALONG_STEP_MM:p==AVOID_CLEAR_TAIL?100:
             p==AVOID_TAPE_PROBE?60:p==AVOID_AXLE_ADVANCE?a->axle_mm:a->offset_mm-SENSOR_LEAD_MM+60;
         motion_begin_distance(&a->leg,mm,enc,now);
         a->leg.alignment_drive=p==AVOID_TAPE_PROBE||p==AVOID_AXLE_ADVANCE;
@@ -123,7 +130,7 @@ static bool may_find_tape(avoid_phase_t p)
 {
     /* Only moving straight legs can be paused and resumed after a spatial
      * ink test. Black glimpses during chassis/sonar turns are not route proof. */
-    return p==AVOID_MOVE_OUT||p==AVOID_MOVE_ALONG||p==AVOID_RETURN_LINE;
+    return p==AVOID_MOVE_OUT||p==AVOID_MOVE_ALONG||p==AVOID_CLEAR_TAIL||p==AVOID_RETURN_LINE;
 }
 /* Encoder-estimated heading relative to the axle-centred crossing. Use both
  * wheels and retain the origin across the opposite sweep. This is a geometric
@@ -152,7 +159,7 @@ static bool route_direction_ok(const obstacle_bypass_t *a,encoder_sample_t enc)
 static bool alignment_window(const obstacle_bypass_t *a,encoder_sample_t enc)
 {
     int32_t heading=alignment_heading(a,enc)*a->align_direction;
-    return heading>=60&&heading<=115&&route_direction_ok(a,enc);
+    return heading>=60&&heading<=115;
 }
 static void resume_alignment(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t now)
 {
@@ -204,7 +211,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->saved_leg=a->leg;
             motion_abort(&a->leg);a->tape_origin.start=enc;a->align_reversed=false;
             a->route_heading_deg=route_heading(a,enc);
-            a->align_direction=a->route_heading_deg>0?-1:1;
+            a->align_direction=1; /* explicit operator right-first preference */
             a->probe_black=true;a->probe_gap=false;a->probe_first_black_mm=0;
             a->tape_decision="SPATIAL_INK_CHECK";
             enter(a,AVOID_TAPE_PROBE,enc,now);
@@ -318,11 +325,12 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             if(a->approach_pending&&fresh&&valid&&cm<=APPROACH_CM&&a->approach_hits<2)
                 a->approach_hits++;
         }
-        /* Near-object approach and perpendicular rejoin require the existing
-         * precise recovery; rolling bend continuation belongs to open following. */
-        a->line.bend_disabled=a->phase==AVOID_VERIFY||a->approach_warning;
+        /* A warning slows the follower but does not disable a measured bend
+         * direction. A committed obstacle stop and rejoin verification still
+         * use precise recovery rather than rolling away from their target. */
+        a->line.bend_disabled=a->phase==AVOID_VERIFY||a->approach_pending;
         course_set_cruise_limit(&a->line,a->phase==AVOID_VERIFY||a->approach_warning?450:
-            a->phase==AVOID_FOLLOW&&a->fast_clear>=2?800:600);
+            a->phase==AVOID_FOLLOW&&a->fast_clear>=2?1000:600);
         if(a->phase==AVOID_FOLLOW&&a->approach_pending){
             if(a->approach_hits<2&&now-a->approach_us<APPROACH_CONFIRM_US)
                 return (line_check_output_t){0,0,false,"OBSTACLE_CONFIRM_STOPPED"};
@@ -333,10 +341,11 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
              * offset allowed the tip to touch a bottle during side inspection.
              * Start at the requested 250mm compromise; physical clearance
              * remains to be checked. Extensions and path scans stay bounded. */
-            a->outward_mm=INITIAL_OFFSET_MM;a->side_seen=false;a->clear_checks=0;a->last_side_seen_mm=0;
+            a->outward_mm=INITIAL_OFFSET_MM;a->departure_deg=90;a->departure_travel_mm=INITIAL_OFFSET_MM;a->departure_forward_mm=0;
+            a->plan=(obstacle_plan_t){0};a->tail_margin_done=false;a->side_seen=false;a->clear_checks=0;a->last_side_seen_mm=0;
             a->approach_pending=false;a->approach_warning=false;
             a->rejoin_armed=false;a->white_us=0;
-            wait_for(a,AVOID_TURN_OUT,now);return quiet(a);
+            wait_for(a,AVOID_SCAN_INITIAL,now);return quiet(a);
         }
         if(!a->range_us){return quiet(a);}
         if(now-a->range_us>RANGE_STALE_US)return fail(a,"AVOID_RANGE_STALE");
@@ -358,7 +367,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         return out;
     }
     if(a->phase==AVOID_WAIT){
-        if(a->next==AVOID_TURN_OUT&&a->offset_mm==0&&fresh&&valid&&cm<MIN_PIVOT_CM)
+        if((a->next==AVOID_TURN_OUT||a->next==AVOID_SCAN_INITIAL)&&a->offset_mm==0&&fresh&&valid&&cm<MIN_PIVOT_CM)
             return fail(a,"AVOID_APPROACH_TOO_CLOSE");
         if(now-a->phase_us>=SETTLE_US){
             /* Wait for a NEW forward-facing sample, not the last side ray. */
@@ -372,12 +381,28 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         }
         return quiet(a);
     }
+    if(a->phase==AVOID_CHECK_LEFT){
+        /* Fixed leftmost servo ray is oblique, not a true side-looking sensor.
+         * Inspect while stopped so forward coverage is not silently disabled. */
+        if(now-a->phase_us>1500000)return fail(a,"AVOID_LEFT_CHECK_STALE");
+        if(now-a->phase_us<SETTLE_US||!fresh)return quiet(a);
+        float limit=a->offset_mm/10.0f+20;
+        if(valid&&cm<=limit){a->left_near=true;a->side_seen=true;a->last_side_seen_mm=a->along_mm;a->tail_margin_done=false;}
+        if(valid&&cm>limit)a->left_far++;
+        if(++a->left_samples>=3){
+            if(!a->left_near&&a->left_far>=2&&(a->side_seen||a->plan.right_edge_known)&&!a->tail_margin_done)
+                wait_for(a,AVOID_CLEAR_TAIL,now);
+            else wait_for(a,AVOID_TURN_LOOK,now);
+        }
+        return quiet(a);
+    }
     if(scan_phase(a->phase)){
         if(now-a->phase_us>2500000)return fail(a,"AVOID_SCAN_STALE");
         if(!fresh||now-a->phase_us<SETTLE_US)return quiet(a);
         float limit=a->phase==AVOID_SCAN_SIDE?a->offset_mm/10.0f+20.0f:
-            a->phase==AVOID_SCAN_OUT?a->outward_mm/10.0f+20.0f:25.0f;
+            a->phase==AVOID_SCAN_OUT?(a->departure_travel_mm?a->departure_travel_mm:a->outward_mm)/10.0f+20.0f:25.0f;
         if(valid){
+            if(a->phase==AVOID_SCAN_INITIAL){a->plan_good[a->scan_index]++;if(cm<a->plan_cm[a->scan_index])a->plan_cm[a->scan_index]=cm;}
             if(cm<a->scan_min_cm){a->scan_min_cm=cm;a->scan_nearest_angle=a->servo_angle;}
             bool in_corridor=true;
             if(a->phase==AVOID_SCAN_OUT){
@@ -401,19 +426,27 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->servo_angle=angles[a->scan_index];a->phase_us=now;return quiet(a);
         }
         a->scans++;a->scan_serial++;
-        if(a->phase==AVOID_SCAN_OUT){
+        if(a->phase==AVOID_SCAN_INITIAL){
+            a->plan=obstacle_plan(a->plan_cm,a->plan_good,a->approach_min_cm);
+            if(a->scan_min_cm<MIN_PIVOT_CM)return fail(a,"AVOID_APPROACH_TOO_CLOSE");
+            a->departure_deg=a->plan.angle_deg;a->outward_mm=a->plan.lateral_mm;
+            a->departure_travel_mm=a->plan.travel_mm;a->departure_forward_mm=a->plan.forward_mm;
+            wait_for(a,AVOID_TURN_OUT,now);
+        }else if(a->phase==AVOID_SCAN_OUT){
             if(a->scan_blocked)return fail(a,"AVOID_RIGHT_PATH_BLOCKED");
             wait_for(a,AVOID_MOVE_OUT,now);
         }else if(a->phase==AVOID_SCAN_FORWARD){
             if(a->scan_blocked){
                 if(a->offset_mm>=MAX_OFFSET_MM)return fail(a,"AVOID_OBJECT_TOO_WIDE_OR_PATH_BLOCKED");
-                a->outward_mm=MAX_OFFSET_MM-a->offset_mm<STEP_MM?MAX_OFFSET_MM-a->offset_mm:STEP_MM;wait_for(a,AVOID_TURN_OUT,now);
+                a->departure_deg=90;a->departure_forward_mm=0;
+                a->outward_mm=MAX_OFFSET_MM-a->offset_mm<STEP_MM?MAX_OFFSET_MM-a->offset_mm:STEP_MM;
+                a->departure_travel_mm=a->outward_mm;wait_for(a,AVOID_TURN_OUT,now);
             }else{
                 if(a->along_mm>=MAX_ALONG_MM)return fail(a,"AVOID_OBJECT_END_NOT_CONFIRMED");
                 wait_for(a,AVOID_MOVE_ALONG,now);
             }
         }else{
-            if(a->scan_blocked){a->side_seen=true;a->last_side_seen_mm=a->along_mm;a->clear_checks=0;}
+            if(a->scan_blocked){a->side_seen=true;a->last_side_seen_mm=a->along_mm;a->clear_checks=0;a->tail_margin_done=false;}
             /* Open space need not echo on precisely the central ray. Use two
              * distinct angles with repeated valid far echoes (or the original
              * repeated central echoes), no close ray, and an observed object
@@ -421,11 +454,11 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
              * a second stationary sweep instead of driving another 200 mm.
              * This authorises a cautious monitored return, not proof of an
              * empty swept volume; all movement obstacle/stale guards remain. */
-            else if(a->side_seen&&a->along_mm>=MIN_ALONG_MM&&
+            else if((a->side_seen||a->plan.right_edge_known)&&a->along_mm>=MIN_ALONG_MM&&
                 a->along_mm>=a->last_side_seen_mm+ALONG_STEP_MM&&
                 (a->scan_center_clear>=2||a->scan_far_rays>=2))a->clear_checks++;
             else a->clear_checks=0;
-            if(a->side_seen&&a->clear_checks>=2&&a->along_mm>=MIN_ALONG_MM)
+            if((a->side_seen||a->plan.right_edge_known)&&a->clear_checks>=2&&a->along_mm>=MIN_ALONG_MM)
                 wait_for(a,AVOID_RETURN_LINE,now);
             else if(a->clear_checks==1)wait_for(a,AVOID_SCAN_SIDE,now);
             else wait_for(a,AVOID_TURN_ALONG,now);
@@ -448,9 +481,10 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
     if(a->leg.phase==MOTION_DONE){
         switch(a->phase){
         case AVOID_TURN_OUT:wait_for(a,AVOID_SCAN_OUT,now);break;
-        case AVOID_MOVE_OUT:a->offset_mm+=a->outward_mm;wait_for(a,AVOID_TURN_FORWARD,now);break;
+        case AVOID_MOVE_OUT:a->offset_mm+=a->outward_mm;a->along_mm+=a->departure_forward_mm;wait_for(a,AVOID_TURN_FORWARD,now);break;
         case AVOID_TURN_FORWARD:case AVOID_TURN_ALONG:wait_for(a,AVOID_SCAN_FORWARD,now);break;
-        case AVOID_MOVE_ALONG:a->along_mm+=ALONG_STEP_MM;wait_for(a,AVOID_TURN_LOOK,now);break;
+        case AVOID_MOVE_ALONG:a->along_mm+=ALONG_STEP_MM;wait_for(a,AVOID_CHECK_LEFT,now);break;
+        case AVOID_CLEAR_TAIL:a->along_mm+=100;a->tail_margin_done=true;wait_for(a,AVOID_TURN_LOOK,now);break;
         case AVOID_TURN_LOOK:wait_for(a,AVOID_SCAN_SIDE,now);break;
         case AVOID_TAPE_PROBE:
             if(a->probe_gap){

@@ -61,11 +61,19 @@ int main(void){
         o=step(0,false,2,2,10000);
         assert(!o.stop&&c.phase==COURSE_LOST&&!o.left&&!o.right&&c.bend_attempts==1);
     }
+    /* A real directed bend can continue beyond the former20mm/8deg gate
+     * and recover without entering the stopped search. */
+    setup();hint(-1);lose(-1);
+    for(int i=0;i<21;i++){
+        line_check_output_t moving=step(i>=17?800:0,false,3,15,20000);
+        assert(!moving.stop&&c.phase==COURSE_FOLLOW&&moving.left>=0&&moving.right>=0);
+    }
+    assert(c.bend_completed==1&&!c.bend_active&&c.recoveries==0);
     /* Unknown/stale direction, startup, barcode proximity, obstacle override,
      * and a crossing do not authorize blind continuation. */
     for(int mode=0;mode<6;mode++){
         setup();if(mode!=0)hint(-1);
-        if(mode==1)for(int i=0;i<7;i++)step(800,false,60,60,100000);
+        if(mode==1)for(int i=0;i<17;i++)step(800,false,60,60,100000);
         if(mode==2)c.drive.launch_complete=false;
         if(mode==3)course_note_barcode_activity(&c,now);
         if(mode==4)c.bend_disabled=true;
@@ -76,9 +84,9 @@ int main(void){
     /* Absolute bounds cannot be renewed by weak tape flicker. */
     for(int mode=0;mode<5;mode++){
         setup();hint(-1);lose(-1);line_check_output_t o;
-        if(mode==0){for(int i=0;i<5;i++)o=step(i%2?650:0,false,5,10,100000);}
-        else if(mode==1)o=step(0,false,200,280,10000);
-        else if(mode==2)o=step(0,false,0,190,10000);
+        if(mode==0){for(int i=0;i<7;i++)o=step(i%2?650:0,false,5,10,100000);}
+        else if(mode==1)o=step(0,false,440,550,10000);
+        else if(mode==2)o=step(0,false,0,410,10000);
         else if(mode==3)o=step(0,false,80,0,10000); /* wrong yaw */
         else o=step(0,false,-30,0,10000); /* reverse encoder motion */
         assert(!c.bend_active&&c.bend_fallbacks==1&&c.phase==COURSE_LOST&&!o.left&&!o.right);
