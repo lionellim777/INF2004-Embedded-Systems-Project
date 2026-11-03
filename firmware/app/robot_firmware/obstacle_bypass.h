@@ -12,7 +12,10 @@ typedef enum {
 } avoid_phase_t;
 typedef struct {
     course_control_t line;
-    motion_control_t leg, origin, tape_origin, episode_origin, align_origin;
+    motion_control_t leg, origin, tape_origin, episode_origin, align_origin, saved_leg;
+    bool probe_black, probe_gap;
+    unsigned probe_first_black_mm;
+    int route_heading_deg;
     unsigned axle_mm;
     int align_direction;
     bool align_reversed;

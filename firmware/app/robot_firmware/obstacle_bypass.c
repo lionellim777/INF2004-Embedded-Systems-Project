@@ -76,8 +76,8 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
         if(p==AVOID_ALIGN_TURN){
             if(!a->align_reversed)a->align_origin.start=enc;
             a->align_hit_us=0;a->align_armed=true;
-            /* Right first is an explicit rejoin policy, not inferred from
-             * accumulated wheel mismatch. Opposite sweep is a bounded fallback. */
+            /* Choose the sweep toward the recorded approach heading. The
+             * opposite sweep remains bounded and cannot accept backward tape. */
             int degrees=a->align_reversed?220:110;
             a->leg.left.target=a->align_direction*1000*degrees/90;
             a->leg.right.target=-a->leg.left.target;
@@ -85,7 +85,7 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     }
     else if(forward_phase(p)){
         unsigned mm=p==AVOID_MOVE_OUT?a->outward_mm:p==AVOID_MOVE_ALONG?ALONG_STEP_MM:
-            p==AVOID_TAPE_PROBE?30:p==AVOID_AXLE_ADVANCE?a->axle_mm:a->offset_mm-SENSOR_LEAD_MM+60;
+            p==AVOID_TAPE_PROBE?60:p==AVOID_AXLE_ADVANCE?a->axle_mm:a->offset_mm-SENSOR_LEAD_MM+60;
         motion_begin_distance(&a->leg,mm,enc,now);
         a->leg.alignment_drive=p==AVOID_TAPE_PROBE||p==AVOID_AXLE_ADVANCE;
     }else if(p==AVOID_VERIFY){
@@ -109,6 +109,7 @@ static int32_t mean_mm(const motion_control_t *m,encoder_sample_t enc)
 static void resume_detour(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t now)
 {
     uint64_t pause=now-a->candidate_us;
+    if(a->phase==AVOID_TAPE_PROBE)a->leg=a->saved_leg;
     a->phase=a->resume_phase;a->phase_us=now;a->servo_angle=a->resume_servo;
     a->rejoin_rejected++;a->range_us=0;a->close_count=0;
     a->leg.start_us+=pause;a->leg.control_us=now;
@@ -120,9 +121,9 @@ static void resume_detour(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t now
 }
 static bool may_find_tape(avoid_phase_t p)
 {
-    return p==AVOID_WAIT||p==AVOID_TURN_OUT||p==AVOID_SCAN_OUT||p==AVOID_MOVE_OUT||
-        p==AVOID_TURN_FORWARD||p==AVOID_SCAN_FORWARD||p==AVOID_MOVE_ALONG||
-        p==AVOID_TURN_LOOK||p==AVOID_SCAN_SIDE||p==AVOID_TURN_ALONG||p==AVOID_RETURN_LINE;
+    /* Only moving straight legs can be paused and resumed after a spatial
+     * ink test. Black glimpses during chassis/sonar turns are not route proof. */
+    return p==AVOID_MOVE_OUT||p==AVOID_MOVE_ALONG||p==AVOID_RETURN_LINE;
 }
 /* Encoder-estimated heading relative to the axle-centred crossing. Use both
  * wheels and retain the origin across the opposite sweep. This is a geometric
@@ -133,10 +134,25 @@ static int32_t alignment_heading(const obstacle_bypass_t *a,encoder_sample_t enc
         motion_right_position(&a->align_origin,enc);
     return (int32_t)(differential*90/2000);
 }
+static int32_t route_heading(const obstacle_bypass_t *a,encoder_sample_t enc)
+{
+    int64_t differential=(int64_t)motion_left_position(&a->episode_origin,enc)-
+        motion_right_position(&a->episode_origin,enc);
+    int32_t degrees=(int32_t)(differential*90/2000)%360;
+    if(degrees>180)degrees-=360;
+    if(degrees< -180)degrees+=360;
+    return degrees;
+}
+static bool route_direction_ok(const obstacle_bypass_t *a,encoder_sample_t enc)
+{
+    /* Odometry is a prior, not compass truth. Allow bends, reject a heading
+     * that points predominantly back toward the approach/bottle. */
+    int h=route_heading(a,enc);return h>=-120&&h<=120;
+}
 static bool alignment_window(const obstacle_bypass_t *a,encoder_sample_t enc)
 {
     int32_t heading=alignment_heading(a,enc)*a->align_direction;
-    return heading>=60&&heading<=115;
+    return heading>=60&&heading<=115&&route_direction_ok(a,enc);
 }
 static void resume_alignment(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t now)
 {
@@ -185,8 +201,12 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->tape_decision=valid?"FAR_ECHO":a->no_return?"NO_RETURN_MONITORED":"NO_RANGE";
         }
         if(a->rejoin_good>=2){
+            a->saved_leg=a->leg;
             motion_abort(&a->leg);a->tape_origin.start=enc;a->align_reversed=false;
-            a->align_direction=1; /* right first for this supervised bypass mode */
+            a->route_heading_deg=route_heading(a,enc);
+            a->align_direction=a->route_heading_deg>0?-1:1;
+            a->probe_black=true;a->probe_gap=false;a->probe_first_black_mm=0;
+            a->tape_decision="SPATIAL_INK_CHECK";
             enter(a,AVOID_TAPE_PROBE,enc,now);
             return quiet(a);
         }
@@ -226,15 +246,21 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         else if(now-a->phase_us>=1500000)return fail(a,"AVOID_ALIGNED_PATH_UNCONFIRMED");
         return quiet(a);
     }
-    if(a->phase==AVOID_TAPE_PROBE&&center<200){
-        /* Crossing the tape is not alignment. The front sensor saw tape
-         * 120 mm ahead of the axle: bring the axle to that recorded point,
-         * subtracting distance already travelled, then search by turning. */
-        int32_t travelled=mean_mm(&a->tape_origin,enc);
-        int32_t remaining=SENSOR_LEAD_MM+8-travelled;
-        if(remaining<70||remaining>140)return fail(a,"AVOID_TAPE_POSITION_UNCERTAIN");
-        a->axle_mm=(unsigned)remaining;motion_abort(&a->leg);
-        wait_for(a,AVOID_AXLE_ADVANCE,now);return quiet(a);
+    if(a->phase==AVOID_TAPE_PROBE){
+        int mm=mean_mm(&a->tape_origin,enc);
+        if(a->probe_black&&center<200){
+            a->probe_black=false;a->probe_gap=true;
+            a->probe_first_black_mm=mm>0?(unsigned)mm:0;
+            if(mm<8){
+                a->tape_decision="INK_TOO_NARROW";
+                resume_detour(a,enc,now);return quiet(a);
+            }
+        }else if(!a->probe_black&&center>=a->reference*80/100){
+            /* Multiple black bands over 60 mm are consistent with barcode or
+             * printed text. Resume the saved detour; do not steer along ink. */
+            a->tape_decision="REPEATED_INK";
+            resume_detour(a,enc,now);return quiet(a);
+        }
     }
     if(a->phase==AVOID_ALIGN_TURN){
         if(!a->range_us||now-a->range_us>RANGE_STALE_US)return fail(a,"AVOID_RANGE_STALE");
@@ -339,7 +365,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             if(!a->range_us||now-a->range_us>RANGE_STALE_US)return fail(a,"AVOID_RANGE_STALE");
             if(a->next==AVOID_AXLE_ADVANCE){
                 int32_t remaining=SENSOR_LEAD_MM+8-mean_mm(&a->tape_origin,enc);
-                if(remaining<70||remaining>140)return fail(a,"AVOID_TAPE_POSITION_UNCERTAIN");
+                if(remaining<40||remaining>140)return fail(a,"AVOID_TAPE_POSITION_UNCERTAIN");
                 a->axle_mm=(unsigned)remaining; /* include coast during settling */
             }
             enter(a,a->next,enc,now);
@@ -426,7 +452,17 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         case AVOID_TURN_FORWARD:case AVOID_TURN_ALONG:wait_for(a,AVOID_SCAN_FORWARD,now);break;
         case AVOID_MOVE_ALONG:a->along_mm+=ALONG_STEP_MM;wait_for(a,AVOID_TURN_LOOK,now);break;
         case AVOID_TURN_LOOK:wait_for(a,AVOID_SCAN_SIDE,now);break;
-        case AVOID_TAPE_PROBE:enter(a,AVOID_VERIFY,enc,now);break;
+        case AVOID_TAPE_PROBE:
+            if(a->probe_gap){
+                int remaining=SENSOR_LEAD_MM+8-mean_mm(&a->tape_origin,enc);
+                if(remaining<40||remaining>140)return fail(a,"AVOID_TAPE_POSITION_UNCERTAIN");
+                a->axle_mm=(unsigned)remaining;
+                a->tape_decision="SINGLE_CROSSING";
+                wait_for(a,AVOID_AXLE_ADVANCE,now);
+            }else if(route_direction_ok(a,enc)){
+                a->tape_decision="CONTINUOUS_INK";enter(a,AVOID_VERIFY,enc,now);
+            }else return fail(a,"AVOID_REJOIN_BACKWARD_HEADING");
+            break;
         case AVOID_AXLE_ADVANCE:wait_for(a,AVOID_ALIGN_TURN,now);break;
         case AVOID_ALIGN_TURN:
             if(a->align_reversed)return fail(a,"AVOID_TAPE_HEADING_NOT_FOUND");

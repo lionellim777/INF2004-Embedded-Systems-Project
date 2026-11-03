@@ -281,8 +281,7 @@ static void encoder_error_tests(void){
     puts("PASS isolated encoder transition, burst/rate/run budget, initial counters and counter reset");
 }
 static void early_rejoin_tests(void){
-    const avoid_phase_t phases[]={AVOID_MOVE_OUT,AVOID_MOVE_ALONG,AVOID_TURN_FORWARD,
-        AVOID_TURN_LOOK,AVOID_TURN_ALONG,AVOID_SCAN_SIDE,AVOID_SCAN_FORWARD,AVOID_WAIT,AVOID_RETURN_LINE};
+    const avoid_phase_t phases[]={AVOID_MOVE_OUT,AVOID_MOVE_ALONG,AVOID_RETURN_LINE};
     for(unsigned k=0;k<sizeof(phases)/sizeof(phases[0]);k++){
         init();a.phase=phases[k];a.episode_us=now;a.offset_mm=200;a.rejoin_armed=true;
         a.next=AVOID_TURN_LOOK;a.servo_angle=50;
@@ -290,7 +289,7 @@ static void early_rejoin_tests(void){
         assert(a.phase==AVOID_CHECK_TAPE&&a.servo_angle==90&&a.rejoin_attempts==1);
         for(unsigned i=0;i<25;i++)tick(true,true,180,700,false);
         assert(a.phase==AVOID_CHECK_TAPE&&!a.completed); /* ignore settling rays */
-        for(unsigned i=0;i<200&&a.phase!=AVOID_VERIFY;i++)tick(true,true,180,700,false);
+        for(unsigned i=0;i<450&&a.phase!=AVOID_VERIFY;i++)tick(true,true,180,700,false);
         assert(a.phase==AVOID_VERIFY&&!a.completed);
         for(unsigned i=0;i<35;i++)tick(true,true,180,700,true);
         assert(!a.completed); /* stationary black is not proof of following */
@@ -337,7 +336,7 @@ static void no_return_rejoin_tests(void){
                 mode!=3,mode==2,mode==2?20:180,
                 mode==4?"AVOID_SONAR_TOO_CLOSE_OR_BAD_PULSE":NULL,mode!=1);
         }
-        if(mode==0){assert(a.phase==AVOID_TAPE_PROBE&&!out.stop);assert(!strcmp(a.tape_decision,"NO_RETURN_MONITORED"));}
+        if(mode==0){assert(a.phase==AVOID_TAPE_PROBE&&!out.stop);assert(!strcmp(a.tape_decision,"SPATIAL_INK_CHECK"));}
         else if(mode==2){assert(a.phase==AVOID_MOVE_ALONG&&a.rejoin_rejected==1);}
         else {assert(out.stop);assert(!strcmp(out.state,mode==4?"AVOID_SONAR_TOO_CLOSE_OR_BAD_PULSE":"AVOID_REJOIN_RANGE_UNAVAILABLE"));}
     }
@@ -473,16 +472,74 @@ static void alignment_drive_tests(void){
     motion_poll(&m,e,200000);assert(!m.left.throttle&&!m.right.throttle);
     puts("PASS old alignment stall reproduced; loaded advance recovery, ramp, overspeed, single/both wheel stall and skew hold");
 }
+static void endpoint_assist_tests(void){
+    /* Reproduce the recorded39-count shortfall with the other wheel done.
+     * Each wheel must restart above21.1%, finish exactly, and a hard block
+     * must still terminate at the existing one-second deadline. */
+    for(unsigned w=0;w<2;w++)for(unsigned blocked=0;blocked<2;blocked++){
+        motion_control_t m={0};encoder_sample_t e={0};
+        assert(motion_begin_distance(&m,200,e,0));
+        double l=m.left.target-(w==0?39:0),r=m.right.target-(w==1?39:0);
+        bool assist=false;
+        for(unsigned i=1;i<=500&&m.phase==MOTION_ACTIVE;i++){
+            if(!blocked){
+                if(w==0)l+=fmaxf(0,m.left.throttle-.24f)*8000*.01;
+                else r+=fmaxf(0,m.right.throttle-.24f)*8000*.01;
+            }
+            e.left_raw=(uint32_t)-(int32_t)l;e.right_raw=(uint32_t)(int32_t)r;
+            motion_poll(&m,e,i*10000u);
+            if(m.left.throttle>.24f||m.right.throttle>.24f)assist=true;
+            assert(m.left.throttle<=.32001f&&m.right.throttle<=.32001f);
+            if(w==0)assert(m.right.throttle==0);else assert(m.left.throttle==0);
+        }
+        assert(assist);
+        if(blocked)assert(m.phase==MOTION_FAULT&&m.fault==MOTION_STALLED);
+        else assert(m.phase==MOTION_DONE);
+    }
+    puts("PASS 39-count endpoint shortfall: each wheel restarts, finished wheel held, hard stall retained");
+}
+static void spatial_ink_tests(void){
+    for(unsigned mode=0;mode<4;mode++){
+        init();a.phase=AVOID_MOVE_ALONG;a.episode_us=now;a.offset_mm=250;
+        a.rejoin_armed=true;motion_begin_distance(&a.leg,200,enc,now);
+        int target=a.leg.left.target;encoder_sample_t start=a.leg.start;
+        tick(true,true,180,700,false);
+        while(a.phase==AVOID_CHECK_TAPE)tick(true,true,180,700,false);
+        assert(a.phase==AVOID_TAPE_PROBE);
+        for(unsigned i=0;i<600&&!out.stop&&a.phase==AVOID_TAPE_PROBE;i++){
+            double mm=(motion_left_position(&a.tape_origin,enc)+motion_right_position(&a.tape_origin,enc))/(2*13.491);
+            int center=700;
+            if(mode==0)center=mm<3?700:0; /* half narrow bar */
+            if(mode==1)center=mm<18||mm>=30?700:0; /* full wide bar + gap + next ink */
+            if(mode==2)center=mm<18?700:0; /* single route crossing */
+            tick(true,true,180,center,false);
+        }
+        assert(!out.stop);
+        if(mode<2){
+            assert(a.phase==AVOID_MOVE_ALONG&&a.rejoin_rejected==1&&!a.completed);
+            assert(a.leg.left.target==target&&!memcmp(&start,&a.leg.start,sizeof(start)));
+            assert(!strcmp(a.tape_decision,mode==0?"INK_TOO_NARROW":"REPEATED_INK"));
+        }else if(mode==2)assert(a.phase==AVOID_WAIT&&a.next==AVOID_AXLE_ADVANCE);
+        else assert(a.phase==AVOID_VERIFY&&!a.completed);
+    }
+    /* Black during a pivot is never accepted as a route candidate. */
+    init();a.phase=AVOID_TURN_LOOK;a.offset_mm=250;a.episode_us=now;a.rejoin_armed=true;
+    motion_begin(&a.leg,MOTION_LEFT_90,enc,now);a.leg.slow_turn=true;
+    tick(true,true,180,700,false);assert(a.phase==AVOID_TURN_LOOK&&!a.rejoin_attempts);
+    puts("PASS spatial ink check: narrow/repeated ink rejected with saved leg; single crossing/continuous tape qualified; pivot ink ignored");
+}
 static void alignment_tests(void){
     /* Geometric plant: sensor 120 mm ahead of axle; tape at x=0 extending
      * along y. A perpendicular approach cannot succeed by a small pivot at
      * the detection point x=-120. Count-to-yaw uses 1000 counts per 90 deg.
      * This validates geometry/control logic, not tyre slip or physical optics. */
-    for(unsigned mode=0;mode<11;mode++){
+    for(unsigned mode=0;mode<14;mode++){
         init();a.phase=AVOID_CHECK_TAPE;a.candidate_us=a.phase_us=a.episode_us=now;
         a.offset_mm=200;a.resume_phase=AVOID_MOVE_ALONG;a.rejoin_attempts=1;
-        /* Prior wheel imbalance must not change the explicit right-first policy. */
-        a.episode_origin.start.left_raw=600;
+        /* A small odometry bias still prefers the right path toward the approach. */
+        a.episode_origin.start.left_raw=(uint32_t)-600;
+        if(mode==11||mode==13)a.episode_origin.start.left_raw=2000; /* outward90 -> left toward approach */
+        if(mode==12)a.episode_origin.start.left_raw=(uint32_t)-2000; /* return-90 -> right */
         double x=-120,y=0,heading=0;
         unsigned visited=0;bool saw_lost=false;
         for(unsigned i=0;i<5000&&!out.stop&&!a.completed;i++){
@@ -501,7 +558,7 @@ static void alignment_tests(void){
             if(a.phase==AVOID_TAPE_PROBE&&!center)saw_lost=true;
             if(mode==1&&(a.phase==AVOID_ALIGN_TURN||a.phase==AVOID_ALIGN_CONFIRM))center=0;
             /* Force preferred sweep to miss, exercise opposite full sweep. */
-            if(mode==2&&a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)center=0;
+            if((mode==2||mode==13)&&a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)center=0;
             double degrees=-heading*180/3.14159265359;
             /* Barcode-like ink at 20..40deg must not end the turn. */
             if((mode==7||mode==9)&&a.phase==AVOID_ALIGN_TURN){
@@ -522,14 +579,14 @@ static void alignment_tests(void){
             out=obstacle_bypass_step(&a,(ir_roles_t){false,center>=250,false},center,enc,now,fresh,mode!=10,cm);
             if(mode==5&&a.phase==AVOID_AXLE_ADVANCE)a.leg.alignment_drive=false;
             visited|=1u<<a.phase;
-            if(a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)assert(a.align_direction==1);
+            if(a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)assert(a.align_direction==((mode==11||mode==13)?-1:1));
             if(a.phase==AVOID_ALIGN_CONFIRM){
                 assert(!out.left&&!out.right);
                 assert(fabs(degrees)>=59&&fabs(degrees)<=116);
             }
         }
         assert(saw_lost&&(visited&(1u<<AVOID_AXLE_ADVANCE)));
-        if(mode==0||mode==2||mode==6||mode==7||mode==8||mode==10){
+        if(mode==0||mode==2||mode==6||mode==7||mode==8||mode==10||mode==11||mode==12){
             if(out.stop||!a.completed)printf("geometry mode=%u phase=%s x=%.2f y=%.2f heading=%.2f stop=%s\n",mode,obstacle_bypass_phase(a.phase),x,y,heading,out.state);
             assert(!out.stop&&a.completed==1);
             assert(visited&(1u<<AVOID_ALIGN_CONFIRM));
@@ -537,13 +594,14 @@ static void alignment_tests(void){
             if(mode==8)assert(a.align_rejected==1);
         }else{
             assert(out.stop&&!a.completed);
-            const char *reason=(mode==1||mode==9)?"AVOID_TAPE_HEADING_NOT_FOUND":mode==3?"AVOID_PATH_OBSTACLE_STOP":mode==5?"NO_ENCODER_PROGRESS_1S":"AVOID_ALIGNED_PATH_BLOCKED";
+            const char *reason=(mode==1||mode==9||mode==13)?"AVOID_TAPE_HEADING_NOT_FOUND":mode==3?"AVOID_PATH_OBSTACLE_STOP":mode==5?"NO_ENCODER_PROGRESS_1S":"AVOID_ALIGNED_PATH_BLOCKED";
             assert(!strcmp(out.state,reason));
         }
     }
-    puts("PASS 11 perpendicular geometry cases: right-first, both sweeps, early false ink, rejected confirmation recovery, absent tape, load and obstacles");
+    puts("PASS 14 perpendicular geometry cases: approach-directed left/right, backward rejection, both sweeps, early false ink, rejected confirmation recovery, absent tape, load and obstacles");
 }
 int main(void){
+    endpoint_assist_tests();spatial_ink_tests();
     corridor_scan_tests();
     approach_clearance_tests();
     adaptive_cruise_tests();

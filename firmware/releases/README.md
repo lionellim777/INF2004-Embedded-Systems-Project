@@ -1,8 +1,9 @@
-# Wireless calibration checkpoint v5.54
+# Wireless calibration checkpoint v5.55
 
 | Build | Firmware | Evidence |
 | --- | --- | --- |
-| v5.54 — latest | [Download UF2](robocar_motion_integration_v5_54_wireless.uf2) | Recovery-direction handoff and slower, wider bounded rejoin verification; software checks passed, physical retest pending. [Verification record](build-report-v5_54.json) |
+| v5.55 — latest | [Download UF2](robocar_motion_integration_v5_55_wireless.uf2) | Spatial ink check, approach-heading alignment and bounded endpoint assistance; physical retest pending. [Verification record](build-report-v5_55.json) |
+| v5.54 — previous | [Download UF2](robocar_motion_integration_v5_54_wireless.uf2) | Recovery-direction handoff and slower, wider bounded rejoin verification; software checks passed, physical retest pending. [Verification record](build-report-v5_54.json) |
 | v5.53 — previous | [Download UF2](robocar_motion_integration_v5_53_wireless.uf2) | 25 cm initial detour, completed-no-return tape rejoin, loaded-turn effort and retained failure reports. Straight-strip bypass observed complete; bend rejoin subsequently lost tape. [Verification record](build-report-v5_53.json) |
 | v5.47 — historical | [Download UF2](robocar_motion_integration_v5_47_wireless.uf2) | Conditional faster cruise and transit; software checks passed, physical speed and straight-strip bypass tests pending. [Verification record](build-report-v5_47.json) |
 | v5.46 — baseline | [Download UF2](robocar_motion_integration_v5_46_wireless.uf2) | One observed bend-obstacle bypass completed and resumed following. Full straight-strip return not yet demonstrated. [Verification record](build-report-v5_46.json) |
@@ -17,16 +18,12 @@ open http://192.168.4.1/, select **Follow track + avoid obstacle**, prepare the 
 then use GP20 to start/stop. See [wireless instructions](../../docs/wireless-calibration.md)
 and [obstacle test procedure](../../docs/testing/obstacle-v5_35-bypass.md).
 
-v5.54 retains a 25 cm initial lateral target and right-first tape alignment. It accepts
-fresh completed no-return measurements for a bounded, monitored rejoin, while
-keeping close-obstacle and sensor-fault handling. Turns can build up to 60% drive
-under load without increasing their speed targets. Latest/previous run failure
-snapshots survive rolling-log overwrite; power cycling clears them.
-
-v5.54 adds timed recovery-direction memory, 450 cps rejoin verification and a
-240-count initial verification search leg (normal following remains 120). Moving
-bend continuation is still disabled during verification; search/time/fault limits
-remain. Keep GP28 centred and GP27 to its right.
+v5.55 retains the 25 cm initial lateral target, 20 cm obstacle detection and
+bounded turn assistance. It checks 60 mm across candidate ink before accepting
+a crossing, chooses alignment towards the approach heading and can assist a
+loaded wheel near a slow forward endpoint up to 32% drive. Stall, sonar and
+travel limits remain. Recovery-direction memory and slower verification from
+v5.54 are retained. See the test procedure for acceptance and rejection markers.
 
 The latest build is not physically validated. Half-size barcode reliability,
 the final mission and the µT-Kernel port remain incomplete. Barcodes are disabled

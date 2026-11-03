@@ -163,10 +163,11 @@ static bool wheel_update(motion_wheel_t *wheel, int32_t position, float dt,
         if(transit&&remaining>900)target_cps=800.0f+adjustment;
         wheel->requested_cps=target_cps;
         float error=target_cps-wheel->cps;
-        float integral_cap=slow_turn?2750.0f:alignment?1200.0f:700.0f;
+        bool endpoint_assist=!slow_turn&&remaining<=400;
+        float integral_cap=slow_turn?2750.0f:(alignment||endpoint_assist)?1200.0f:700.0f;
         wheel->integral=clamp(wheel->integral+error*dt,-integral_cap,integral_cap);
         float requested=clamp((right?0.142f:0.157f)*target_cps/1200.0f+
-                              0.000040f*error+0.0002f*wheel->integral,0.0f,slow_turn?0.60f:alignment?0.32f:transit?0.28f:0.24f);
+                              0.000040f*error+0.0002f*wheel->integral,0.0f,slow_turn?0.60f:(alignment||endpoint_assist)?0.32f:transit?0.28f:0.24f);
         /* A stopped wheel near a turn endpoint may need more starting
          * torque than the speed PI can supply. Bounded turn-only assist;
          * PI retains loaded effort after progress; retain the one-second stall stop. */
@@ -176,7 +177,7 @@ static bool wheel_update(motion_wheel_t *wheel, int32_t position, float dt,
          * the PI to retain the effort needed under load, and briefly request
          * breakaway effort after 300 ms without progress. Speed target stays
          * 450/600 cps; overspeed still removes drive, no permanent PWM floor. */
-        if(alignment&&now_us-wheel->last_progress_us>=300000)requested=0.32f;
+        if((alignment||endpoint_assist)&&now_us-wheel->last_progress_us>=300000)requested=0.32f;
         float previous=wheel->throttle*direction;
         wheel->throttle=clamp(requested,0.0f,previous+(slow_turn?1.2f:0.4f)*dt)*direction;
         return true;
