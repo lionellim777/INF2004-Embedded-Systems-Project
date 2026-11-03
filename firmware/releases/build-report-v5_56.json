@@ -1,0 +1,9 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_56_wireless.uf2",
+  "bytes": 991744,
+  "blocks": 1937,
+  "sha256": "6d8f8b74ce9b817416d7382b02a5642f31ca738e6501ec8447ff24021acc27d4",
+  "physical_validation": "Pending. Built for the next supervised run; not flashed or run by the agent.",
+  "software_checks": "Sanitized scan-planner/state-machine tests, 14 alignment geometry cases, 21 obstacle scenarios, centre bend/steering regressions including continuous recovery beyond former limits, 45 production-main cases, wireless protocol/concurrency and mocked-browser tests passed. Strict Pico W build and UF2 structure/version/embedded page verified.",
+  "limits": "Right-first alignment with bounded opposite fallback if tape is missed. Sonar edge/width estimates use sparse finite-beam rays, not exact measurements; unknown right edge uses 90-degree/250mm fallback. Servo125 assumed leftmost per mounting convention. Physical angle, clearance and1000cps stability unverified."
+}

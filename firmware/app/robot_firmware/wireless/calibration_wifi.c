@@ -8,7 +8,7 @@
 #define CAL_RESULT_TITLE "v5.7 stationary barcode / motors OFF / black>250 white<=220"
 #else
 #include "calibration_page.h"
-#define CAL_RESULT_TITLE "v5.55 wireless / obstacle bypass test, barcode disabled in avoidance mode / course test available / diagnostics retained / filtered black>=226 white<=220 mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..800cps bounded-search"
+#define CAL_RESULT_TITLE "v5.56 wireless / obstacle bypass test, barcode disabled in avoidance mode / course test available / diagnostics retained / filtered black>=226 white<=220 mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..1000cps bounded-search"
 #endif
 #include "dhcpserver.h"
 #include "pico/cyw43_arch.h"

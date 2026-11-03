@@ -57,7 +57,7 @@ bool course_reads_barcodes(const course_control_t *c);
 void course_center_level(course_control_t *c,int32_t level);
 /* Set once from the stopped countdown; never adjusted by running samples. */
 void course_set_center_reference(course_control_t *c,int32_t level);
-/* Optional 450..800 cps straight cruise. Default remains 600; caller supplies
+/* Optional 450..1000 cps straight cruise. Default remains 600; caller supplies
  * clearance permission. Optical stability and recovery always take priority. */
 void course_set_cruise_limit(course_control_t *c,unsigned cps);
 void course_note_barcode_activity(course_control_t *c,uint64_t now);
