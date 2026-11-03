@@ -1,3 +1,24 @@
+## v5.55 retest — 3 November 2026
+
+Flash `firmware/releases/robocar_motion_integration_v5_55_wireless.uf2`, refresh
+http://192.168.4.1/ and confirm v5.55. Use **Follow track + avoid obstacle**.
+Keep the current GP28-centred / GP27-right mounting.
+
+1. Bottle on a straight strip: check the 25 cm initial detour, passing the
+   bottle, rejoining in the original direction, and continued following.
+2. Bottle on the bend: check that it rejoins the route, rather than a barcode
+   or printed sign, and continues beyond the bend without returning to the bottle.
+3. Save each log and video. The log should show SPATIAL_INK_CHECK followed by
+   SINGLE_CROSSING or CONTINUOUS_INK for accepted tape. INK_TOO_NARROW or
+   REPEATED_INK means the candidate was rejected and the original detour resumed.
+   A real tape rejection is a failed test, not proof the track is wrong.
+
+The 60 mm ink check and 120-degree approach-heading bound are provisional.
+Very narrow tape, printed strokes, tight geometry or wheel slip can defeat
+these heuristics. A persistent wheel jam still stops after one second; endpoint
+assistance does not disable that guard. Record any contact or wrong-direction
+rejoin even if the run later completes. Physical acceptance is still pending.
+
 ## v5.54 retest — 3 November 2026
 
 Flash `firmware/releases/robocar_motion_integration_v5_54_wireless.uf2` and

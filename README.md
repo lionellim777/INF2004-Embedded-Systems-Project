@@ -6,12 +6,12 @@ The goal is an autonomous two-wheel robot that follows a line, decodes navigatio
 
 ## Current status
 
-Latest checkpoint: **v5.54 wireless calibration**, 3 November 2026.
-Includes a 25 cm initial obstacle detour, right-first perpendicular alignment,
-and bounded loaded-turn assistance. v5.53 completed the observed straight-strip
-bypass, but the bend run lost the line during rejoin verification. v5.54 retains
-confirmed recovery direction and uses slower verification with a wider bounded
-search. **v5.54 physical validation is pending**; top cruise speed is unchanged.
+Latest checkpoint: **v5.55 wireless calibration**, 3 November 2026.
+Adds a spatial ink check before obstacle rejoin, alignment towards the recorded
+approach heading, and bounded assistance near slow forward endpoints. Initial
+detour remains 25 cm and obstacle detection 20 cm. **Physical v5.55 validation
+is pending**; the prior runs showed false route acceptance and a loaded-wheel
+stop. Top cruise speed is unchanged.
 See [progress and evidence](docs/development-status.md) and
 [test instructions](docs/testing/obstacle-v5_35-bypass.md).
 The [ready-to-flash UF2s and verification records](firmware/releases/README.md)
@@ -31,7 +31,7 @@ barcodes are disabled in obstacle mode. See the
 | Line following | Centre-sensor control, encoder feedback, bounded recovery, GP20 start/stop, crossing handling and diagnostics implemented. Operator reports completed home routes; frequent recovery and final line-loss stops remain in logs. |
 | Wheel encoders and motion | About 2543 counts/revolution; 30 cm and 90/180-degree calibration incorporated into moving firmware. School runs recorded right-wheel non-progress during loaded turns. v5.53 increases bounded turn effort and preserves per-wheel fault evidence. Subsequent straight-strip bypass completed; broader repeatability remains unverified. |
 | Barcode navigation | Dedicated GP26 acquisition at 2 kHz; framed Code 39 A-Z decoder; independent course capture and configurable Y/Z actions. Earlier complete A/Z captures pass replay. Latest moving half-A/Z reads fail; no claim of reliable half-size or turning acceptance. |
-| Obstacle bypass and line recovery | Bounded right-side bypass and perpendicular tape alignment implemented. Earlier home runs resumed following. v5.53 straight-strip bypass completed, while the bend rejoin lost tape. v5.54 improves recovery-direction handoff and verification; physical retests pending. |
+| Obstacle bypass and line recovery | Bounded right-side bypass and perpendicular tape alignment implemented. Earlier home runs resumed following. v5.53 straight-strip bypass completed, while the bend rejoin lost tape. v5.55 adds spatial route checks, heading selection and endpoint assistance; physical retests pending. |
 | Wi-Fi/MQTT telemetry | Local Wi-Fi access point, browser controls and downloadable logs implemented. This calibration page is not the final MQTT subsystem. |
 
 Detailed evidence and limitations are recorded in [docs/development-status.md](docs/development-status.md).

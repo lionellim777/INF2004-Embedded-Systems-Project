@@ -1,3 +1,43 @@
+## 2026-11-03 — v5.55 route confirmation and endpoint assistance
+
+Evidence: videos `20261103_115816.mp4` and `20261103_120004.mp4`, with exports
+`AAI10-motion-2026-11-03T03-59-18-472Z.txt` and
+`AAI10-motion-2026-11-03T04-01-52-331Z.txt`. The exports overlap and contain
+explicit gaps, so exact video-to-fault timing is not established. The first
+video shows travel over printed/barcode ink away from the main route; the second
+shows apparent rejoining towards the bottle. Retained results include
+CENTER_LINE_NOT_REACQUIRED after software completion and NO_ENCODER_PROGRESS_1S
+in MOVE_ALONG: left 2704/2698, right 2659/2698, right PWM 0.211 and 1043 ms
+without progress, zero invalid transitions. The 39-count shortfall is about
+2.9 mm. Insufficient loaded effort is addressed as a hypothesis, not a proven
+absence of a mechanical/electrical issue.
+
+Changes:
+- Accept tape candidates during straight detour legs only. A 60 mm spatial
+  check rejects repeated stripes or an initial remaining black segment under
+  8 mm, then resumes the original detour target with fresh sonar observations.
+  A single crossing advances the axle to the recorded tape; continuous black
+  proceeds to the existing follow verification. This reduces false barcode/text
+  acceptance, but cannot distinguish every printed stroke from real tape.
+- Choose the alignment sweep towards the recorded approach heading. Both-wheel
+  odometry rejects candidate headings more than 120 degrees from that approach,
+  including the bounded opposite sweep. Slip can corrupt this prior; this is
+  not a compass or a general solution for routes that double back.
+- Slow straight moves within 400 counts of their endpoint may build to 32%
+  drive, with a breakaway request after 300 ms without progress. Speed targets,
+  finished-wheel stopping, one-second stall stop, sonar guards and episode
+  bounds remain. The initial detour stays 250 mm and detection stays 20 cm.
+- Log spatial decisions, first black-segment distance and approach-relative
+  heading; update browser descriptions to match the new rejoin policy.
+
+Validation: sanitized obstacle suite passed (spatial ink cases, either loaded
+endpoint and a hard jam, 14 alignment geometry cases, 21 obstacle scenarios).
+Centre bend tests, 45 production-main centre scenarios, wireless core/HTTP and
+concurrent radio tests, isolated mocked-browser UI/download tests, and strict Pico W build passed. UF2 structure, version
+and embedded page verified. Physical v5.55 validation is pending. Keep GP28
+centred, GP27 right, GP26 barcode. Cruise speed was not increased. Raw private
+videos/logs are not committed; the evidence summary is retained here.
+
 ## 2026-11-03 — v5.54 rejoin alignment and recovery-direction handoff
 
 Publication checkpoint: source, tests, UF2 and verification record on

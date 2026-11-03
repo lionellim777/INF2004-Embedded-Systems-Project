@@ -515,9 +515,9 @@ static bool button_fell(button_t *button, uint pin, uint64_t now_us)
 static void print_controls(void)
 {
 #ifdef ROBOCAR_WIRELESS_CALIBRATION
-    printf("\nAAI10 MOTION INTEGRATION v5.54 WIRELESS | obstacle bypass test | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.55 WIRELESS | obstacle bypass test | %s %s\n", __DATE__, __TIME__);
 #else
-    printf("\nAAI10 MOTION INTEGRATION v5.54 USB | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.55 USB | %s %s\n", __DATE__, __TIME__);
 #endif
     printf("Starts STOPPED. Existing IR, sonar, servo and terrain settings retained.\n");
     printf("Batch 5: CPR2543 wheel60mm track115mm; turn early290 L90+65 R180-60.\n");
@@ -816,7 +816,7 @@ int main(void)
                         motion_init(&motion);motion.kind=MOTION_AVOID;motion.phase=MOTION_ACTIVE;
                         motion.start=enc;motion.start_us=now_us;
                         obstacle_bypass_begin(&avoidance,enc,now_us,baseline);
-                        printf("[AVOID BEGIN] barcode=DISABLED direction=RIGHT rejoin=RIGHT_FIRST align_window_deg=60..115 stable_ms=80 baseline=%ld sensor_lead_mm=120 offset_initial_mm=250 warning_cm=45 approach_cm=20 min_pivot_cm=12 max_offset_mm=600 max_along_mm=1200 outward_step_mm=100 along_step_mm=200 speed_target_cps=600 cruise_max_cps=800 cruise_stable_ms=1000 cruise_ramp_cps_s=200 cruise_clear_cm=60 transit_max_cps=800 transit_pwm_cap=0.28 straight_pwm_cap=0.24 alignment_pwm_cap=0.32 turn_assist_cap=0.60 turn_skew_hold_counts=120 bypass_R90_counts=1100 bypass_L90_counts=1090 side_confirmation=REPEAT_SWEEP.\n",(long)baseline);
+                        printf("[AVOID BEGIN] barcode=DISABLED direction=RIGHT rejoin=APPROACH_HEADING probe_mm=60 min_ink_mm=8 heading_limit_deg=120 endpoint_pwm_cap=0.32 align_window_deg=60..115 stable_ms=80 baseline=%ld sensor_lead_mm=120 offset_initial_mm=250 warning_cm=45 approach_cm=20 min_pivot_cm=12 max_offset_mm=600 max_along_mm=1200 outward_step_mm=100 along_step_mm=200 speed_target_cps=600 cruise_max_cps=800 cruise_stable_ms=1000 cruise_ramp_cps_s=200 cruise_clear_cm=60 transit_max_cps=800 transit_pwm_cap=0.28 straight_pwm_cap=0.24 alignment_pwm_cap=0.32 turn_assist_cap=0.60 turn_skew_hold_counts=120 bypass_R90_counts=1100 bypass_L90_counts=1090 side_confirmation=REPEAT_SWEEP.\n",(long)baseline);
                     }else motion_state=ready?"IR_SAMPLING_UNAVAILABLE":"CENTER_BASELINE_NOT_READY";
                 } else if (pending == MOTION_NONE || scan_kind(pending)) {
                     motion_init(&motion);
@@ -947,8 +947,8 @@ int main(void)
             }
             if(avoidance.phase!=before)printf("[AVOID] phase=%s next=%s offset_mm=%u along_mm=%u side_seen=%u clear_checks=%u servo=%u tape_checks=%u rejected=%u axle_mm=%u align_dir=%d reverse_sweep=%u align_rejected=%u.\n",
                 obstacle_bypass_phase(avoidance.phase),obstacle_bypass_phase(avoidance.next),avoidance.offset_mm,avoidance.along_mm,avoidance.side_seen,avoidance.clear_checks,avoidance.servo_angle,avoidance.rejoin_attempts,avoidance.rejoin_rejected,avoidance.axle_mm,avoidance.align_direction,avoidance.align_reversed,avoidance.align_rejected);
-            if(avoidance.phase!=before&&(before==AVOID_CHECK_TAPE||before==AVOID_ALIGN_CONFIRM))
-                printf("[AVOID TAPE] from=%s to=%s decision=%s center=%ld reference=%ld samples=%u no_return=%u sonar=%s.\n",obstacle_bypass_phase(before),obstacle_bypass_phase(avoidance.phase),avoidance.tape_decision?avoidance.tape_decision:"NONE",(long)centre_blackness,(long)avoidance.reference,avoidance.rejoin_good,avoidance.no_return,sonar_status);
+            if(avoidance.phase!=before&&(before==AVOID_CHECK_TAPE||before==AVOID_TAPE_PROBE||before==AVOID_ALIGN_CONFIRM))
+                printf("[AVOID TAPE] from=%s to=%s decision=%s center=%ld reference=%ld samples=%u no_return=%u sonar=%s approach_heading_deg=%d first_ink_mm=%u.\n",obstacle_bypass_phase(before),obstacle_bypass_phase(avoidance.phase),avoidance.tape_decision?avoidance.tape_decision:"NONE",(long)centre_blackness,(long)avoidance.reference,avoidance.rejoin_good,avoidance.no_return,sonar_status,avoidance.route_heading_deg,avoidance.probe_first_black_mm);
             if(avoidance.phase!=before&&(before==AVOID_ALIGN_TURN||before==AVOID_ALIGN_CONFIRM))
                 printf("[AVOID ALIGN] heading_deg=%ld direction=%d rejected=%u center=%ld reference=%ld.\n",
                     (long)(((int64_t)motion_left_position(&avoidance.align_origin,enc)-motion_right_position(&avoidance.align_origin,enc))*90/2000),
