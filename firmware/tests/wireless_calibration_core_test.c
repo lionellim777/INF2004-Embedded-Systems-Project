@@ -23,6 +23,11 @@ int main(void)
     for (size_t i=0;i<strlen(stop);i++) calibration_capture(&c,stop+i,1);
     calibration_capture(&c,settled,strlen(settled));
     assert(strcmp(c.stop,stop)==0 && strcmp(c.settled,settled)==0);
+    const char *detail="[MOTION DETAIL] stalled_mask=2 last_pwm=0.12/-0.45 no_progress_ms=0/1000\n";
+    calibration_capture(&c,detail,strlen(detail));
+    for(unsigned i=0;i<CAL_LOG_CAPACITY+100;i++)calibration_capture(&c,"x",1);
+    assert(strcmp(c.motion_detail,detail)==0);
+    calibration_capture(&c,"\n",1);
     const char *check="[CHECK] samples=4 IR_L=190..3100 edges=2\n";
     const char *timing="[TIMING] max_loop_us=35000 wifi_max_poll_us=4000\n";
     calibration_capture(&c,check,strlen(check));calibration_capture(&c,timing,strlen(timing));
@@ -35,7 +40,8 @@ int main(void)
     assert(strcmp(c.stop,stop)==0 && strcmp(c.settled,settled)==0);
     assert(strcmp(c.barcode,stream)==0);
     calibration_capture(&c,"\n[MOTION GO] next\n",18);
-    assert(c.stop[0]==0 && c.settled[0]==0 && c.summary[0]==0 && c.timing[0]==0 && c.barcode[0]==0);
+    assert(!strcmp(c.previous_stop,stop)&&!strcmp(c.previous_detail,detail));
+    assert(c.motion_detail[0]==0 && c.stop[0]==0 && c.settled[0]==0 && c.summary[0]==0 && c.timing[0]==0 && c.barcode[0]==0);
     const char *trace1="[SCAN EDGES 1] total=30 time_ms:level=10:B,20:W\n";
     const char *trace2="[SCAN EDGES 2] total=30 time_ms:level=\n";
     calibration_capture(&c,trace1,strlen(trace1));calibration_capture(&c,trace2,strlen(trace2));

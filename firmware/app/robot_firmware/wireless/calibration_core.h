@@ -16,6 +16,9 @@ typedef struct {
     size_t line_length;
     bool line_overflow;
     char stop[CAL_LINE_CAPACITY];
+    char motion_detail[CAL_LINE_CAPACITY];
+    char previous_stop[CAL_LINE_CAPACITY];
+    char previous_detail[CAL_LINE_CAPACITY];
     char settled[CAL_LINE_CAPACITY];
     char summary[CAL_LINE_CAPACITY];
     char timing[CAL_LINE_CAPACITY];

@@ -23,6 +23,10 @@ typedef struct {
     float integral;
     float throttle;
     float cps;
+    float applied_pwm; /* Last controller output, retained after fault/abort. */
+    float requested_cps;
+    uint32_t no_progress_ms;
+    bool held; /* Deliberately held to let the other wheel catch up. */
     int32_t target;
     int32_t position;
     int32_t previous;
@@ -44,6 +48,7 @@ typedef struct {
     motion_kind_t kind;
     motion_phase_t phase;
     motion_fault_t fault;
+    uint8_t stalled_wheels; /* bit0 left, bit1 right; captured before zeroing outputs. */
     bool slow_distance;
     bool transit_drive; /* Optional clear bypass leg: 800 cps, slowing near endpoint. */
     bool alignment_drive; /* Probe/axle advance: adaptive low-speed effort, max32%. */

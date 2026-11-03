@@ -1,0 +1,9 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_55_wireless.uf2",
+  "bytes": 984064,
+  "blocks": 1922,
+  "sha256": "e5a943b136d53f93a33824d78979dde1b41b585f8e004ababa5eaf4071da3eed",
+  "physical_validation": "Pending. No v5.55 physical run has been performed.",
+  "software_checks": "Sanitized obstacle tests: spatial ink cases, both loaded endpoints and hard jam, 14 rejoin geometry cases, 21 obstacle scenarios; centre bend tests; 45 production-main centre scenarios; wireless protocol/concurrency tests; strict Pico W build; UF2 magic/family/numbering/addresses/version and embedded HTML verified. Isolated mocked-browser UI/download tests passed.",
+  "limitations": "Spatial ink classification and encoder heading are heuristics, not a guarantee of correct route identification. Wheel slip, unknown tape widths and route reversals require physical testing. Barcode decoding is disabled in obstacle mode."
+}

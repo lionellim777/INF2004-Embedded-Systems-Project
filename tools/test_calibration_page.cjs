@@ -11,7 +11,7 @@ await page.route('http://192.168.4.1/**',async r=>{
  if(offline){await r.abort();return;}
  if(u.pathname==='/'){await r.fulfill({contentType:'text/html',body:fs.readFileSync('firmware/app/robot_firmware/wireless/calibration.html','utf8')});return;}
  if(u.pathname==='/logs'){
-  let body=u.searchParams.get('since')==='0'?'AAI10 MOTION INTEGRATION v5.47 WIRELESS\nRun=0 State=STOPPED\n':'';
+  let body=u.searchParams.get('since')==='0'?'AAI10 MOTION INTEGRATION v5.55 WIRELESS\nRun=0 State=STOPPED\n':'';
   body+=reply;reply='';await r.fulfill({headers:{'X-Boot':boot,'X-Next':'80','X-Gap':'0','X-Idle':idle?'1':'0'},body});return;
  }
  if(u.pathname==='/result'){resultRequests++;await r.fulfill({body:continuous?'[MOTION STOP] GP20\n[MOTION SETTLED] CONTINUOUS_SCAN\n[BARCODE RESULT] mode=CONTINUOUS reads=2 sequence=AZ\n':'[OPTICAL RESULT] motors=OFF samples=5000 raw=172..2782 max_gap_us=1017 empty_bins=0 aborted=0 sampling_ok=1\n'});return;}
@@ -61,7 +61,7 @@ await page.screenshot({path:'build/wireless-host-tests/calibration-desktop.png',
 await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(200);await page.screenshot({path:'build/wireless-host-tests/calibration-mobile.png',fullPage:true});
 assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
 const downloadPromise=page.waitForEvent('download');await page.locator('#download').click();await(await downloadPromise).saveAs('build/wireless-host-tests/browser-test-download.txt');
-const saved=fs.readFileSync('build/wireless-host-tests/browser-test-download.txt','utf8');assert(saved.includes('v5.47'));assert(saved.includes('[OPTICAL RESULT]'));assert(saved.includes('[OPTICAL DATA]'));assert(saved.includes('Physical observations supplied separately in chat.'));
+const saved=fs.readFileSync('build/wireless-host-tests/browser-test-download.txt','utf8');assert(saved.includes('v5.55'));assert(saved.includes('[OPTICAL RESULT]'));assert(saved.includes('[OPTICAL DATA]'));assert(saved.includes('Physical observations supplied separately in chat.'));
 for(const ch of ['f','l','r','u']){await page.locator('#test-mode').selectOption(ch);await page.locator('#prepare').click();assert.equal(commands.at(-1),'/command/'+ch);assert((await page.locator('#start-help').innerText()).includes('press GP20'));}
 await page.locator('#test-mode').selectOption('course');assert(await page.locator('#optical-panel').isHidden());
 await page.locator('#prepare').click();assert.equal(commands.at(-1),'/mission/s/s/120');
@@ -81,6 +81,9 @@ await page.waitForFunction(()=>document.getElementById('message').textContent.in
 assert.deepEqual(await page.evaluate(()=>opticalBins[0]),[190,240]);
 continuous=true;const streamDownload=page.waitForEvent('download');await page.locator('#download').click();await(await streamDownload).saveAs('build/wireless-host-tests/browser-stream-download.txt');assert(fs.readFileSync('build/wireless-host-tests/browser-stream-download.txt','utf8').includes('reads=2 sequence=AZ'));assert(fs.readFileSync('build/wireless-host-tests/browser-stream-download.txt','utf8').includes('source=DRIVE'));
 offline=true;await page.waitForFunction(()=>document.getElementById('connection').className==='offline');assert(await page.locator('#prepare').isDisabled());
+const cached=await page.evaluate(()=>downloadedResult);assert(cached.includes('reads=2'));
+await page.evaluate(()=>recover());assert.equal(await page.evaluate(()=>downloadedResult),cached);
+assert(await page.evaluate(()=>resultPending));
 offline=false;idle=true;boot='44556677';await page.waitForFunction(()=>document.getElementById('log').textContent.includes('CAR POWER RESET'));await page.waitForFunction(()=>document.getElementById('connection').className==='online');assert.equal(await page.evaluate(()=>opticalBins.length),0);assert(await page.locator('#optical-plot').isHidden());assert.deepEqual(errors,[]);
 console.log('Simplified UI passed: three buttons, all modes, fragmented optical trace, auto recovery, one combined download, mission configuration, input validation, running lockout, stop, disconnect/reset and mobile width. Mock robot only.');
 } finally {await browser.close();}

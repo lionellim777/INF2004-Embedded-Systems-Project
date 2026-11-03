@@ -22,6 +22,7 @@ typedef struct {
     center_trim_t center_trim;
     int32_t center_reference;
     unsigned cruise_limit_cps;
+    unsigned recovery_limit_counts; /* 0: normal120; rejoin may request up to240 */
     uint64_t steady_line_us;
     unsigned trim_attempts,trim_reversals,trim_no_responses;
     bool center_search_started;
@@ -29,6 +30,11 @@ typedef struct {
     int32_t center_level;
     uint64_t barcode_activity_us;
     unsigned recoveries;
+    bool bend_disabled, bend_ready, bend_active;
+    int bend_direction;
+    uint64_t bend_hint_us, bend_ready_us, bend_start_us, bend_strong_us;
+    int32_t bend_ready_l, bend_ready_r, bend_l, bend_r;
+    unsigned bend_attempts, bend_completed, bend_fallbacks;
     uint64_t start_us,last_us,segment_us,phase_us,both_us,clear_us,seek_us;
     int32_t segment_l,segment_r,entry_l,entry_r,exit_l,exit_r,seek_l,seek_r;
     unsigned junctions,turns,route_updates,replacements,deferred_replacements;
@@ -51,7 +57,7 @@ bool course_reads_barcodes(const course_control_t *c);
 void course_center_level(course_control_t *c,int32_t level);
 /* Set once from the stopped countdown; never adjusted by running samples. */
 void course_set_center_reference(course_control_t *c,int32_t level);
-/* Optional 600..800 cps straight cruise. Default remains 600; caller supplies
+/* Optional 450..800 cps straight cruise. Default remains 600; caller supplies
  * clearance permission. Optical stability and recovery always take priority. */
 void course_set_cruise_limit(course_control_t *c,unsigned cps);
 void course_note_barcode_activity(course_control_t *c,uint64_t now);

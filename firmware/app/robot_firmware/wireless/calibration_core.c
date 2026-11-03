@@ -22,12 +22,19 @@ void calibration_capture(calibration_core_t *c, const char *data, size_t length)
                 } else if(strncmp(c->line,"[OPTICAL RESULT]",16u)==0) {
                     snprintf(c->optical_result,sizeof(c->optical_result),"%.*s",(int)sizeof(c->optical_result)-1,c->line);
                 } else if (strncmp(c->line, "[MOTION GO]", 11u) == 0 || strncmp(c->line, "[SCAN START]", 12u) == 0) {
+                    if(c->stop[0]){
+                        memcpy(c->previous_stop,c->stop,sizeof(c->stop));
+                        memcpy(c->previous_detail,c->motion_detail,sizeof(c->motion_detail));
+                    }
                     c->optical_result[0]=0;
-                    c->course_result[0] = c->stop[0] = c->settled[0] = c->summary[0] = c->timing[0] = c->barcode[0] = c->trace[0][0] = c->trace[1][0] = '\0';
+                    c->motion_detail[0] = c->course_result[0] = c->stop[0] = c->settled[0] = c->summary[0] = c->timing[0] = c->barcode[0] = c->trace[0][0] = c->trace[1][0] = '\0';
                 } else if (strncmp(c->line, "[MOTION STOP]", 13u) == 0 ||
                            strncmp(c->line, "[STOP]", 6u) == 0 || strncmp(c->line, "[SCAN STOP]", 11u) == 0) {
                     memcpy(c->stop, c->line, c->line_length + 1u);
+                    c->motion_detail[0]=0;
                     c->course_result[0] = c->settled[0] = c->summary[0] = c->timing[0] = c->barcode[0] = c->trace[0][0] = c->trace[1][0] = '\0';
+                } else if (strncmp(c->line, "[MOTION DETAIL]", 15u) == 0) {
+                    memcpy(c->motion_detail,c->line,c->line_length+1u);
                 } else if (strncmp(c->line, "[MOTION SETTLED]", 16u) == 0) {
                     memcpy(c->settled, c->line, c->line_length + 1u);
                 } else if (strncmp(c->line, "[CHECK]", 7u) == 0) {

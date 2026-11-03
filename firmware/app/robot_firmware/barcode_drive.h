@@ -35,6 +35,7 @@ typedef struct {
     uint64_t launch_us;
     int32_t launch_l,launch_r;
     float launch_left_pwm,launch_right_pwm;
+    bool center_bend; /* Bounded course continuation permits stronger forward-only steering. */
     float center_steer; /* signed target difference: negative left, positive right */
     float center_cruise_cps; /* Optional course cap; zero retains the 600 cps profile. */
     float yaw_error, yaw_pwm; /* requested minus measured wheel difference, counts/duty */
@@ -158,7 +159,7 @@ static inline line_check_output_t barcode_drive_step_profile(ir_roles_t ir,uint6
     }
     bool cruise=continuous && p->cruise_clear_tracking && elapsed-p->cruise_clear_since>=TRACK_CLEAR_CRUISE_US;
     float desired_left=continuous?(cruise?TRACK_CRUISE_CPS:TRACK_TARGET_CPS):BARCODE_DRIVE_TARGET_CPS,desired_right=desired_left;
-    if(p->center_profile)desired_left=desired_right=barcode_clamp(p->center_cruise_cps,600.0f,800.0f);
+    if(p->center_profile)desired_left=desired_right=(p->center_cruise_cps>0?barcode_clamp(p->center_cruise_cps,450.0f,800.0f):600.0f);
     if(p->both_active){
         desired_left=desired_right=900.0f;
         p->steering_since_update=true;p->balance_offset=left-right;
@@ -172,7 +173,7 @@ static inline line_check_output_t barcode_drive_step_profile(ir_roles_t ir,uint6
         /* Keep the outside wheel at the proven600cps profile. The450cps
          * trial left the physical motors in deadband and reversed actual yaw. */
         desired_left=desired_right=600.0f;
-        float amount=barcode_clamp(p->center_steer,-220.0f,220.0f);
+        float amount=barcode_clamp(p->center_steer,p->center_bend?-420.0f:-220.0f,p->center_bend?420.0f:220.0f);
         if(amount<0)desired_left+=amount;else desired_right-=amount;
         p->steering_since_update=true;p->balance_offset=left-right;
     } else if(!p->center_profile) {

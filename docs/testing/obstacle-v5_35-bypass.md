@@ -1,3 +1,56 @@
+## v5.55 retest — 3 November 2026
+
+Flash `firmware/releases/robocar_motion_integration_v5_55_wireless.uf2`, refresh
+http://192.168.4.1/ and confirm v5.55. Use **Follow track + avoid obstacle**.
+Keep the current GP28-centred / GP27-right mounting.
+
+1. Bottle on a straight strip: check the 25 cm initial detour, passing the
+   bottle, rejoining in the original direction, and continued following.
+2. Bottle on the bend: check that it rejoins the route, rather than a barcode
+   or printed sign, and continues beyond the bend without returning to the bottle.
+3. Save each log and video. The log should show SPATIAL_INK_CHECK followed by
+   SINGLE_CROSSING or CONTINUOUS_INK for accepted tape. INK_TOO_NARROW or
+   REPEATED_INK means the candidate was rejected and the original detour resumed.
+   A real tape rejection is a failed test, not proof the track is wrong.
+
+The 60 mm ink check and 120-degree approach-heading bound are provisional.
+Very narrow tape, printed strokes, tight geometry or wheel slip can defeat
+these heuristics. A persistent wheel jam still stops after one second; endpoint
+assistance does not disable that guard. Record any contact or wrong-direction
+rejoin even if the run later completes. Physical acceptance is still pending.
+
+## v5.54 retest — 3 November 2026
+
+Flash `firmware/releases/robocar_motion_integration_v5_54_wireless.uf2` and
+refresh the page to v5.54. Keep GP28 centred over tape, GP27 to its right and
+GP26 for barcodes. Select **Follow track + avoid obstacle**, prepare, then GP20.
+
+Repeat bottle-on-bend and bottle-on-straight tests. After rejoining, allow it
+to continue into the next left bend. Record whether it keeps following and
+download the log before switching off. Look for `[AVOID COMPLETE]`, subsequent
+following/search states, and the final stop reason. v5.54 is not yet physically
+validated. Rejoin now uses 450 cps and a wider bounded correction; normal cruise
+speed and the 25 cm initial detour remain unchanged. It still stops on exhausted
+recovery or faults; it does not implement a new symmetric two-sensor layout.
+
+## v5.53 — found tape with no echo; shorter initial detour
+
+Use the v5.53 release UF2. The initial lateral encoder target is 25 cm; measure its actual foam travel if practical. Once the car finds stable tape, two completed no-return readings can now permit the monitored probe/axle-advance/right-first alignment sequence. It no longer rejects that tape merely because no distant object reflects ultrasound. A missing ECHO rising edge, stale data or sensor fault does not qualify. Close-object stops remain. Slow turns can apply up to 60% drive under load with feedback; physical turn precision and clearance still need testing.
+
+Run the same **Follow track + avoid obstacle** mode on (1) a straight-strip bottle and (2) a bend bottle. Observe whether it returns to following after finding tape, and download before switching off. The latest and preceding stop/detail snapshots remain available within the same boot. New `[AVOID TAPE]` and `tape_decision` fields explain each rejoin choice. Software and simulated geometry checks pass; v5.53 physical acceptance is pending.
+
+## v5.52 — foam turn effort and failure retention
+
+Flash `robocar_motion_integration_v5_52_wireless.uf2`, reload the page and verify v5.52. Select **Follow track + avoid obstacle**, prepare, then press GP20. Test a bottle on the straight strip before repeating the bend. Observe completion of the initial right and subsequent left turns and resumed line following. Download before power-off: current and preceding run stop/detail snapshots are retained, even if normal log text wraps. New turn effort is capped at 45% with speed feedback; endpoints and the one-second hard-stall stop remain. Simulation and build checks pass; physical success is unverified.
+
+> **v5.51 local test:** Adds a brief forward bend arc after line loss when recent direction evidence exists. Maximum 450 ms / ~20 mm wheel travel / ~8 degrees encoder-estimated yaw; otherwise stopped recovery. Strong-tape confirmation resumes following without a stopped launch. Unknown direction, recent barcode activity, crossings, near-obstacle approach and obstacle rejoin keep the existing recovery. v5.50 obstacle settings retained. First test clear bends with the bottle removed; compare video and BendOK/BendFallback logs. Physical improvement remains pending.
+
+> **v5.50 local test:** 20 cm bypass target; 45 cm only slows straight approach. A remembered target and encoder travel prevent missing/background echoes from allowing unlimited approach; that conservative estimate may stop earlier than an actual 20 cm sonar reading. 30 cm lateral offset retained. Turn PI retains loaded effort up to 32% and holds a wheel that leads by >120 counts. Flash v5.50 and test straight foam first, then bend; record approach clearance, both wheels during the turn, and continued tape following. Software/build checks passed; physical validation pending. Earlier entries are historical.
+
+> **v5.49 local test:** First valid reading within 45 cm stops approach immediately; missing/background echoes retain the warning. Initial side offset is now 30 cm. A reading below 25 cm before the first pivot stops with AVOID_APPROACH_TOO_CLOSE. Flash v5.49, start the bottle about 50–60 cm ahead of the sonar, test straight then bend, and record contacts plus resumed following. Leave ample clear floor for the wider detour. Software/build checks passed; physical validation pending. Earlier entries below are historical.
+
+> **v5.48 local test:** Side clearance can use repeated far echoes across two scan angles when the central echo is absent. Confirmation repeats while stationary, with at least 200 mm travel since the last side-obstacle observation and 400 mm total along travel. The outward scan accounts for the car corridor; bypass-only turn trims are provisional (R 1100 / L 1090 counts). Flash v5.48, test the bottle on a straight strip first, then the bend. Physical return and angle validation remain pending; prior versions below are historical.
+
 > **v5.47 current:** Conditional 600–800 cps stable straight cruise and faster clear MOVE_OUT/MOVE_ALONG legs. Slow bend/rejoin/turn behaviour retained. v5.46 physically completed one bend bypass and followed to the tape end; full straight-strip return and new speed profile await user tests. Software checks/build passed.
 
 > **v5.46 current:** Perpendicular rejoin turns right first. Early black readings outside the 60–115 degree alignment window are rejected; strong tape must persist for 80 ms, then survive stopped confirmation. A vanished candidate resumes the remaining sweep rather than immediately failing. Opposite search remains a bounded fallback. Software regressions/build passed; physical acceptance pending. Earlier entries below are historical.

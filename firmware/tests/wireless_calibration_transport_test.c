@@ -66,11 +66,11 @@ static void http_tests(void){
     core.selection_allowed=false;c=open_client();req="POST /command/r HTTP/1.1\r\nx-calibrate: 1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"409"));
     c=open_client();req="POST /command/x HTTP/1.1\r\nX-Calibrate: 1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"202"));assert(calibration_wifi_getchar()=='x');
     c=open_client();req="GET /logs?since=0 HTTP/1.1\r\n\r\n";capture("test log\n",9);feed(c,req,strlen(req));drain(c);assert(strstr(wire,"test log\n"));assert(strstr(wire,"X-Next: 9\r\n"));
-    /* Eight maximum retained lines still fit and survive the HTTP result. */
-    char *fields[]={core.stop,core.settled,core.summary,core.timing,core.barcode,core.trace[0],core.trace[1],core.course_result};
-    for(unsigned i=0;i<8;i++){memset(fields[i],'A'+i,CAL_LINE_CAPACITY-1);fields[i][CAL_LINE_CAPACITY-2]='\n';fields[i][CAL_LINE_CAPACITY-1]=0;}
+    /* Eleven maximum retained lines still fit and survive the HTTP result. */
+    char *fields[]={core.stop,core.settled,core.summary,core.timing,core.barcode,core.trace[0],core.trace[1],core.course_result,core.motion_detail,core.previous_stop,core.previous_detail};
+    for(unsigned i=0;i<11;i++){memset(fields[i],'A'+i,CAL_LINE_CAPACITY-1);fields[i][CAL_LINE_CAPACITY-2]='\n';fields[i][CAL_LINE_CAPACITY-1]=0;}
     c=open_client();req="GET /result HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);
-    for(unsigned i=0;i<8;i++)assert(strstr(wire,fields[i]));
+    for(unsigned i=0;i<11;i++)assert(strstr(wire,fields[i]));
     strcpy(core.optical_result,"[OPTICAL RESULT] samples=5000\n");
     c=open_client();req="GET /result HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,core.optical_result));
     core.selection_allowed=true;c=open_client();req="POST /command/v HTTP/1.1\r\nX-Calibrate: 1\r\n\r\n";

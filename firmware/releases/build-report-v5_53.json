@@ -1,0 +1,8 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_53_wireless.uf2",
+  "bytes": 982528,
+  "blocks": 1919,
+  "sha256": "2e704d6f7ea163050b2eb8defb7da1d8d216012b06d295c3f3197499628f374e",
+  "physical_validation": "Pending. v5.52 school runs confirmed tape rejection on completed no-return and right encoder non-progress under 45% drive. v5.53 has not been flashed or physically tested by the agent.",
+  "software_checks": "Sanitized obstacle, loaded-turn and 11 perpendicular-rejoin geometry regressions; 45 production-main scenarios; centre bend and standalone motion; wireless core/transport/concurrent radio; isolated browser download and result recovery; strict Pico W build; every UF2 block, address, family, version, control markers and exact embedded HTML verified."
+}
