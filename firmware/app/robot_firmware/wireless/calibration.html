@@ -1,56 +1,343 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AAI10 · Car testing</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>AAI10 · Car testing</title>
 <style>
-:root{font:16px system-ui,sans-serif;color:#e8eef7;background:#0e1622;color-scheme:dark}*{box-sizing:border-box}body{max-width:780px;margin:auto;padding:24px}h1{font-size:1.8rem;margin:0}h2{font-size:1rem;margin:0 0 10px}p{line-height:1.5;color:#b9c8da;margin:10px 0}.top,.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.top{justify-content:space-between;margin-bottom:20px}.version,small{color:#a9b9cc;font-size:.85rem}.card{background:#182536;border:1px solid #304057;border-radius:14px;padding:20px;margin-bottom:16px}button,select,input{font:inherit;border:1px solid #4a627e;border-radius:8px;padding:11px 14px;color:#fff;background:#243a50}button{cursor:pointer}button:hover{background:#355570}button:disabled,select:disabled,input:disabled{opacity:.45;cursor:default}.primary{background:#167766;flex:1}.stop{background:#a52d40}label{display:block;color:#b9c8da;margin:0 0 7px}select{width:100%;background:#101b2a}input{max-width:100%}.field{flex:1;min-width:220px}#connection{font-size:.85rem;color:#ffd18a}#connection.online{color:#80e6ca}.actions{margin-top:18px}#message{min-height:1.5em;color:#91eadb}details{margin-top:16px}summary{cursor:pointer;color:#b9c8da;padding:6px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4;font-size:12px;background:#0b1420;padding:12px;border-radius:8px;max-height:300px;overflow:auto}canvas{display:block;width:100%;height:180px;background:#0b1420;border-radius:8px;margin-top:12px}[hidden]{display:none!important}.footer{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}#download{background:#243a50}#route-advance{width:130px}@media(max-width:500px){body{padding:14px}.card{padding:16px}.actions button{min-height:48px}.field{min-width:100%}}
+:root{--frame:#232425;--frame-2:#2c2d2f;--face:#0f0f0f;--face-2:#191919;--seam:#000;--line:#353638;--line-2:#4a4b4e;
+--ink:#f3f1ea;--ink-2:#bcbab2;--ink-3:#9a9891;--dark:#121212;
+--amber:#f4a62a;--amber-bg:#2e2410;--red:#ff7a6b;--red-bg:#341816;--red-fill:#c8352a;--green:#8adbaa;--green-bg:#14271c;
+--board:"Avenir Next Condensed","Bahnschrift","Roboto Condensed","Arial Narrow",sans-serif-condensed,system-ui,sans-serif;
+--text:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+font:16px/1.5 var(--text);color:var(--ink);background:var(--frame);color-scheme:dark;-webkit-text-size-adjust:100%}
+*{box-sizing:border-box}
+body{margin:0;background:var(--frame)}
+::selection{background:var(--amber);color:var(--dark)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 24px 40px}
+h1,h2,h3{margin:0;font-family:var(--board);font-stretch:condensed;font-weight:600;letter-spacing:.01em}
+h1{font-size:1.75rem;line-height:1.1}
+h2{font-size:1.15rem;line-height:1.2;color:var(--ink)}
+h3{font-size:1rem}
+p{margin:8px 0}
+small,.meta{color:var(--ink-3);font-size:.85rem}
+.num{font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Header */
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:16px}
+.top .version{color:var(--ink-3);font-size:.9rem;margin-left:10px;font-variant-numeric:tabular-nums}
+.link{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#connection{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;font-weight:600;padding:5px 12px;border-radius:4px;background:var(--amber-bg);color:var(--amber)}
+#connection::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+#connection.online{background:var(--green-bg);color:var(--green)}
+#connection.offline{background:var(--red-bg);color:var(--red)}
+#age{font-size:.85rem;color:var(--ink-3)}
+#age.stale{color:var(--amber)}
+
+/* Boards */
+.board{background:var(--face);border:1px solid var(--line);border-radius:6px;padding:18px 20px}
+.board>header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.grid{display:grid;gap:16px;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start}
+#controls,#optical-panel,#rawarea{grid-column:1/-1}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+
+/* Controls */
+#controls{background:var(--frame-2);border-color:var(--line-2)}
+.ctl{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.field{flex:1;min-width:220px}
+label{display:block;color:var(--ink-2);font-size:.9rem;margin:0 0 6px}
+button,select,input{font:inherit;color:var(--ink);border-radius:4px}
+select,input[type=number]{width:100%;min-height:44px;padding:9px 12px;background:var(--face);border:1px solid var(--line-2)}
+input[type=number]{width:140px}
+button{min-height:46px;padding:10px 20px;border:1px solid var(--line-2);background:var(--face-2);cursor:pointer;font-weight:600;transition:background-color .15s,transform .1s}
+button:hover{background:#262626}
+button:active{transform:translateY(1px)}
+button:disabled,select:disabled,input:disabled{opacity:.45;cursor:default;transform:none}
+.primary{background:var(--ink);color:var(--dark);border-color:var(--ink);min-width:200px}
+.primary:hover{background:#fff}
+.stop{background:var(--red-fill);border-color:var(--red-fill);color:#fff;min-width:120px}
+.stop:hover{background:#dd4033}
+#message{min-height:1.5em;margin:14px 0 4px;font-weight:600;color:var(--ink)}
+#test-help{color:var(--ink-2);max-width:72ch}
+details>summary{cursor:pointer;color:var(--ink-2);padding:6px 0}
+details>summary:hover{color:var(--ink)}
+#barcode-actions{margin-top:6px}
+#barcode-actions .ctl{margin-top:8px}
+
+/* Flap cells: the board's signature */
+.flaps{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--board);font-stretch:condensed;font-weight:600;line-height:1}
+.flaps .w{display:inline-flex;gap:3px}
+.flaps .c{position:relative;display:inline-grid;place-items:center;width:.78em;height:1.22em;background:#1b1b1b;color:var(--ink);border-radius:3px;overflow:hidden}
+.flaps .c::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--seam)}
+/* No fill modes and a non-zero delay: until an animation actually runs, the cell shows its real letter. */
+.flaps .c.flip{animation:flip .12s cubic-bezier(.2,.8,.2,1) calc(var(--d,0ms) + 100ms)}
+.flaps .c.flip::before{content:attr(data-g);position:absolute;inset:0;display:grid;place-items:center;background:inherit;color:var(--ink-2);opacity:0;animation:pass .1s steps(1,end) var(--d,20ms)}
+@keyframes pass{from{opacity:1}to{opacity:0}}
+@keyframes flip{from{transform:scaleY(.55);filter:brightness(.6)}to{transform:none;filter:none}}
+#phase{font-size:2.6rem;min-height:1.3em}
+#phase.fault .c{color:var(--red)}#phase.warn .c{color:var(--amber)}#phase.ok .c{color:var(--green)}
+#phase-meaning{font-size:1.05rem;color:var(--ink);max-width:62ch;margin:14px 0 0}
+
+/* Counters strip */
+.strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:18px 0 0;background:var(--face-2);border-radius:4px}
+.strip div{padding:10px 14px;border-left:1px solid var(--line)}
+.strip div:first-child{border-left:0}
+.strip dt{font-size:.8rem;color:var(--ink-3)}
+.strip dd{margin:2px 0 0;font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums;font-family:var(--board);font-stretch:condensed}
+.strip dd.bad{color:var(--red)}.strip dd.warn{color:var(--amber)}
+
+/* Diagnosis */
+#diagnosis{margin-top:18px;padding:16px 18px;border-radius:4px;background:var(--red-bg)}
+#diagnosis.op{background:var(--face-2)}#diagnosis.ok{background:var(--green-bg)}
+#diag-title{font-size:1.25rem;color:var(--red)}
+#diagnosis.op #diag-title{color:var(--ink)}#diagnosis.ok #diag-title{color:var(--green)}
+#diag-code{font-size:.85rem;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-top:2px}
+#diag-text{margin:8px 0 6px;max-width:66ch}
+#diag-checks{margin:6px 0;padding-left:20px;max-width:66ch}
+#diag-checks li{margin:3px 0}
+.evidence{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.kv{display:inline-flex;gap:6px;padding:2px 8px;border-radius:3px;background:rgba(0,0,0,.35);font-size:.82rem;font-variant-numeric:tabular-nums;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.kv b{font-weight:400;color:var(--ink-3)}
+
+/* Barcode board */
+.bc-head{display:flex;gap:20px;align-items:center}
+#bc-letter{font-size:5.2rem}
+#bc-letter .c{width:.8em;height:1.18em}
+#bc-letter.empty .c{color:var(--ink-3)}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;font-size:.95rem}
+.facts dt{color:var(--ink-3)}.facts dd{margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+figure{margin:16px 0 0}
+.paper{display:block;width:100%;height:112px;background:var(--ink);border-radius:3px;padding:6px 0}
+#bc-psvg{height:64px}
+figcaption{margin-top:8px;font-size:.88rem;color:var(--ink-2)}
+#bc-history{display:flex;flex-wrap:wrap;gap:6px;font-size:1.4rem;margin-top:8px}
+#bc-history .c{cursor:default}
+.subhead{margin:20px 0 4px;font-size:.95rem;color:var(--ink-2);font-family:var(--text);font-weight:600;letter-spacing:0}
+#bc-partial-text{font-size:.88rem;color:var(--ink-2);overflow-wrap:anywhere}
+#bc-partial-text strong{color:var(--amber);font-weight:600}
+.empty-note{color:var(--ink-3);font-size:.92rem;margin:6px 0}
+
+/* Performance */
+.perf{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 24px;margin:0}
+.perf div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--face-2)}
+.perf dt{color:var(--ink-2);font-size:.92rem}
+.perf dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.perf dd small{font-weight:400}
+.speed{margin:6px 0 14px}
+.bar{display:grid;grid-template-columns:2.2em 1fr 5.5em;align-items:center;gap:10px;margin:6px 0;font-variant-numeric:tabular-nums}
+.bar span:first-child{color:var(--ink-3)}
+.bar i{display:block;height:12px;background:var(--face-2);border-radius:2px;overflow:hidden}
+.bar i b{display:block;height:100%;width:0;background:var(--ink);transition:width .25s ease-out}
+.bar span:last-child{text-align:right;font-weight:600}
+
+/* Event board */
+.filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.filters fieldset{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:6px}
+.filters legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip span{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border-radius:4px;background:var(--face-2);color:var(--ink-2);font-size:.9rem;font-variant-numeric:tabular-nums;border:1px solid transparent}
+.chip input:checked+span{background:var(--ink);color:var(--dark);font-weight:600}
+.chip input:focus-visible+span{outline:2px solid var(--amber);outline-offset:2px}
+.chip span em{font-style:normal;opacity:.75}
+.pause{display:inline-flex;align-items:center;gap:8px;margin:0 0 0 auto;font-size:.9rem;color:var(--ink-2);min-height:36px;cursor:pointer}
+.pause input{width:18px;height:18px;accent-color:var(--amber)}
+.cols{display:grid;grid-template-columns:5.6em 6.5em 5.2em minmax(0,1fr);gap:12px;padding:0 12px 6px;font-size:.82rem;color:var(--ink-3);border-bottom:1px solid var(--line);margin-top:14px}
+#events{list-style:none;margin:0;padding:0;max-height:560px;overflow:auto}
+.ev{border-bottom:1px solid var(--face-2)}
+.ev>summary{display:grid;grid-template-columns:5.6em 6.5em 5.2em minmax(0,1fr);gap:12px;align-items:baseline;padding:9px 12px;list-style:none;color:var(--ink)}
+.ev>summary::-webkit-details-marker{display:none}
+.ev>summary:hover{background:var(--face-2)}
+.ev[open]>summary{background:var(--face-2)}
+.t{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:.9rem;line-height:1.25}
+.t small{display:block;font-size:.78rem}
+.sys{font-family:var(--board);font-stretch:condensed;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em;font-size:.95rem}
+.sev{justify-self:start;white-space:nowrap;font-size:.78rem;font-weight:600;padding:2px 7px;border-radius:3px;background:var(--face-2);color:var(--ink-3)}
+.ev[data-sev=fault] .sev{background:var(--red-bg);color:var(--red)}
+.ev[data-sev=warn] .sev{background:var(--amber-bg);color:var(--amber)}
+.ev[data-sev=ok] .sev{background:var(--green-bg);color:var(--green)}
+.ev[data-sev=fault] .what{color:var(--red)}
+.what{font-weight:600;overflow-wrap:anywhere}
+.what small{display:block;font-weight:400;color:var(--ink-2);font-size:.85rem;margin-top:2px}
+.what .evidence{margin-top:6px}
+.raw{margin:0 12px 12px;padding:10px 12px;background:#000;border-radius:3px;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--ink-2);white-space:pre-wrap;overflow-wrap:anywhere}
+.ev .evidence{margin:0 12px 10px}
+#events-empty{padding:18px 12px;color:var(--ink-3)}
+#events[data-filter=problems] .ev:not([data-sev=fault]):not([data-sev=warn]),
+#events[data-filter=barcode] .ev:not([data-sys=Barcode]),
+#events[data-filter=motion] .ev:not([data-sys=Motion]):not([data-sys=Run]),
+#events[data-filter=obstacle] .ev:not([data-sys=Obstacle]),
+#events[data-filter=course] .ev:not([data-sys=Course]){display:none}
+
+/* Optical */
+canvas{display:block;width:100%;height:180px;background:var(--face-2);border-radius:4px;margin-top:12px}
+#optical-summary{font-weight:600}
+
+/* Raw + footer */
+.footer{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+#download{background:var(--face);}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#000;color:var(--ink-2);padding:12px;border-radius:4px;max-height:320px;overflow:auto;margin:8px 0 16px}
+#technical{margin-top:10px}
+#technical h3{margin-top:10px;font-family:var(--text);font-size:.95rem;color:var(--ink-2)}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:5px}::-webkit-scrollbar-track{background:transparent}
+
+@media(max-width:1000px){.grid{grid-template-columns:minmax(0,1fr)}.col{display:contents}#now{order:1}#barcode{order:2}#perf{order:3}#events-board{order:4}#rawarea{order:5}#controls{order:0}#optical-panel{order:0}}
+@media(max-width:640px){
+ .what .evidence .kv:nth-child(n+3){display:none}
+ .wrap{padding:14px 16px 32px}
+ .board{padding:16px}
+ #phase{font-size:1.9rem}
+ #bc-letter{font-size:4rem}
+ .strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .strip div{border-left:0;border-top:1px solid var(--line)}
+ .strip div:nth-child(-n+2){border-top:0}
+ .strip div:nth-child(even){border-left:1px solid var(--line)}
+ .strip div:last-child{grid-column:1/-1;border-left:0}
+ .perf{grid-template-columns:minmax(0,1fr)}
+ .ctl button{flex:1;min-width:0}
+ .field{min-width:100%}
+ .cols{display:none}
+ .ev>summary{grid-template-columns:auto 1fr auto;grid-template-areas:"sys what sev" "t what sev";row-gap:2px}
+ .ev .t{grid-area:t}.ev .sys{grid-area:sys}.ev .sev{grid-area:sev}.ev .what{grid-area:what}
+ .pause{margin-left:0}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head><body>
-<header class="top"><div><h1>Car testing</h1><span class="version">AAI10 · v5.55</span></div><span id="connection" role="status">Connecting…</span></header>
-<main>
-<section class="card">
-<label for="test-mode">Test</label>
+<div class="wrap">
+<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.55</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
+<main class="grid">
+
+<section id="controls" class="board" aria-label="Test controls">
+<div class="ctl">
+<div class="field"><label for="test-mode">Test</label>
 <select id="test-mode" class="setting" disabled>
 <option value="o">Follow track + avoid obstacle</option>
 <option value="v">Barcode sensor check · motors off</option>
 <option value="course">Follow track + read barcodes</option>
 <option value="f">30 cm forward</option><option value="l">Left 90°</option><option value="r">Right 90°</option><option value="u">Right 180°</option>
-</select>
+</select></div>
+<button id="prepare" class="primary" disabled>Record sensor · 5 seconds</button><button id="stop" class="stop">Stop</button>
+</div>
+<p id="message" role="status">Waiting for the car.</p>
 <p id="test-help">Keep the car still. Start on white, then slide the whole barcode underneath once during the five-second recording, finishing on white.</p>
-<div id="course-options" hidden><details id="barcode-actions"><summary>Y/Z actions · default: keep following</summary><p>A and other letters are recorded only. These are your test instructions.</p><div class="row">
+<small id="start-help">No GP20 start needed. GP20 cancels this sensor test.</small>
+<div id="course-options" hidden><details id="barcode-actions"><summary>Y/Z actions · default: keep following</summary><p>A and other letters are recorded only. These are your test instructions.</p><div class="ctl">
 <div class="field"><label for="y-action">When Y is read</label><select id="y-action" class="setting"><option value="s">Go straight — cancel pending turn</option><option value="L">Turn left 90° now</option><option value="R">Turn right 90° now</option><option value="U">U-turn 180° now</option><option value="l">Turn left at next junction</option><option value="r">Turn right at next junction</option><option value="a">Skip 1 junction, then turn left</option><option value="b">Skip 1 junction, then turn right</option><option value="c">Skip 2 junctions, then turn left</option><option value="d">Skip 2 junctions, then turn right</option><option value="x">Stop now</option></select></div>
 <div class="field"><label for="z-action">When Z is read</label><select id="z-action" class="setting"><option value="s">Go straight — cancel pending turn</option><option value="L">Turn left 90° now</option><option value="R">Turn right 90° now</option><option value="U">U-turn 180° now</option><option value="l">Turn left at next junction</option><option value="r">Turn right at next junction</option><option value="a">Skip 1 junction, then turn left</option><option value="b">Skip 1 junction, then turn right</option><option value="c">Skip 2 junctions, then turn left</option><option value="d">Skip 2 junctions, then turn right</option><option value="x">Stop now</option></select></div>
 </div><p><small>A new Y/Z replaces a waiting turn. A turn already underway finishes first; Stop overrides. Barcode reading continues during turns and line recovery.</small></p>
 <label for="route-advance">Advance before a junction turn (mm)</label><input id="route-advance" class="setting" type="number" min="60" max="250" step="1" value="120">
 </details></div>
-<div class="row actions"><button id="prepare" class="primary" disabled>Record sensor · 5 seconds</button><button id="stop" class="stop">Stop</button></div>
-<p id="message" role="status">Waiting for the car.</p>
-<small id="start-help">No GP20 start needed. GP20 cancels this sensor test.</small>
 </section>
-<section id="optical-panel" class="card"><h2>Sensor result</h2><p id="optical-summary" role="status">No recording yet.</p><canvas id="optical-plot" width="900" height="220" aria-label="Barcode sensor readings across five seconds" hidden></canvas><small id="plot-help" hidden>Higher readings mean darker. Dashed lines: 226 / 220. Driving uses a 6 ms average; this graph shows raw readings and does not confirm a decoded barcode.</small></section>
+
+<section id="optical-panel" class="board"><header><h2>Sensor result</h2></header><p id="optical-summary" role="status">No recording yet.</p><canvas id="optical-plot" width="900" height="220" aria-label="Barcode sensor readings across five seconds" hidden></canvas><small id="plot-help" hidden>Higher readings mean darker. Dashed lines: 226 / 220. Driving uses a 6 ms average; this graph shows raw readings and does not confirm a decoded barcode.</small></section>
+
+<div class="col">
+<section id="now" class="board" aria-labelledby="now-h">
+<header><h2 id="now-h">Now</h2><span id="now-test" class="meta"></span></header>
+<div id="phase" class="flaps" aria-hidden="true"></div><span id="phase-sr" class="sr" aria-live="polite"></span>
+<p id="phase-meaning">Choose a test and prepare it. The car starts only when GP20 is pressed.</p>
+<dl class="strip">
+<div><dt>Run time</dt><dd id="c-time">—</dd></div>
+<div><dt>Barcode reads</dt><dd id="c-reads">0</dd></div>
+<div><dt>Rejected reads</dt><dd id="c-retries">0</dd></div>
+<div><dt>Warnings</dt><dd id="c-warns">0</dd></div>
+<div><dt>Faults</dt><dd id="c-faults">0</dd></div>
+</dl>
+<div id="diagnosis" hidden role="alert"><h3 id="diag-title"></h3><div id="diag-code"></div><p id="diag-text"></p><ul id="diag-checks"></ul><div id="diag-evidence" class="evidence"></div></div>
+</section>
+
+<section id="events-board" class="board" aria-labelledby="ev-h">
+<header><h2 id="ev-h">Events</h2><span class="meta">Newest first. Open a row for the raw line.</span></header>
+<div class="filters"><fieldset><legend>Show</legend>
+<label class="chip"><input type="radio" name="evf" value="all" checked><span>All <em id="n-all">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="problems"><span>Problems <em id="n-problems">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="barcode"><span>Barcode <em id="n-barcode">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="motion"><span>Motion <em id="n-motion">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="obstacle"><span>Obstacle <em id="n-obstacle">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="course"><span>Course <em id="n-course">0</em></span></label>
+</fieldset><label class="pause"><input type="checkbox" id="pause"> <span id="pause-label">Pause updates</span></label></div>
+<div class="cols" aria-hidden="true"><span>Time</span><span>System</span><span>Status</span><span>Event</span></div>
+<ul id="events" data-filter="all" aria-label="Car events"></ul>
+<p id="events-empty">Events appear here as the car reports them: selections, phase changes, barcode reads, retries and stop reasons.</p>
+</section>
+</div>
+<div class="col">
+<section id="barcode" class="board" aria-labelledby="bc-h">
+<header><h2 id="bc-h">Barcode</h2><span class="meta">Code 39 · A–Z</span></header>
+<div class="bc-head">
+<div id="bc-letter" class="flaps empty" aria-hidden="true"></div>
+<dl class="facts">
+<dt>Decoded</dt><dd id="bc-value">None yet</dd>
+<dt>Read</dt><dd id="bc-seq">—</dd>
+<dt>Run time</dt><dd id="bc-at">—</dd>
+<dt>Car action</dt><dd id="bc-action">—</dd>
+</dl>
+</div>
+<figure id="bc-fig" hidden><svg id="bc-svg" class="paper" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="bc-cap"></svg><figcaption id="bc-cap"></figcaption></figure>
+<p id="bc-empty" class="empty-note">No letter decoded in this session. Course mode reads framed letters (*A*). Obstacle mode has barcodes off.</p>
+<h3 class="subhead">Reads this run</h3>
+<div id="bc-history" class="flaps"></div><p id="bc-history-empty" class="empty-note">No reads yet.</p>
+<h3 class="subhead">Last rejected capture</h3>
+<figure id="bc-pfig" hidden><svg id="bc-psvg" class="paper" preserveAspectRatio="none" role="img" aria-label="Measured bar and gap widths of the rejected capture"></svg></figure>
+<p id="bc-partial-text" class="empty-note">No rejected captures.</p>
+<h3 class="subhead">Scanner totals</h3>
+<dl class="facts" id="bc-totals"><dt>Rejected</dt><dd id="bt-rejected">—</dd><dt>Timeouts</dt><dd id="bt-timeouts">—</dd><dt>Sequence</dt><dd id="bt-seq">—</dd><dt>Width source</dt><dd id="bt-source">—</dd><dt>Integrity fault</dt><dd id="bt-fault">—</dd></dl>
+</section>
+
+<section id="perf" class="board" aria-labelledby="perf-h">
+<header><h2 id="perf-h">Last run</h2><span class="meta">Reported by the car after it stops</span></header>
+<div class="speed"><div class="meta">Mean wheel speed, clear stretches (counts/s)</div>
+<div class="bar"><span>L</span><i><b id="sp-l"></b></i><span id="sp-lv">—</span></div>
+<div class="bar"><span>R</span><i><b id="sp-r"></b></i><span id="sp-rv">—</span></div>
+<small id="sp-note">Appears after a driving run.</small></div>
+<dl class="perf">
+<div><dt>Result</dt><dd id="p-outcome">—</dd></div>
+<div><dt>Wheel counts L / R</dt><dd id="p-counts">—</dd></div>
+<div><dt>Encoder errors L / R</dt><dd id="p-invalid">—</dd></div>
+<div><dt>Line recoveries</dt><dd id="p-recov">—</dd></div>
+<div><dt>Steering trims</dt><dd id="p-trims">—</dd></div>
+<div><dt>Junctions / turns</dt><dd id="p-turns">—</dd></div>
+<div><dt>IR left raw</dt><dd id="p-irl">—</dd></div>
+<div><dt>IR centre raw</dt><dd id="p-irc">—</dd></div>
+<div><dt>IR right raw</dt><dd id="p-irr">—</dd></div>
+<div><dt>Sonar range</dt><dd id="p-sonar">—</dd></div>
+<div><dt>Longest loop</dt><dd id="p-loop">—</dd></div>
+<div><dt>Longest Wi-Fi poll</dt><dd id="p-wifi">—</dd></div>
+</dl>
+</section>
+</div>
+
+<section id="rawarea" aria-label="Log file">
 <div class="footer"><button id="download">Download log</button><small>One file includes every test. Save before switching off.</small></div>
-<details id="technical"><summary>Live log &amp; technical details</summary><h2>Latest saved result</h2><pre id="result">Results are retrieved automatically when a test finishes or you download.</pre><h2>Live log</h2><pre id="log" aria-label="Robot diagnostic log"></pre><p><small>IR order: barcode GP26 / line centre GP28 / line right GP27. Keep GP28 directly over the black tape. The car cannot detect table edges. Web Stop needs Wi-Fi; GP20 is the local stop. Captured logs remain in this page; power resets clear results on the car.</small></p></details>
+<details id="technical"><summary>Raw log &amp; technical details</summary><h3>Latest saved result</h3><pre id="result">Results are retrieved automatically when a test finishes or you download.</pre><h3>Live log</h3><pre id="log" aria-label="Robot diagnostic log"></pre><p><small>IR order: barcode GP26 / line centre GP28 / line right GP27. Keep GP28 directly over the black tape. The car cannot detect table edges. Web Stop needs Wi-Fi; GP20 is the local stop. Captured logs remain in this page; power resets clear results on the car.</small></p></details>
+</section>
 </main>
+</div>
 <script>
 'use strict';
 let cursor=0, boot='', transcript='', busy=false, online=false, robotIdle=false, downloadedResult='', requestBusy=false, resultPending=false;
 const el=id=>document.getElementById(id);
-function append(text){inspectOptical(text);transcript+=text;if(transcript.length>1048576)transcript='[BROWSER LOG TRIMMED: earlier text removed]\n'+transcript.slice(-1000000);el('log').textContent=transcript.slice(-50000);el('log').scrollTop=el('log').scrollHeight;}
+const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+let lastData=0;
+function append(text,snapshot){if(snapshot)inspectSnapshot(text);else inspectOptical(text);transcript+=text;if(transcript.length>1048576)transcript='[BROWSER LOG TRIMMED: earlier text removed]\n'+transcript.slice(-1000000);el('log').textContent=transcript.slice(-50000);el('log').scrollTop=el('log').scrollHeight;}
 let opticalLines='',opticalBins=[];
 function updateMode(){const mode=el('test-mode').value;el('course-options').hidden=mode!=='course';el('optical-panel').hidden=mode!=='v';el('prepare').textContent=mode==='v'?'Record sensor · 5 seconds':'Prepare run';el('test-help').textContent=mode==='v'?'Keep the car still. Start on white, then slide the whole barcode underneath once during the five-second recording, finishing on white.':mode==='course'?'Centre GP28 over the tape; keep GP27 beside it. Default: follow the track, go straight through crossings and record barcodes.':mode==='o'?'Centre GP28 over the tape. Slow right-side bypass. It checks tape found during the detour and resumes following when the path ahead is clear. Otherwise, it continues around the object. Barcodes are disabled. Test on the floor with clear space to the right.':'Place the car on a clear, flat surface for the selected movement.';el('start-help').textContent=mode==='v'?'No GP20 start needed. GP20 cancels this sensor test.':'After confirmation, press GP20 on the car. Hold it still through the 3-second countdown. GP20 also stops it.';}
 el('test-mode').onchange=()=>{updateMode();drawOptical();};
 window.addEventListener('resize',drawOptical);
 function drawOptical(){
  const canvas=el('optical-plot');if(!canvas.clientWidth)return;const w=canvas.clientWidth,h=180,ratio=window.devicePixelRatio||1;canvas.width=Math.round(w*ratio);canvas.height=Math.round(h*ratio);const ctx=canvas.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);
- ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1420';ctx.fillRect(0,0,w,h);
+ ctx.clearRect(0,0,w,h);ctx.fillStyle='#191919';ctx.fillRect(0,0,w,h);
  const top=Math.max(300,...opticalBins.filter(Boolean).map(v=>v[1]))*1.1;
  const y=v=>h-25-v/top*(h-40),x=i=>48+i/500*(w-60);
- ctx.font='13px system-ui';ctx.fillStyle='#b9c8da';ctx.fillText('Raw '+Math.ceil(top),5,15);ctx.fillText('0 s',48,h-5);ctx.fillText('5 s',w-30,h-5);
- ctx.strokeStyle='#ffbd69';ctx.setLineDash([5,4]);
+ ctx.font='13px system-ui';ctx.fillStyle='#bcbab2';ctx.fillText('Raw '+Math.ceil(top),5,15);ctx.fillText('0 s',48,h-5);ctx.fillText('5 s',w-30,h-5);
+ ctx.strokeStyle='#f4a62a';ctx.setLineDash([5,4]);
  for(const value of [220,226]){ctx.beginPath();ctx.moveTo(48,y(value));ctx.lineTo(w-10,y(value));ctx.stroke();ctx.fillText(String(value),value===220?5:w-35,y(value)-3);}
- ctx.setLineDash([]);ctx.strokeStyle='#70dbca';
+ ctx.setLineDash([]);ctx.strokeStyle='#f3f1ea';
  opticalBins.forEach((v,i)=>{if(!v)return;ctx.beginPath();ctx.moveTo(x(i),y(v[0]));ctx.lineTo(x(i),y(v[1])-1);ctx.stroke();});
 }
 function inspectOptical(text){
  opticalLines+=text;const lines=opticalLines.split('\n');opticalLines=lines.pop();
  for(const line of lines){
+  handleLine(line);
   if(/^\[SELECT(?: Y\/Z)?\]/.test(line)){
    const detail=line.replace(/^\[SELECT(?: Y\/Z)?\]\s*/, '');
    const rejected=/^(?:Rejected\b|Use\b|Wait\b|Ignored\b|Obstacle mode requires\b)/.test(detail);
@@ -59,8 +346,7 @@ function inspectOptical(text){
   if(line.startsWith('[START]'))el('message').textContent='Starting · keep the car still through the countdown.';
   if(line.startsWith('[AVOID]')){
    const phase=(line.match(/phase=(\w+)/)||[])[1];
-   const labels={FOLLOW:'Following the tape.',SETTLE:'Pausing to settle before the next move.',TURN_RIGHT_OUT:'Turning right to leave the tape.',SCAN_RIGHT_PATH:'Checking space on the right.',MOVE_OUT:'Moving out beside the object.',FACE_FORWARD:'Turning back towards the original direction.',SCAN_FORWARD:'Checking the path ahead.',MOVE_ALONG:'Moving alongside the object.',FACE_OBJECT:'Turning to look towards the object.',SCAN_OBJECT_SIDE:'Checking whether the object has ended.',FACE_ALONG:'Turning to continue alongside.',SEEK_RETURN_LINE:'Moving towards the tape.',CHECK_FOUND_TAPE:'Found tape: stopping to check the path ahead.',PROBE_TAPE_HEADING:'Checking whether this is a single tape strip.',ADVANCE_AXLE_TO_TAPE:'Bringing the wheels to the tape.',ALIGN_WITH_TAPE:'Finding the tape heading towards the original direction of travel.',CONFIRM_TAPE_HEADING:'Checking the new heading.',VERIFY_LINE:'Trying to follow the recovered tape.',FAILED:'Stopped; download the log for the reason.'};
-   el('message').textContent=labels[phase]||'Obstacle manoeuvre in progress.';
+   el('message').textContent=AVOID_LABELS[phase]||'Obstacle manoeuvre in progress.';
   }
   if(line.startsWith('[AVOID COMPLETE]'))el('message').textContent='Obstacle passed; tape found; following resumed.';
   if(line.startsWith('[MOTION GO]'))el('message').textContent='Running · GP20 or Stop ends the run.';
@@ -78,10 +364,283 @@ function inspectOptical(text){
  }
  if(opticalLines.length>4096)opticalLines='';
 }
+
+/* ---------- Log interpretation ---------- */
+const AVOID_LABELS={FOLLOW:'Following the tape.',SETTLE:'Pausing to settle before the next move.',TURN_RIGHT_OUT:'Turning right to leave the tape.',SCAN_RIGHT_PATH:'Checking space on the right.',MOVE_OUT:'Moving out beside the object.',FACE_FORWARD:'Turning back towards the original direction.',SCAN_FORWARD:'Checking the path ahead.',MOVE_ALONG:'Moving alongside the object.',FACE_OBJECT:'Turning to look towards the object.',SCAN_OBJECT_SIDE:'Checking whether the object has ended.',FACE_ALONG:'Turning to continue alongside.',SEEK_RETURN_LINE:'Moving towards the tape.',CHECK_FOUND_TAPE:'Found tape: stopping to check the path ahead.',PROBE_TAPE_HEADING:'Checking whether this is a single tape strip.',ADVANCE_AXLE_TO_TAPE:'Bringing the wheels to the tape.',ALIGN_WITH_TAPE:'Finding the tape heading towards the original direction of travel.',CONFIRM_TAPE_HEADING:'Checking the new heading.',VERIFY_LINE:'Trying to follow the recovered tape.',FAILED:'Stopped; download the log for the reason.'};
+const ACTIONS={STRAIGHT_CANCEL_PENDING:'Go straight, cancel pending turn',TURN_NOW:'Turn now',STOP_NOW:'Stop now',RECORD_ONLY:'Recorded only',WAIT_FOR_FUTURE_JUNCTION:'Turn at a coming junction',REPLACED_WAITING_INSTRUCTION:'Replaced the waiting turn',DEFERRED_UNTIL_MANOEUVRE_COMPLETE:'Held until the current manoeuvre ends',IGNORED_STOPPED:'Ignored: car stopped',IGNORED_UNMAPPED:'Ignored: letter has no action'};
+const OK_CODES=/^(MOTION_COMPLETE|COURSE_BARCODE_STOP|BARCODE_PASS|COMPLETE|PASS|NONE|OK)$/;
+const OP_CODES=/^(BUTTON_STOP|EXTERNAL_STOP|STOPPED)$/;
+const line_lost=['Look at where the car stopped: is the tape within reach of GP28?','Compare line recoveries in Last run with earlier runs; many recoveries point at steering or sensor height.'];
+const sonar=['Check the ultrasonic sensor wiring.','Point it at a broad, solid surface; thin or angled objects may not echo.'];
+const DIAG={
+CENTER_LINE_NOT_REACQUIRED:['Lost the line','GP28 left the tape and the bounded search did not find it again.',line_lost],
+CENTER_LOCAL_RECOVERY_EXHAUSTED:['Lost the line','Local recovery used all its attempts without finding the tape.',line_lost],
+COURSE_LINE_NOT_REACQUIRED:['Lost the line','After a turn or crossing the car could not find the tape again.',line_lost],
+COURSE_REACQUIRE_AMBIGUOUS:['Line position unclear','Both line sensors gave a reading that did not match one tape position.',['Check for crossing tape or a stray mark near the stop point.']],
+CENTER_STEERING_NO_RESPONSE:['Steering had no effect','Trim commands did not change the GP28 reading.',['Check both wheels turn and grip the floor.','Check GP28 sits on the tape edge, not fully on black or white.']],
+CENTER_SEARCH_ENCODER_STALL:['A wheel stalled while searching','Encoder counts stopped while the car was looking for the tape.',['Check the wheel turns freely and its motor is powered.','Check the battery level.']],
+CENTER_START_NOT_ON_LINE:['Started off the line','GP28 did not see tape when the run began.',['Place GP28 directly over the black tape before pressing GP20.']],
+CENTER_BASELINE_NOT_READY:['Sensor baseline not ready','The line sensors had no stable baseline when the run began.',['Hold the car still through the 3-second countdown.']],
+COURSE_ENCODER_FAULT:['Encoder fault','Wheel encoder readings were invalid during the course.',['Check the encoder connectors on both wheels.']],
+ENCODER_INVALID:['Encoder fault','Wheel encoder readings were invalid.',['Check the encoder connectors on both wheels.']],
+AVOID_ENCODER_INVALID:['Encoder fault during bypass','Wheel encoder readings were invalid during the obstacle manoeuvre.',['Check the encoder connectors on both wheels.']],
+COURSE_TRAVEL_LIMIT:['Travel limit reached','The run reached its distance safety cap.',['Expected on a long run. Otherwise check the car is not circling.']],
+AVOID_RUN_TRAVEL_LIMIT:['Travel limit reached','The bypass reached its distance safety cap.',['Check the object is not wider than the bypass allows.']],
+COURSE_CONTROL_LATE:['Control loop ran late','The control loop missed its timing window, so the car stopped for safety.',['Check Longest loop and Longest Wi-Fi poll in Last run.','Keep only one browser tab open on the car.']],
+AVOID_CONTROL_LATE:['Control loop ran late','The control loop missed its timing window during the bypass.',['Check Longest loop and Longest Wi-Fi poll in Last run.','Keep only one browser tab open on the car.']],
+COURSE_TURN_REJECTED:['Turn rejected','A barcode asked for a turn the course controller could not start.',['Open the barcode event for the action and state.']],
+COURSE_CENTER_TIMEOUT:['Centering timed out','The car could not centre over the junction in time.',['Check the junction tape is straight and wide enough.']],
+COURSE_CROSSING_TOO_WIDE:['Crossing too wide','Both sensors saw black for longer than a crossing should take.',['Check for a wide patch of tape or a dark floor mark.']],
+COURSE_BAD_CONFIG:['Invalid course settings','The Y/Z settings were not accepted.',['Prepare the course again from this page.']],
+COURSE_BARCODE_STOP:['Stopped by barcode','A barcode set to Stop now was read.',[]],
+MOTOR_SERVICE_TIMEOUT:['Motor watchdog stopped the car','The motor service missed its deadline and the alarm removed motor power.',['Press GP20 to restart. If it repeats, download the log.']],
+MOTION_TIMEOUT:['Move timed out','The move did not reach its target in time.',['Check for a stalled wheel or a low battery.']],
+MOTION_FAULT:['Motion fault','A wheel stopped making progress during the move.',['Open the stop event: stall_wheel names the wheel and no_progress_ms how long it stalled.']],
+OBSTACLE_STOP:['Obstacle ahead','The sonar saw an object inside the stop distance.',['Clear the path, then press GP20.']],
+NEAR_OBSTACLE:['Obstacle ahead','The sonar saw an object inside the stop distance.',['Clear the path, then press GP20.']],
+IR_SAMPLING_UNAVAILABLE:['IR sampling stopped','IR sensor readings were not fresh.',['Restart the firmware before driving.']],
+AVOID_IR_STALE:['IR readings went stale','IR sensor readings stopped updating during the bypass.',['Restart the firmware before driving.']],
+BARCODE_SAMPLE_FAULT:['Barcode sampling fault','The 2 kHz barcode sampler missed samples, so reads were discarded.',['Check max_gap_us in the barcode result. Restart if it repeats.']],
+BARCODE_START_NOT_WHITE:['Barcode sensor not on white','GP26 did not see white paper when the test began.',['Start with GP26 over white.']],
+AVOID_RETURN_LINE_NOT_FOUND:['Tape not found after the detour','The car went around the object but did not find the line on the way back.',['Check tape lies within reach of the 25 cm detour.','Open the result event: tape_checks and rejected show how many candidates were refused.']],
+AVOID_TAPE_HEADING_NOT_FOUND:['Tape direction not found','Tape was found, but the car could not align with its direction.',['Check the rejoin tape is a single straight strip.']],
+AVOID_TAPE_POSITION_UNCERTAIN:['Tape position uncertain','The found tape did not give a consistent position.',['Check for stray marks near the rejoin point.']],
+AVOID_LINE_ALIGNMENT_FAILED:['Line alignment failed','The car could not follow the recovered tape.',['Check the tape heading near the rejoin point.']],
+AVOID_REJOIN_BACKWARD_HEADING:['Rejoin points backwards','The found tape would send the car back the way it came, so it stopped.',['Check the tape layout around the object.']],
+AVOID_APPROACH_HEADING_UNCERTAIN:['Approach heading uncertain','The car could not record its heading before the bypass.',['Start the bypass on a straight stretch of tape.']],
+AVOID_RIGHT_PATH_BLOCKED:['Right side blocked','There was no clear path to the right of the object.',['Clear space on the right. The bypass only goes right.']],
+AVOID_OBJECT_TOO_WIDE_OR_PATH_BLOCKED:['Object too wide or path blocked','The car could not get around the object within its limits.',['Use a narrower object or clear the right side.']],
+AVOID_OBJECT_END_NOT_CONFIRMED:['Object end not confirmed','The sonar never confirmed the side of the object had ended.',sonar],
+AVOID_APPROACH_TOO_CLOSE:['Too close to the object','The object was detected inside the 12 cm minimum pivot distance.',['Start further back from the object.']],
+AVOID_EPISODE_TIMEOUT:['Bypass took too long','The obstacle manoeuvre exceeded its time limit.',['Check for a stalled wheel or repeated sonar retries.']],
+AVOID_EPISODE_LIMIT:['Too many bypasses','The run reached its limit of obstacle manoeuvres.',[]],
+AVOID_ALIGNED_PATH_BLOCKED:['Path blocked after rejoining','Another object was detected after aligning with the tape.',['Clear the path ahead of the rejoin point.']],
+AVOID_ALIGNED_PATH_UNCONFIRMED:['Path ahead unconfirmed','After aligning, the sonar could not confirm the path was clear.',sonar],
+AVOID_RETURN_BLOCKED:['Return path blocked','An object blocked the way back to the tape.',['Clear the space between the object and the tape.']],
+AVOID_PATH_OBSTACLE_STOP:['Obstacle during bypass','Another object came inside the stop distance during the manoeuvre.',['Clear the path, then press GP20.']],
+AVOID_ALIGN_OBSTACLE_STOP:['Obstacle while aligning','An object came inside the stop distance while aligning with the tape.',['Clear the path, then press GP20.']],
+AVOID_SONAR_RECOVERY_FAILED:['Sonar readings unavailable','The ultrasonic sensor did not recover valid readings.',sonar],
+AVOID_SONAR_RETRY_STOPPED:['Sonar readings unavailable','Sonar retries ran out while the motors were stopped.',sonar],
+AVOID_SONAR_ECHO_HIGH_BEFORE_TRIGGER:['Sonar echo line stuck high','The echo pin was already high before a measurement.',sonar],
+AVOID_SONAR_TOO_CLOSE_OR_BAD_PULSE:['Sonar pulse invalid','The sonar returned a pulse that was too short or malformed.',sonar],
+AVOID_RANGE_STALE:['Sonar readings went stale','No fresh range reading arrived in time.',sonar],
+AVOID_SCAN_STALE:['Sonar scan went stale','A servo scan did not finish in time.',sonar],
+AVOID_REJOIN_RANGE_UNAVAILABLE:['No range at rejoin','The sonar had no valid reading when the car tried to rejoin.',sonar],
+AVOID_BAD_PHASE:['Unexpected bypass state','The obstacle controller reached a state it does not expect.',['Download the log and share it; this points at a firmware issue.']]
+};
+function human(code){return String(code||'').replace(/_/g,' ').toLowerCase().replace(/^./,c=>c.toUpperCase());}
+function pairs(s){const o={};for(const m of s.matchAll(/([A-Za-z_]\w*)=([^\s;]*)/g))o[m[1]]=m[2].replace(/[.,]+$/,'');return o;}
+function fmtS(ms){return (ms/1000).toFixed(1)+' s';}
+function fmtRange(v){return v?v.replace('..','–'):'—';}
+
+/* Split-flap cells */
+const GLYPHS='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+function flap(node,text){
+ text=String(text).toUpperCase();
+ const prev=node.dataset.text||'';if(prev===text)return;node.dataset.text=text;
+ const old=prev.replace(/ /g,'');const still=reduced()||document.hidden;
+ node.textContent='';let i=0;const cells=[];
+ for(const word of text.split(' ')){if(!word)continue;const w=document.createElement('span');w.className='w';for(const ch of word){const c=document.createElement('span');c.className='c';c.textContent=ch;w.append(c);if(!still&&old[i]!==ch)cells.push([c,ch,i]);i++;}node.append(w);}
+ /* The real letter is always in the DOM. A CSS overlay shows one passing glyph, so a throttled tab can never leave a half-flipped word. */
+ cells.forEach(([c,ch,idx])=>{c.dataset.g=GLYPHS[(GLYPHS.indexOf(ch)+7+idx)%GLYPHS.length];c.style.setProperty('--d',(20+Math.min(idx*18,160))+'ms');c.classList.add('flip');});
+}
+
+/* Run state */
+const run={start:0,end:0,reads:0,retries:0,warns:0,faults:0,history:[],diag:false};
+let barcodeEver=false;
+function newRun(){Object.assign(run,{start:Date.now(),end:0,reads:0,retries:0,warns:0,faults:0,history:[],diag:false});el('diagnosis').hidden=true;renderHistory();renderCounters();}
+function setPhase(text,meaning,tone){flap(el('phase'),text);el('phase').className='flaps'+(tone?' '+tone:'');el('phase-sr').textContent=text.toLowerCase()+'. '+(meaning||'');if(meaning)el('phase-meaning').textContent=meaning;}
+function renderCounters(){if(run.start)el('c-time').textContent=fmtS((run.end||Date.now())-run.start);el('c-reads').textContent=run.reads;el('c-retries').textContent=run.retries;el('c-warns').textContent=run.warns;el('c-faults').textContent=run.faults;el('c-faults').className=run.faults?'bad':'';el('c-warns').className=run.warns?'warn':'';el('c-retries').className=run.retries?'warn':'';}
+function kvChips(node,kv,keys){node.textContent='';for(const k of keys||Object.keys(kv)){if(kv[k]===undefined||kv[k]==='')continue;const s=document.createElement('span');s.className='kv';const b=document.createElement('b');b.textContent=k;s.append(b,document.createTextNode(kv[k]));s.title=k+'='+kv[k];node.append(s);}}
+function diagnose(code,kv,line,force,note){
+ if(!code)return;if(run.diag&&!force)return;
+ const box=el('diagnosis');const known=DIAG[code];
+ let kind=OK_CODES.test(code)?'ok':OP_CODES.test(code)?'op':'fault';
+ if(code==='COURSE_BARCODE_STOP')kind='ok';
+ run.diag=kind==='fault';
+ box.className=kind==='fault'?'':kind;box.hidden=false;
+ el('diag-title').textContent=kind==='op'?'Stopped by operator':kind==='ok'?(known?known[0]:'Run completed'):(known?known[0]:human(code));
+ el('diag-code').textContent='Car reported '+code;
+ el('diag-text').textContent=kind==='op'?(code==='BUTTON_STOP'?'GP20 was pressed on the car.':'Stop was requested from the browser or USB.'):known?known[1]:note||'This outcome has no plain-language note yet. Open its row in Events for the raw line.';
+ const ul=el('diag-checks');ul.textContent='';if(kind==='fault')for(const c of (known?known[2]:['Download the log and share it with the stop line.'])){const li=document.createElement('li');li.textContent=c;ul.append(li);}
+ const skip=new Set(['outcome','result']);const ev={};for(const k in kv)if(!skip.has(k))ev[k]=kv[k];kvChips(el('diag-evidence'),ev,Object.keys(ev).slice(0,14));
+ setPhase(kind==='fault'?'FAULT':kind==='ok'?'DONE':'STOPPED',kind==='fault'?(known?known[1]:human(code)):kind==='ok'?'Run finished normally.':'Stopped by operator. Choose a test to run again.',kind==='fault'?'fault':kind==='ok'?'ok':'');
+}
+
+/* Barcode */
+const C39={'*':0x094};[0x109,0x049,0x148,0x019,0x118,0x058,0x00D,0x10C,0x04C,0x01C,0x103,0x043,0x142,0x013,0x112,0x052,0x007,0x106,0x046,0x016,0x181,0x0C1,0x1C0,0x091,0x190,0x0D0].forEach((p,i)=>C39[String.fromCharCode(65+i)]=p);
+function code39(letter){
+ const N=6,W=16,H=58;let x=20,bars='',labels='',pattern=[];
+ ['*',letter,'*'].forEach(ch=>{const p=C39[ch];if(p===undefined)return;const x0=x;const pat=[];for(let i=0;i<9;i++){const wide=(p>>(8-i))&1;const w=wide?W:N;if(i%2===0)bars+='<rect x="'+x+'" y="10" width="'+w+'" height="'+H+'"/>';pat.push(wide?'W':'n');x+=w;}labels+='<text x="'+((x0+x)/2)+'" y="'+(H+30)+'" text-anchor="middle">'+ch+'</text>';if(ch===letter)pattern=pat;x+=N;});
+ return {svg:'<g fill="#121212">'+bars+'</g><g fill="#121212" font-family="system-ui,sans-serif" font-size="17" font-weight="700">'+labels+'</g>',w:x+14,h:H+38,pattern};
+}
+function showLetter(letter,seq,atMs,action){
+ barcodeEver=true;flap(el('bc-letter'),letter);el('bc-letter').classList.remove('empty');
+ el('bc-value').textContent=letter;el('bc-seq').textContent=seq?'#'+seq:'—';el('bc-at').textContent=atMs!=null?fmtS(atMs):'—';el('bc-action').textContent=action?(ACTIONS[action]||human(action)):'—';
+ const c=code39(letter);const svg=el('bc-svg');svg.setAttribute('viewBox','0 0 '+c.w+' '+c.h);svg.innerHTML=c.svg;
+ el('bc-cap').textContent='Expected Code 39 pattern for *'+letter+'*. Bars and gaps of '+letter+': '+c.pattern.join(' ')+' (W wide, n narrow).';
+ el('bc-fig').hidden=false;el('bc-empty').hidden=true;
+}
+function renderHistory(){const h=el('bc-history');h.textContent='';for(const r of run.history){const c=document.createElement('span');c.className='c';c.textContent=r.letter;c.title=r.letter+' at '+fmtS(r.at)+' · '+(ACTIONS[r.action]||human(r.action));h.append(c);}el('bc-history-empty').hidden=run.history.length>0;}
+function showPartial(widths,unit,reason){
+ const list=(widths||'').split(',').map(Number).filter(n=>n>0);const t=el('bc-partial-text');t.className='';t.textContent='';
+ const s=document.createElement('strong');s.textContent=reason;t.append(s,document.createTextNode(' '+list.length+' of 29 elements captured'+(list.length?'. Widths ('+unit+'): '+list.join(', ')+'.':'.')));
+ if(!list.length){el('bc-pfig').hidden=true;return;}
+ const total=list.reduce((a,b)=>a+b,0),W=300;let x=10,bars='';list.forEach((v,i)=>{const w=Math.max(1,v/total*W);if(i%2===0)bars+='<rect x="'+x.toFixed(1)+'" y="8" width="'+w.toFixed(1)+'" height="44"/>';x+=w;});
+ const svg=el('bc-psvg');svg.setAttribute('viewBox','0 0 320 60');svg.innerHTML='<g fill="#121212">'+bars+'</g>';el('bc-pfig').hidden=false;
+}
+
+/* Performance */
+function setPerf(tag,kv){
+ if(tag==='TIMING'){
+  if(kv.max_loop_us)el('p-loop').innerHTML=(kv.max_loop_us/1000).toFixed(1)+' <small>ms</small>';
+  if(kv.wifi_max_poll_us)el('p-wifi').innerHTML=(kv.wifi_max_poll_us/1000).toFixed(1)+' <small>ms</small>';
+  if(kv.mean_cps){const [l,r]=kv.mean_cps.split('/').map(Number);const hi=Math.max(l,r,...[kv.range_left,kv.range_right].filter(Boolean).map(v=>Number(v.split('..')[1])||0))||1;
+   el('sp-l').style.width=(l/hi*100)+'%';el('sp-r').style.width=(r/hi*100)+'%';el('sp-lv').textContent=l;el('sp-rv').textContent=r;
+   const diff=l&&r?Math.abs(l-r)/Math.max(l,r)*100:0;el('sp-note').textContent='Range L '+fmtRange(kv.range_left)+', R '+fmtRange(kv.range_right)+'. Difference '+diff.toFixed(0)+'%'+(diff>8?', check the slower wheel.':'.');
+  }else{el('sp-l').style.width='0';el('sp-r').style.width='0';el('sp-lv').textContent='—';el('sp-rv').textContent='—';el('sp-note').textContent='No clear straight stretch long enough to measure speed in this run.';}
+ }
+ if(tag==='MOTION SETTLED'){if(kv.L&&kv.R&&!kv.L.includes('/'))el('p-counts').textContent=kv.L+' / '+kv.R;else if(kv.L)el('p-counts').textContent=kv.L.split('/')[0]+' / '+(kv.R||'').split('/')[0];if(kv.invalid)el('p-invalid').textContent=kv.invalid.replace('/',' / ');if(kv.outcome)el('p-outcome').textContent=human(kv.outcome);}
+ if(tag==='CHECK'){el('p-irl').textContent=fmtRange(kv.IR_L)+(kv.edges?'':'');el('p-irc').textContent=fmtRange(kv.IR_C);el('p-irr').textContent=fmtRange(kv.IR_R);if(kv.range_cm)el('p-sonar').innerHTML=fmtRange(kv.range_cm)+' <small>cm</small>';}
+ if(tag==='COURSE RESULT'){el('p-recov').textContent=kv.recoveries??'—';el('p-trims').textContent=(kv.trims??'—')+(kv.trim_reversals?' ('+kv.trim_reversals+' reversed)':'');el('p-turns').textContent=(kv.encounters??'—')+' / '+(kv.turns??'—');}
+ if(tag==='BARCODE RESULT'){el('bt-rejected').textContent=kv.rejected??'—';el('bt-timeouts').textContent=kv.timeouts??'—';el('bt-seq').textContent=kv.sequence||(kv.decoded&&kv.decoded!=='-'?kv.decoded:'None');el('bt-source').textContent=kv.width_source?human(kv.width_source):'Time';el('bt-fault').textContent=kv.integrity_fault==='1'?'Yes':kv.integrity_fault==='0'?'No':'—';el('bt-fault').style.color=kv.integrity_fault==='1'?'var(--red)':'';}
+}
+
+/* Event classification */
+function sysOf(tag){
+ if(/^(BARCODE|ROUTE BARCODE|SCAN)/.test(tag))return 'Barcode';
+ if(/^(AVOID|SONAR)/.test(tag))return 'Obstacle';
+ if(/^(COURSE|ROUTE|JUNCTION|BEND|CENTER)/.test(tag))return 'Course';
+ if(/^(OPTICAL)/.test(tag))return 'Sensor';
+ if(/^(SELECT|BROWSER|WIFI)/.test(tag))return 'Control';
+ if(/^(CHECK|TIMING|TERRAIN)/.test(tag))return 'Run';
+ if(/^(CAR POWER RESET|LOG GAP)/.test(tag))return 'Page';
+ return 'Motion';
+}
+function describe(tag,rest,kv){
+ if(/^(OPTICAL DATA|SCAN EDGES|BARCODE DISCARD WIDTHS|RETAINED SNAPSHOT|PREVIOUS RUN|CURRENT RUN)/.test(tag))return null;
+ let sev='info',title=human(tag),sub=rest.length>140?rest.slice(0,140)+'…':rest,keys=null;
+ const outcome=kv.outcome||kv.result;
+ switch(tag){
+  case 'SELECT':case 'SELECT Y/Z':{const rej=/^(Rejected|Use|Wait|Ignored|Obstacle mode requires)/.test(rest);sev=rej?'fault':'ok';title=rej?'Not prepared':'Ready for GP20';break;}
+  case 'BROWSER':title='Request sent';break;
+  case 'ARM':title='Countdown';break;
+  case 'START':title='Starting';break;
+  case 'MOTION GO':sev='ok';title='Run started';break;
+  case 'STOP':{const op=/GP20 abort|USB\/browser stop/.test(rest);sev=op?'info':'fault';title=op?'Stopped by operator':'Stopped: '+rest.split(/[.:]/)[0];break;}
+  case 'MOTION STOP':{const code=kv.reason&&kv.result==='MOTION_FAULT'?kv.reason:kv.result;sev=OK_CODES.test(code)?'ok':OP_CODES.test(code)?'info':'fault';title='Stopped: '+(DIAG[code]?DIAG[code][0]:human(code));keys=['result','reason','phase','stall_wheel','no_progress_ms','counts','last_measured_cps','last_pwm'];break;}
+  case 'MOTION SETTLED':case 'CHECK':case 'AVOID RESULT':case 'COURSE RESULT':{const code=kv.fault&&kv.fault!=='NONE'?kv.fault:outcome;sev=!code||OK_CODES.test(code)?'ok':OP_CODES.test(code)?'info':'fault';title=(tag==='MOTION SETTLED'?'Settled: ':tag==='CHECK'?'Sensor summary: ':tag==='AVOID RESULT'?'Bypass result: ':'Course result: ')+(code?(DIAG[code]?DIAG[code][0]:human(code)):'done');keys=tag==='COURSE RESULT'?['encounters','turns','recoveries','trims','trim_reversals','outcome']:tag==='CHECK'?['IR_L','IR_C','IR_R','range_cm','no_echo','outcome']:tag==='AVOID RESULT'?['detected','completed','phase','tape_checks','rejected','sonar_retries','fault','outcome']:['L','R','invalid','outcome'];break;}
+  case 'TIMING':title='Timing: longest loop '+(kv.max_loop_us?(kv.max_loop_us/1000).toFixed(1)+' ms':'—');keys=['max_loop_us','wifi_max_poll_us','mean_cps','range_left','range_right'];break;
+  case 'BARCODE EVENT':sev='ok';title='Read '+kv.letter+(kv.at_ms?' at '+fmtS(kv.at_ms):'');sub=ACTIONS[kv.action]||human(kv.action);break;
+  case 'ROUTE BARCODE':title=kv.source+' selects '+human(kv.selected);keys=['source','selected','prior_waiting','remaining','deferred'];break;
+  case 'BARCODE RETRY':sev='warn';title='Capture rejected';keys=['rejected','timeouts'];break;
+  case 'BARCODE PARTIAL':sev='warn';title='Partial capture: '+(kv.completed_runs||0)+' of 29 elements';keys=['completed_runs','raw_range','max_gap_us','active'];break;
+  case 'BARCODE DISCARD':sev='warn';title='Capture discarded: '+human(kv.reason);keys=['reason','completed_runs','motion_aborts','pause_timeouts','zero_distance_aborts'];break;
+  case 'BARCODE RESULT':{const bad=kv.integrity_fault==='1';sev=bad?'fault':'info';title='Barcode totals: '+(kv.reads!==undefined?kv.reads+' read'+(kv.reads==='1'?'':'s'):'decoded '+kv.decoded);keys=['reads','sequence','decoded','rejected','timeouts','integrity_fault','max_gap_us','width_source'];break;}
+  case 'BARCODE':if(/rejected/i.test(rest)){sev='fault';title='Barcode start rejected';}else title='Barcode';break;
+  case 'AVOID':{sev=kv.phase==='FAILED'?'fault':'info';title='Phase: '+human(kv.phase);sub=AVOID_LABELS[kv.phase]||'';keys=['next','offset_mm','along_mm','tape_checks','rejected','align_rejected'];break;}
+  case 'AVOID BEGIN':title='Bypass started';keys=[];break;
+  case 'AVOID COMPLETE':sev='ok';title='Obstacle passed, following resumed';break;
+  case 'AVOID APPROACH':title='Approach: nearest '+kv.nearest_cm+' cm';keys=['nearest_cm','hits','detected'];break;
+  case 'AVOID SCAN':title='Scan: nearest '+kv.nearest_cm+' cm';keys=['phase','nearest_cm','blocked','no_echo','center_clear','side_seen'];break;
+  case 'AVOID TAPE':{sev=/REJECT|NONE/.test(kv.decision||'')?'warn':'info';title='Tape check: '+human(kv.decision);keys=['from','to','center','reference','first_ink_mm','approach_heading_deg'];break;}
+  case 'AVOID ALIGN':title='Align: heading '+kv.heading_deg+'°';break;
+  case 'AVOID LEG':title='Leg finished: '+human(kv.phase);break;
+  case 'SONAR RETRY':sev='warn';title='Sonar retry: '+human(kv.status);keys=['phase','status','pulse_us'];break;
+  case 'SONAR RESUME':title='Sonar recovered at '+kv.range_cm+' cm';break;
+  case 'SONAR RESULT':title='Sonar summary: '+human(kv.last_status);break;
+  case 'ENCODER NOTE':sev='warn';title='Encoder glitch ignored';break;
+  case 'JUNCTION':title='Junction '+kv.encounter+': '+human(kv.action);keys=['at_ms','counts','action','remaining'];break;
+  case 'ROUTE':sev=/complete/.test(rest)?'ok':'info';title=/complete/.test(rest)?'Turn complete, line found':'Route update';break;
+  case 'OPTICAL START':title=rest.includes('source=DRIVE')?'Driving sensor trace saved':'Sensor recording started';break;
+  case 'OPTICAL RESULT':sev=kv.sampling_ok==='1'?'ok':'warn';title='Sensor recording: '+(kv.samples||'?')+' samples';keys=['samples','raw','max_gap_us','empty_bins','aborted','sampling_ok'];break;
+  case 'OPTICAL END':sev='ok';title='Sensor recording saved';break;
+  case 'CAR POWER RESET':sev='warn';title='Car restarted';break;
+  case 'LOG GAP':sev='warn';title='Some log text was lost';break;
+  case 'WIFI':title='Wi-Fi';break;
+ }
+ if(/^(ALIGNMENT AT STOP|ENCODER AT STOP|SENSOR AT STOP|MOTION DETAIL)/.test(tag)){title=human(tag);keys=null;}
+ const plain=sub!==(rest.length>140?rest.slice(0,140)+'…':rest)?sub:'';
+ return {sys:sysOf(tag),sev,title,sub,keys,plain};
+}
+
+/* Event board */
+const SEV_LABEL={fault:'Fault',warn:'Warning',ok:'OK',info:'Info'};
+let paused=false,pending=[];const counts={all:0,problems:0,barcode:0,motion:0,obstacle:0,course:0};
+function addEvent(ev,kv,line){
+ const now=Date.now();
+ if(ev.sev==='fault'){run.faults++;}else if(ev.sev==='warn'){run.warns++;}
+ renderCounters();
+ counts.all++;if(ev.sev==='fault'||ev.sev==='warn')counts.problems++;const f={Barcode:'barcode',Motion:'motion',Run:'motion',Obstacle:'obstacle',Course:'course'}[ev.sys];if(f)counts[f]++;
+ for(const k in counts)el('n-'+k).textContent=counts[k];
+ const d=document.createElement('details');d.className='ev';d.dataset.sev=ev.sev;d.dataset.sys=ev.sys;
+ const s=document.createElement('summary');
+ const t=document.createElement('span');t.className='t';const clock=new Date(now);t.textContent=clock.toTimeString().slice(0,8);
+ if(run.start&&now>=run.start&&(!run.end||now-run.end<3000)){const sm=document.createElement('small');sm.textContent='+'+fmtS(now-run.start);t.append(sm);}
+ const sy=document.createElement('span');sy.className='sys';sy.textContent=ev.sys;
+ const sv=document.createElement('span');sv.className='sev';sv.textContent=SEV_LABEL[ev.sev];
+ const w=document.createElement('span');w.className='what';w.textContent=ev.title;
+ const sub=ev.keys?ev.plain:ev.sub;if(sub&&sub!==ev.title){const sm=document.createElement('small');sm.textContent=sub;w.append(sm);}
+ if(ev.keys&&ev.keys.length){const chips=document.createElement('div');chips.className='evidence';kvChips(chips,kv,ev.keys);if(chips.childNodes.length)w.append(chips);}
+ s.append(t,sy,sv,w);d.append(s);
+ const raw=document.createElement('div');raw.className='raw';raw.textContent=line;d.append(raw);
+ if(paused){pending.push(d);el('pause-label').textContent='Paused · '+pending.length+' new';}else insertEvent(d);
+}
+function insertEvent(d){const list=el('events');list.prepend(d);while(list.children.length>400)list.lastChild.remove();el('events-empty').hidden=true;}
+el('pause').onchange=e=>{paused=e.target.checked;if(!paused){for(const d of pending)insertEvent(d);pending=[];el('pause-label').textContent='Pause updates';}};
+document.querySelectorAll('input[name=evf]').forEach(r=>r.onchange=()=>{el('events').dataset.filter=r.value;});
+
+function handleLine(line){
+ line=line.replace(/\r+$/,'');const t=line.match(/^\[([A-Z0-9][A-Z0-9 \/_-]*)\]\s?(.*)$/);if(!t)return;
+ const tag=t[1],rest=t[2],kv=pairs(rest);
+ updateState(tag,rest,kv,line);
+ const ev=describe(tag,rest,kv);if(ev)addEvent(ev,kv,line);
+}
+function updateState(tag,rest,kv,line){
+ switch(tag){
+  case 'SELECT':{const rej=/^(Rejected|Use|Wait|Ignored|Obstacle mode requires)/.test(rest);if(rej)setPhase('NOT READY',rest,'warn');else{setPhase('READY','Press GP20 on the car to start.','');el('now-test').textContent=human(rest.split(/[;.]/)[0]);}break;}
+  case 'SELECT Y/Z':setPhase('READY','Course armed: Y '+(ACTIONS[kv.Y]||human(kv.Y)).toLowerCase()+', Z '+(ACTIONS[kv.Z]||human(kv.Z)).toLowerCase()+'. Press GP20 to start.','');el('now-test').textContent='Follow track and read barcodes';break;
+  case 'ARM':setPhase('COUNTDOWN','Hold the car still. '+rest,'warn');break;
+  case 'MOTION GO':newRun();setPhase('RUNNING','Running. GP20 or Stop ends the run.','ok');break;
+  case 'AVOID':if(kv.phase)setPhase(kv.phase.replace(/_/g,' '),AVOID_LABELS[kv.phase],kv.phase==='FAILED'?'fault':'');break;
+  case 'AVOID COMPLETE':setPhase('FOLLOW','Obstacle passed; following resumed.','ok');break;
+  case 'JUNCTION':setPhase('JUNCTION '+(kv.encounter||''),human(kv.action)+'.','');break;
+  case 'ROUTE':if(/complete/.test(rest))setPhase('FOLLOW','Turn complete; line found.','ok');break;
+  case 'BARCODE EVENT':run.reads++;run.history.push({letter:kv.letter,at:Number(kv.at_ms)||0,action:kv.action});renderHistory();renderCounters();showLetter(kv.letter,kv.seq,Number(kv.at_ms),kv.action);break;
+  case 'ROUTE BARCODE':el('bc-action').textContent=human(kv.selected);break;
+  case 'BARCODE RETRY':run.retries=Math.max(run.retries+1,Number(kv.rejected||0)+Number(kv.timeouts||0));renderCounters();break;
+  case 'BARCODE PARTIAL':{const key=Object.keys(kv).find(k=>k.startsWith('widths_'));showPartial(kv[key],key&&key.includes('us')?'µs':'encoder counts ×1000','Rejected:');break;}
+  case 'BARCODE DISCARD WIDTHS':showPartial(kv.sumcounts_x1000,'encoder counts ×1000','Discarded:');break;
+  case 'BARCODE RESULT':setPerf(tag,kv);if(kv.decoded&&kv.decoded!=='-'&&kv.valid==='1')showLetter(kv.decoded,null,null,'RECORD_ONLY');break;
+  case 'STOP':{run.end=Date.now();if(/GP20 abort/.test(rest))diagnose('BUTTON_STOP',kv,line,true);else if(/USB\/browser stop/.test(rest))diagnose('EXTERNAL_STOP',kv,line,true);else{const code=(rest.match(/^([A-Z][A-Z_]{2,})/)||[])[1];diagnose(code==='OBSTACLE'?'OBSTACLE_STOP':code||'UNSPECIFIED_STOP',kv,line,true,rest);}break;}
+  case 'MOTION STOP':{run.end=run.end||Date.now();const code=kv.reason&&kv.result==='MOTION_FAULT'?kv.reason:kv.result;diagnose(code,kv,line,true);break;}
+  case 'MOTION SETTLED':setPerf(tag,kv);if(kv.outcome&&!OK_CODES.test(kv.outcome)&&!OP_CODES.test(kv.outcome))diagnose(kv.outcome,kv,line,true);break;
+  case 'AVOID RESULT':if(kv.fault&&kv.fault!=='NONE')diagnose(kv.fault,kv,line,true);break;
+  case 'TIMING':case 'CHECK':case 'COURSE RESULT':setPerf(tag,kv);break;
+  case 'OPTICAL START':if(!rest.includes('source=DRIVE'))setPhase('RECORDING','Slide the whole barcode under GP26 now. Motors are off.','warn');break;
+  case 'OPTICAL END':if(el('phase').dataset.text==='RECORDING')setPhase('SAVED','Sensor recording saved.','ok');break;
+  case 'CAR POWER RESET':setPhase('RESTARTED','Car restarted. Choose a test and prepare it again.','warn');break;
+ }
+}
+/* Retained snapshot: fill Last run only, never duplicate events */
+function inspectSnapshot(text){
+ const cur=text.split('[CURRENT RUN]')[1];if(cur===undefined)return;
+ for(const line of cur.split(/\r?\n/)){const t=line.match(/^\[([A-Z0-9][A-Z0-9 \/_-]*)\]\s?(.*)$/);if(!t)continue;const kv=pairs(t[2]);
+  if(/^(TIMING|CHECK|COURSE RESULT|MOTION SETTLED|BARCODE RESULT)$/.test(t[1]))setPerf(t[1],kv);
+  if(t[1]==='MOTION SETTLED'&&kv.outcome&&el('diagnosis').hidden)diagnose(kv.outcome,kv,line);}
+}
+
+/* Clock: run time and data freshness */
+setInterval(()=>{
+ if(run.start)el('c-time').textContent=fmtS((run.end||Date.now())-run.start);
+ const age=el('age');if(!lastData){age.textContent='No data yet';return;}
+ const s=(Date.now()-lastData)/1000;age.textContent=s<3?'Updated '+s.toFixed(1)+' s ago':'No data for '+Math.round(s)+' s';age.className=s<3?'num':'num stale';
+},250);
+
 function setOnline(value){online=value;el('connection').textContent=value?'Connected':'Offline · join AAI10-Calibrate';el('connection').className=value?'online':'offline';refreshButtons();}
 function refreshButtons(){document.querySelectorAll('.setting,#prepare').forEach(b=>b.disabled=!online||!robotIdle||requestBusy);}
 async function request(path,options={}){const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),3500);try{return await fetch(path,{...options,cache:'no-store',signal:ctl.signal});}finally{clearTimeout(timer);}}
-async function poll(){if(busy)return;busy=true;try{const r=await request('/logs?since='+cursor);if(!r.ok)throw Error('HTTP '+r.status);const newBoot=r.headers.get('X-Boot');const next=Number(r.headers.get('X-Next'));let text=await r.text();if(boot&&newBoot!==boot){append('\n[CAR POWER RESET: previous selection and retained results cleared]\n');cursor=0;downloadedResult='';opticalBins=[];drawOptical();el('optical-summary').textContent='Car restarted; capture cleared.';robotIdle=false;refreshButtons();el('message').textContent='Car restarted. Choose a test and prepare it again.';el('optical-plot').hidden=true;el('plot-help').hidden=true;el('result').textContent='Car restarted; no current result.';boot=newBoot;return;}boot=newBoot;if(r.headers.get('X-Gap')==='1')append('\n[LOG GAP: older car log bytes unavailable; download includes the retained result]\n');cursor=next;const wasIdle=robotIdle,wasOnline=online;robotIdle=r.headers.get('X-Idle')==='1';setOnline(true);append(text);if(robotIdle&&(!wasIdle||!wasOnline||!downloadedResult||resultPending))await recover();}catch(e){setOnline(false);}finally{busy=false;setTimeout(poll,500);}}
+async function poll(){if(busy)return;busy=true;try{const r=await request('/logs?since='+cursor);if(!r.ok)throw Error('HTTP '+r.status);lastData=Date.now();const newBoot=r.headers.get('X-Boot');const next=Number(r.headers.get('X-Next'));let text=await r.text();if(boot&&newBoot!==boot){append('\n[CAR POWER RESET: previous selection and retained results cleared]\n');cursor=0;downloadedResult='';opticalBins=[];drawOptical();el('optical-summary').textContent='Car restarted; capture cleared.';robotIdle=false;refreshButtons();el('message').textContent='Car restarted. Choose a test and prepare it again.';el('optical-plot').hidden=true;el('plot-help').hidden=true;el('result').textContent='Car restarted; no current result.';boot=newBoot;return;}boot=newBoot;if(r.headers.get('X-Gap')==='1')append('\n[LOG GAP: older car log bytes unavailable; download includes the retained result]\n');cursor=next;const wasIdle=robotIdle,wasOnline=online;robotIdle=r.headers.get('X-Idle')==='1';setOnline(true);append(text);if(robotIdle&&(!wasIdle||!wasOnline||!downloadedResult||resultPending))await recover();}catch(e){setOnline(false);}finally{busy=false;setTimeout(poll,500);}}
 async function sendSelection(path){requestBusy=true;refreshButtons();try{const r=await request(path,{method:'POST',headers:{'X-Calibrate':'1'}});const reply=await r.text();if(!r.ok)throw Error(reply);el('message').textContent=path==='/command/v'?'Requested. Wait for the recording confirmation.':path==='/command/x'?'Stop requested. GP20 stops locally if Wi-Fi is unavailable.':'Requested. Wait for the ready confirmation before pressing GP20.';append('\n[BROWSER] '+reply+'\n');}catch(e){el('message').textContent='Request not confirmed. Check the live log; use GP20 to abort locally.';}finally{requestBusy=false;refreshButtons();}}
 function command(ch){return sendSelection('/command/'+ch);}
 el('prepare').onclick=()=>{
@@ -92,8 +651,10 @@ el('prepare').onclick=()=>{
  sendSelection('/mission/'+y+'/'+z+'/'+advance);
 };
 el('stop').onclick=()=>command('x');
-async function recover(){resultPending=true;try{const r=await request('/result');if(!r.ok)throw Error();const recovered=await r.text();if(recovered!==downloadedResult)append('\n[RETAINED SNAPSHOT]\n'+recovered);downloadedResult=recovered;resultPending=false;el('result').textContent=downloadedResult;}catch(e){el('result').textContent=downloadedResult||'Could not reach the car. Retrying while stopped.';}}
+async function recover(){resultPending=true;try{const r=await request('/result');if(!r.ok)throw Error();const recovered=await r.text();if(recovered!==downloadedResult)append('\n[RETAINED SNAPSHOT]\n'+recovered,true);downloadedResult=recovered;resultPending=false;el('result').textContent=downloadedResult;}catch(e){el('result').textContent=downloadedResult||'Could not reach the car. Retrying while stopped.';}}
 el('download').onclick=async()=>{await recover();const metadata='AAI10 v5.55 wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';const blob=new Blob([metadata,'RECOVERED RESULT (may duplicate log):\n',downloadedResult||'Current result unavailable; see captured live log.\n','\nLIVE LOG:\n',transcript],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-motion-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 updateMode();
+setPhase('IDLE','Choose a test and prepare it. The car starts only when GP20 is pressed.');
+flap(el('bc-letter'),'–');
 poll();
 </script></body></html>
