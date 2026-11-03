@@ -73,13 +73,16 @@ s = stubs('test_stationary_barcode.py')
 ok &= run('stationary_main', [tests / 'stationary_main_test.c'] +
           [app / f for f in BC], ['-DROBOCAR_WIRELESS_CALIBRATION=1', '-I' + str(s)], 18)
 s = stubs('test_course_main.py')
-srcs = ['course_control.c', 'motion_control.c', 'barcode_acquisition.c',
-        'barcode_reader.c', 'barcode_decoder.c', 'run_diagnostics.c',
-        'navigation_commands.c']
+# Take the source list and scenario counts from the team's script, so this
+# runner stays in step when new modules or scenarios are added.
+course_script = (root / 'tools' / 'test_course_main.py').read_text()
+srcs = re.findall(r"'([a-z_0-9]+\.c)'",
+                  re.search(r"sources=\[([^\]]*)\]", course_script).group(1))
+counts = re.search(r"range\((\d+) if center else (\d+)\)", course_script)
 for center in (0, 1):
     ok &= run(f'course_main_center{center}', [tests / 'course_main_test.c'] +
               [app / f for f in srcs],
               ['-DROBOCAR_WIRELESS_CALIBRATION=1',
                f'-DROBOCAR_CENTER_LINE={center}', '-I' + str(s)],
-              34 if center else 18)
+              int(counts.group(1) if center else counts.group(2)))
 print('ALL PASS' if ok else 'SOME FAILED')
