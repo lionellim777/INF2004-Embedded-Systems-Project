@@ -70,7 +70,7 @@ bool gpio_get(uint p)
     if(p==21)return true;
     if(p==1&&scenario==37&&start_us&&clock_us-start_us>500000)return true;
     if(p==1&&scenario==41&&start_us&&clock_us-start_us>500000){
-        uint64_t width=clock_us-start_us<2000000?60000:1000;
+        uint64_t width=clock_us-start_us<2000000?60000:1100;
         return clock_us>=echo_us&&clock_us<echo_us+width;
     }
     if(p==1&&scenario==40&&start_us&&clock_us-start_us>500000){
@@ -81,7 +81,7 @@ bool gpio_get(uint p)
         uint64_t width=scenario==39?60000:(echo_us/200000%2?38000:6000);
         return clock_us>=echo_us&&clock_us<echo_us+width;
     }
-    if(p==1){uint64_t width=(scenario==2||scenario>=34)&&start_us&&clock_us-start_us>500000?1000:6000;return clock_us>=echo_us&&clock_us<echo_us+width;}
+    if(p==1){uint64_t width=(scenario==2||scenario>=34)&&start_us&&clock_us-start_us>500000?(scenario==44?600:1000):6000;return clock_us>=echo_us&&clock_us<echo_us+width;}
     return false;
 }
 void adc_init(void){}void adc_gpio_init(uint p){(void)p;}void adc_select_input(uint p){adc_channel=p;}
@@ -218,9 +218,10 @@ int main(int argc,char **argv)
         assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);
         assert(pwm[6][0]==1500); /* recentered on every abort */
         assert(avoid_run&&!course_run&&!barcode_sampler.enabled&&!barcode_capture.event_count);
-        assert(avoidance.detected==(scenario>=37&&scenario<=40?0u:1u)&&!avoidance.completed);
+        assert(avoidance.detected==((scenario>=37&&scenario<=40)||scenario==44?0u:1u)&&!avoidance.completed);
         assert(strstr(output,"[AVOID RESULT]")&&!strstr(output,"result=OBSTACLE_STOP"));
-        if(scenario==35)assert(strstr(output,"GP20 abort"));
+        if(scenario==44)assert(strstr(output,"AVOID_APPROACH_TOO_CLOSE")&&!avoidance.scans);
+        else if(scenario==35)assert(strstr(output,"GP20 abort"));
         else if(scenario==36)assert(strstr(output,"USB/browser stop"));
         else if(scenario==37)assert(strstr(output,"AVOID_SONAR_RECOVERY_FAILED")&&avoidance.sonar_retries==1&&!avoidance.sonar_resumes);
         else if(scenario==38){

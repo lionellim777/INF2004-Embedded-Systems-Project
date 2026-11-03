@@ -7,8 +7,13 @@
  * length is inspected in steps; lateral extension is limited to 600 mm. */
 enum { SETTLE_US=300000, RANGE_STALE_US=400000, EPISODE_US=240000000,
        STEP_MM=100, ALONG_STEP_MM=200, MAX_ALONG_MM=1200, MAX_OFFSET_MM=600, MIN_ALONG_MM=400,
-       SENSOR_LEAD_MM=120, MAX_EPISODES=5 };
+       SENSOR_LEAD_MM=120, MAX_EPISODES=5, INITIAL_OFFSET_MM=250,
+       WARNING_CM=45, APPROACH_CM=20, MIN_PIVOT_CM=12, APPROACH_CONFIRM_US=600000 };
 static const unsigned angles[]={50,70,90,110,125};
+/* Provisional bypass-only trims from the 2 Nov overhead video. Encoder travel
+ * is not yaw feedback: surface slip and camera perspective limit accuracy.
+ * Keep standalone calibration and the tape-guided alignment sweep unchanged. */
+enum { BYPASS_RIGHT_COUNTS=1100, BYPASS_LEFT_COUNTS=1090 };
 static const float counts_per_mm=2543.0f/(3.14159265f*60.0f);
 
 const char *obstacle_bypass_phase(avoid_phase_t p)
@@ -55,6 +60,8 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     motion_init(&a->leg);
     if(scan_phase(p)){
         a->scan_index=a->samples=a->scan_no_echo=a->scan_center_clear=0;a->scan_min_cm=401;
+        a->scan_ray_far=a->scan_far_rays=a->scan_far_samples=0;
+        a->scan_nearest_angle=a->scan_blocked_angle=0;
         a->scan_blocked=false;a->servo_angle=angles[0];return;
     }
     a->servo_angle=90;
@@ -64,9 +71,8 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     if(p==AVOID_ALIGN_TURN)turn=a->align_direction>0?MOTION_RIGHT_90:MOTION_LEFT_90;
     if(turn!=MOTION_NONE){
         motion_begin(&a->leg,turn,enc,now);a->leg.slow_turn=true;
-        /* v5.41 slow R90 finished at mean989.5 counts and measured ~85deg.
-         * Add round(989.5*5/85)=58 only to this bypass profile. */
-        if(turn==MOTION_RIGHT_90){a->leg.left.target+=58;a->leg.right.target-=58;}
+        if(turn==MOTION_RIGHT_90){a->leg.left.target=BYPASS_RIGHT_COUNTS;a->leg.right.target=-BYPASS_RIGHT_COUNTS;}
+        else {a->leg.left.target=-BYPASS_LEFT_COUNTS;a->leg.right.target=BYPASS_LEFT_COUNTS;}
         if(p==AVOID_ALIGN_TURN){
             if(!a->align_reversed)a->align_origin.start=enc;
             a->align_hit_us=0;a->align_armed=true;
@@ -169,16 +175,21 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         if(now-a->candidate_us<SETTLE_US)return quiet(a);
         bool tape=center>=a->reference*70/100;
         if(!tape||(fresh&&valid&&cm<=30)){
+            a->tape_decision=!tape?"TAPE_DISAPPEARED":"NEAR_OBSTACLE";
             resume_detour(a,enc,now);return quiet(a);
         }
-        if(fresh)a->rejoin_good=valid&&cm>30?a->rejoin_good+1:0;
+        if(fresh){
+            bool observed=(valid&&cm>30)||(!valid&&a->no_return);
+            a->rejoin_good=observed?a->rejoin_good+1:0;
+            a->tape_decision=valid?"FAR_ECHO":a->no_return?"NO_RETURN_MONITORED":"NO_RANGE";
+        }
         if(a->rejoin_good>=2){
             motion_abort(&a->leg);a->tape_origin.start=enc;a->align_reversed=false;
             a->align_direction=1; /* right first for this supervised bypass mode */
             enter(a,AVOID_TAPE_PROBE,enc,now);
             return quiet(a);
         }
-        if(now-a->candidate_us>=1500000)resume_detour(a,enc,now);
+        if(now-a->candidate_us>=1500000){a->tape_decision="NO_FRESH_RANGE";return fail(a,"AVOID_REJOIN_RANGE_UNAVAILABLE");}
         return quiet(a);
     }
     if(may_find_tape(a->phase)&&!(a->phase==AVOID_WAIT&&
@@ -194,7 +205,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             (a->phase==AVOID_MOVE_OUT&&mean_mm(&a->leg,enc)>=80);
         if(tape&&departed&&a->rejoin_armed){
             a->resume_phase=a->phase;a->resume_servo=a->servo_angle;
-            a->candidate_us=now;a->rejoin_attempts++;a->rejoin_good=0;
+            a->candidate_us=now;a->rejoin_attempts++;a->rejoin_good=0;a->tape_decision="CHECKING";
             a->rejoin_armed=false;a->white_us=0;a->range_us=0;
             a->phase=AVOID_CHECK_TAPE;a->servo_angle=90;
             return quiet(a);
@@ -206,7 +217,10 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             resume_alignment(a,enc,now);return quiet(a);
         }
         if(now-a->phase_us<SETTLE_US)return quiet(a);
-        if(fresh)a->rejoin_good=valid&&cm>30?a->rejoin_good+1:0;
+        if(fresh){
+            a->rejoin_good=((valid&&cm>30)||(!valid&&a->no_return))?a->rejoin_good+1:0;
+            a->tape_decision=valid?"FAR_ECHO":a->no_return?"NO_RETURN_MONITORED":"NO_RANGE";
+        }
         if(a->rejoin_good>=2)enter(a,AVOID_VERIFY,enc,now);
         else if(now-a->phase_us>=1500000)return fail(a,"AVOID_ALIGNED_PATH_UNCONFIRMED");
         return quiet(a);
@@ -236,15 +250,64 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         }else a->align_hit_us=0;
     }
     if(a->phase==AVOID_FOLLOW||a->phase==AVOID_VERIFY){
-        course_set_cruise_limit(&a->line,a->phase==AVOID_FOLLOW&&a->fast_clear>=2?800:600);
-        if(fresh){a->close_count=valid&&cm<=30?a->close_count+1:0;}
-        if(a->close_count>=2){
-            if(a->phase==AVOID_VERIFY)return fail(a,"AVOID_RETURN_BLOCKED");
+        if(a->phase==AVOID_VERIFY){
+            if(fresh)a->close_count=valid&&cm<=30?a->close_count+1:0;
+            if(a->close_count>=2)return fail(a,"AVOID_RETURN_BLOCKED");
+        }else{
+            /* Retain a near target when a narrow bottle drops out of the beam.
+             * This is a conservative travel budget, not a new sonar measurement.
+             * Estimate sensor displacement from the fixed warning origin, not
+             * per-tick absolute wheel differences (asynchronous encoder edges
+             * would inflate that sum). Use translation plus front-tip rotation;
+             * add 20% odometry margin. Large heading change invalidates pursuit. */
+            float approach_travel_cm=0;
+            if(a->approach_warning&&!a->approach_pending){
+                float dl=motion_left_position(&a->approach_origin,enc)/counts_per_mm;
+                float dr=motion_right_position(&a->approach_origin,enc)/counts_per_mm;
+                float yaw=fabsf(dl-dr)/115.0f;
+                a->approach_yaw_rad=yaw;
+                approach_travel_cm=1.2f*(fabsf(dl+dr)*0.5f+130.0f*yaw)/10.0f;
+                float budget=a->approach_anchor_cm-approach_travel_cm;
+                if(budget<a->approach_estimate_cm)a->approach_estimate_cm=budget;
+            }
+            if(fresh&&valid&&cm<=WARNING_CM){
+                if(!a->approach_warning){
+                    a->approach_warning=true;a->approach_origin.start=enc;
+                    a->approach_estimate_cm=a->approach_anchor_cm=cm;a->approach_min_cm=cm;
+                    a->approach_yaw_rad=0;
+                }
+                if(cm<a->approach_min_cm)a->approach_min_cm=cm;
+                if(cm<a->approach_estimate_cm){
+                    a->approach_estimate_cm=cm;a->approach_anchor_cm=cm+approach_travel_cm;
+                }
+            }
+            if(a->approach_warning&&a->approach_min_cm<MIN_PIVOT_CM)
+                return fail(a,"AVOID_APPROACH_TOO_CLOSE");
+            if(a->approach_warning&&!a->approach_pending&&a->approach_yaw_rad>0.35f)
+                return fail(a,"AVOID_APPROACH_HEADING_UNCERTAIN");
+            if(a->approach_warning&&a->approach_estimate_cm<=APPROACH_CM&&!a->approach_pending){
+                a->approach_pending=true;a->approach_us=now;a->approach_hits=0;
+            }
+            if(a->approach_pending&&fresh&&valid&&cm<=APPROACH_CM&&a->approach_hits<2)
+                a->approach_hits++;
+        }
+        /* Near-object approach and perpendicular rejoin require the existing
+         * precise recovery; rolling bend continuation belongs to open following. */
+        a->line.bend_disabled=a->phase==AVOID_VERIFY||a->approach_warning;
+        course_set_cruise_limit(&a->line,a->phase==AVOID_FOLLOW&&a->approach_warning?450:
+            a->phase==AVOID_FOLLOW&&a->fast_clear>=2?800:600);
+        if(a->phase==AVOID_FOLLOW&&a->approach_pending){
+            if(a->approach_hits<2&&now-a->approach_us<APPROACH_CONFIRM_US)
+                return (line_check_output_t){0,0,false,"OBSTACLE_CONFIRM_STOPPED"};
             if(a->detected>=MAX_EPISODES)return fail(a,"AVOID_EPISODE_LIMIT");
             a->detected++;a->episode_us=now;a->episode_origin.start=enc;a->offset_mm=a->along_mm=0;
-            /* Provisional 200 mm starting offset, then inspect the forward
-             * corridor. Extend only in 100 mm stages when still obstructed. */
-            a->outward_mm=200;a->side_seen=false;a->clear_checks=0;
+            /* Front tip is 130mm ahead of axle, half-width <=60mm: pivot
+             * radius ~=143mm before margins and object width. 200mm lateral
+             * offset allowed the tip to touch a bottle during side inspection.
+             * Start at the requested 250mm compromise; physical clearance
+             * remains to be checked. Extensions and path scans stay bounded. */
+            a->outward_mm=INITIAL_OFFSET_MM;a->side_seen=false;a->clear_checks=0;a->last_side_seen_mm=0;
+            a->approach_pending=false;a->approach_warning=false;
             a->rejoin_armed=false;a->white_us=0;
             wait_for(a,AVOID_TURN_OUT,now);return quiet(a);
         }
@@ -267,6 +330,8 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         return out;
     }
     if(a->phase==AVOID_WAIT){
+        if(a->next==AVOID_TURN_OUT&&a->offset_mm==0&&fresh&&valid&&cm<MIN_PIVOT_CM)
+            return fail(a,"AVOID_APPROACH_TOO_CLOSE");
         if(now-a->phase_us>=SETTLE_US){
             /* Wait for a NEW forward-facing sample, not the last side ray. */
             if(!a->range_us||now-a->range_us>RANGE_STALE_US)return fail(a,"AVOID_RANGE_STALE");
@@ -285,13 +350,25 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         float limit=a->phase==AVOID_SCAN_SIDE?a->offset_mm/10.0f+20.0f:
             a->phase==AVOID_SCAN_OUT?a->outward_mm/10.0f+20.0f:25.0f;
         if(valid){
-            if(cm<a->scan_min_cm)a->scan_min_cm=cm;
-            if(cm<=limit)a->scan_blocked=true;
+            if(cm<a->scan_min_cm){a->scan_min_cm=cm;a->scan_nearest_angle=a->servo_angle;}
+            bool in_corridor=true;
+            if(a->phase==AVOID_SCAN_OUT){
+                /* 12 cm body + 4 cm clearance each side. Widen each measured
+                 * ray by a provisional 15-degree beam/heading uncertainty.
+                 * A 34 cm echo at 50deg is beside this corridor, not ahead.
+                 * Very close echoes still veto regardless of angle. */
+                float bearing=fabsf((float)a->servo_angle-90.0f);
+                float inner=fmaxf(0,bearing-15.0f)*3.14159265f/180.0f;
+                in_corridor=cm*sinf(inner)<=10.0f||cm<=12.0f;
+            }
+            if(cm<=limit&&in_corridor){a->scan_blocked=true;a->scan_blocked_angle=a->servo_angle;}
             if(a->servo_angle==90&&cm>limit)a->scan_center_clear++;
+            if(cm>limit){a->scan_ray_far++;a->scan_far_samples++;}
         }
         else a->scan_no_echo++;
         if(++a->samples<3)return quiet(a);
-        a->samples=0;
+        if(a->scan_ray_far>=2)a->scan_far_rays++;
+        a->samples=a->scan_ray_far=0;
         if(++a->scan_index<sizeof(angles)/sizeof(angles[0])){
             a->servo_angle=angles[a->scan_index];a->phase_us=now;return quiet(a);
         }
@@ -302,19 +379,27 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         }else if(a->phase==AVOID_SCAN_FORWARD){
             if(a->scan_blocked){
                 if(a->offset_mm>=MAX_OFFSET_MM)return fail(a,"AVOID_OBJECT_TOO_WIDE_OR_PATH_BLOCKED");
-                a->outward_mm=STEP_MM;wait_for(a,AVOID_TURN_OUT,now);
+                a->outward_mm=MAX_OFFSET_MM-a->offset_mm<STEP_MM?MAX_OFFSET_MM-a->offset_mm:STEP_MM;wait_for(a,AVOID_TURN_OUT,now);
             }else{
                 if(a->along_mm>=MAX_ALONG_MM)return fail(a,"AVOID_OBJECT_END_NOT_CONFIRMED");
                 wait_for(a,AVOID_MOVE_ALONG,now);
             }
         }else{
-            if(a->scan_blocked){a->side_seen=true;a->clear_checks=0;}
-            /* Two spatial checkpoints, each with two valid far returns on
-             * the central ray. A missing echo alone cannot authorise return. */
-            else if(a->side_seen&&a->scan_center_clear>=2)a->clear_checks++;
+            if(a->scan_blocked){a->side_seen=true;a->last_side_seen_mm=a->along_mm;a->clear_checks=0;}
+            /* Open space need not echo on precisely the central ray. Use two
+             * distinct angles with repeated valid far echoes (or the original
+             * repeated central echoes), no close ray, and an observed object
+             * at least 200 mm behind the latest along checkpoint. Confirm with
+             * a second stationary sweep instead of driving another 200 mm.
+             * This authorises a cautious monitored return, not proof of an
+             * empty swept volume; all movement obstacle/stale guards remain. */
+            else if(a->side_seen&&a->along_mm>=MIN_ALONG_MM&&
+                a->along_mm>=a->last_side_seen_mm+ALONG_STEP_MM&&
+                (a->scan_center_clear>=2||a->scan_far_rays>=2))a->clear_checks++;
             else a->clear_checks=0;
             if(a->side_seen&&a->clear_checks>=2&&a->along_mm>=MIN_ALONG_MM)
                 wait_for(a,AVOID_RETURN_LINE,now);
+            else if(a->clear_checks==1)wait_for(a,AVOID_SCAN_SIDE,now);
             else wait_for(a,AVOID_TURN_ALONG,now);
         }
         return quiet(a);
@@ -355,13 +440,14 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
 
 line_check_output_t obstacle_bypass_guarded_step(obstacle_bypass_t *a,ir_roles_t ir,
     int32_t center,encoder_sample_t enc,uint64_t wall,bool fresh,bool valid,float cm,
-    const char *error)
+    const char *error,bool completed_no_return)
 {
     if(a->phase==AVOID_FAILED)return fail(a,a->fault);
     if(wall<a->wall_us||wall-a->wall_us>250000)return fail(a,"AVOID_CONTROL_LATE");
     uint64_t delta=wall-a->wall_us;a->wall_us=wall;
     if(!a->sonar_wait)a->active_us+=delta;
     if(!encoder_health_ok(a,enc,a->active_us))return fail(a,"AVOID_ENCODER_INVALID");
+    if(fresh)a->no_return=completed_no_return&&!error&&!valid;
     if(fresh&&error){
         bool recoverable=!strcmp(error,"AVOID_SONAR_ECHO_HIGH_BEFORE_TRIGGER");
         if(!recoverable)return fail(a,error);

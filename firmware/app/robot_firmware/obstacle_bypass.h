@@ -20,10 +20,18 @@ typedef struct {
     uint64_t align_hit_us;
     unsigned align_rejected;
     unsigned fast_clear;
+    bool approach_pending, approach_warning;
+    motion_control_t approach_origin;
+    float approach_estimate_cm, approach_anchor_cm, approach_yaw_rad;
+    uint64_t approach_us;
+    float approach_min_cm;
+    unsigned approach_hits;
     avoid_phase_t phase, next, resume_phase;
     uint64_t white_us, candidate_us;
     unsigned resume_servo, rejoin_attempts, rejoin_rejected, rejoin_good;
     bool rejoin_armed;
+    bool no_return; /* Fresh completed no-return pulse, not NO_RISE or a sensor fault. */
+    const char *tape_decision;
     uint64_t phase_us, last_us, episode_us, range_us, hit_us;
     uint64_t wall_us, active_us, sonar_wait_us;
     bool sonar_wait;
@@ -32,6 +40,8 @@ typedef struct {
     uint64_t encoder_error_us[2];
     unsigned encoder_skips[2];
     unsigned servo_angle, scan_index, samples, close_count, clear_checks, scan_center_clear;
+    unsigned scan_ray_far, scan_far_rays, scan_far_samples, scan_nearest_angle, scan_blocked_angle;
+    unsigned last_side_seen_mm;
     unsigned offset_mm, along_mm, outward_mm;
     unsigned detected, completed, scans, no_echo, scan_no_echo, scan_serial;
     float scan_min_cm;
@@ -50,6 +60,9 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a, ir_roles_t ir,
  * Controller time excludes the stopped wait; encoder positions are preserved. */
 line_check_output_t obstacle_bypass_guarded_step(obstacle_bypass_t *a, ir_roles_t ir,
     int32_t center_level, encoder_sample_t enc, uint64_t wall_now,
-    bool range_fresh, bool range_valid, float range_cm, const char *sonar_error);
+    bool range_fresh, bool range_valid, float range_cm, const char *sonar_error, bool completed_no_return);
+/* completed_no_return is true only for a completed over-range/no-return
+ * measurement. A missing ECHO rising edge must pass false. It permits only
+ * monitored tape rejoin; it does not certify side-scan clearance. */
 const char *obstacle_bypass_phase(avoid_phase_t phase);
 #endif

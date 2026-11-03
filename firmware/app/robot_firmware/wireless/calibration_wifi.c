@@ -8,7 +8,7 @@
 #define CAL_RESULT_TITLE "v5.7 stationary barcode / motors OFF / black>250 white<=220"
 #else
 #include "calibration_page.h"
-#define CAL_RESULT_TITLE "v5.47 wireless / obstacle bypass test, barcode disabled in avoidance mode / course test available / diagnostics retained / filtered black>=226 white<=220 mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..800cps bounded-search"
+#define CAL_RESULT_TITLE "v5.53 wireless / obstacle bypass test, barcode disabled in avoidance mode / course test available / diagnostics retained / filtered black>=226 white<=220 mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..800cps bounded-search"
 #endif
 #include "dhcpserver.h"
 #include "pico/cyw43_arch.h"
@@ -46,7 +46,8 @@ static void shared_exit(void){}
 #define AP_PASSWORD "AAI10-drive"
 #define CLIENT_COUNT 3u
 #define REQUEST_CAPACITY 1536u
-#define BODY_CAPACITY 7168u
+#define BODY_CAPACITY 10240u
+_Static_assert(BODY_CAPACITY > 11u*CAL_LINE_CAPACITY+256u+sizeof(CAL_RESULT_TITLE)+180u, "retained results must fit HTTP body");
 #define CLIENT_TIMEOUT_US 5000000u
 
 typedef struct {
@@ -220,8 +221,8 @@ static void handle_request(client_t *c)
         response(c, "200 OK", "text/plain", c->data, n, next, gap);
     } else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0) {
         shared_enter();
-        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n%s%s%s%s%s%s%s%s%s",
-                         (unsigned long)boot_id, core.stop, core.settled, core.summary, core.timing, core.barcode, core.trace[0], core.trace[1], core.course_result, core.optical_result);
+        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n[PREVIOUS RUN]\n%s%s[CURRENT RUN]\n%s%s%s%s%s%s%s%s%s%s",
+                         (unsigned long)boot_id, core.previous_stop, core.previous_detail, core.stop, core.settled, core.summary, core.timing, core.barcode, core.trace[0], core.trace[1], core.course_result, core.optical_result, core.motion_detail);
         if (core.stop[0] == '\0' && core.settled[0] == '\0' && core.optical_result[0] == '\0') {
             n += snprintf(c->data + n, sizeof(c->data) - (size_t)n,
                           "No completed/aborted test result retained in this boot yet.\n");

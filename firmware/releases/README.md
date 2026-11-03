@@ -1,8 +1,9 @@
-# Wireless calibration checkpoint v5.47
+# Wireless calibration checkpoint v5.53
 
 | Build | Firmware | Evidence |
 | --- | --- | --- |
-| v5.47 — latest | [Download UF2](robocar_motion_integration_v5_47_wireless.uf2) | Conditional faster cruise and transit; software checks passed, physical speed and straight-strip bypass tests pending. [Verification record](build-report-v5_47.json) |
+| v5.53 — latest | [Download UF2](robocar_motion_integration_v5_53_wireless.uf2) | 25 cm initial detour, completed-no-return tape rejoin, loaded-turn effort and retained failure reports. Software checks passed; physical validation pending. [Verification record](build-report-v5_53.json) |
+| v5.47 — historical | [Download UF2](robocar_motion_integration_v5_47_wireless.uf2) | Conditional faster cruise and transit; software checks passed, physical speed and straight-strip bypass tests pending. [Verification record](build-report-v5_47.json) |
 | v5.46 — baseline | [Download UF2](robocar_motion_integration_v5_46_wireless.uf2) | One observed bend-obstacle bypass completed and resumed following. Full straight-strip return not yet demonstrated. [Verification record](build-report-v5_46.json) |
 | v5.34 — historical | [Download UF2](robocar_motion_integration_v5_34_wireless.uf2) | Earlier barcode calibration checkpoint. [Verification record](build-report-v5_34.json) |
 
@@ -15,11 +16,17 @@ open http://192.168.4.1/, select **Follow track + avoid obstacle**, prepare the 
 then use GP20 to start/stop. See [wireless instructions](../../docs/wireless-calibration.md)
 and [obstacle test procedure](../../docs/testing/obstacle-v5_35-bypass.md).
 
-v5.47 increases speed only with stable tape and fresh clear forward readings;
-turns and tape reacquisition retain the cautious profile. Barcodes are disabled
-in obstacle mode. Half-size barcode reliability, the final mission and the
-µT-Kernel port remain incomplete. The successful bend test does not establish
-arbitrary-bend capability or full straight-strip obstacle clearance.
+v5.53 uses a 25 cm initial lateral target and right-first tape alignment. It accepts
+fresh completed no-return measurements for a bounded, monitored rejoin, while
+keeping close-obstacle and sensor-fault handling. Turns can build up to 60% drive
+under load without increasing their speed targets. Latest/previous run failure
+snapshots survive rolling-log overwrite; power cycling clears them.
+
+The latest build is not physically validated. Half-size barcode reliability,
+the final mission and the µT-Kernel port remain incomplete. Barcodes are disabled
+in obstacle mode. Historical successful home tests do not establish real-course
+acceptance. See [progress](../../docs/development-status.md) for observed failures
+and the distinction between simulations and physical tests.
 
 ## Build from source
 
@@ -35,4 +42,4 @@ Set PICO_SDK_PATH and the toolchain path for your installation. `build/release/r
 
 ## Validation
 
-Latest checkpoint host checks: `tools/test_obstacle_bypass.py`, `tools/test_barcode_calibration.py`, `tools/test_course_main.py --center`, `tools/test_course_main.py`, `tools/test_wireless_calibration.py`, `tools/test_wireless_dhcp_lwip.py`. These scripts currently contain local macOS SDK assumptions; adjust SDKROOT for another host. They test software and simulated inputs, not physical track acceptance.
+Latest checkpoint host checks: `tools/test_obstacle_bypass.py`, `tools/test_center_bend.py`, `tools/test_barcode_calibration.py`, `tools/test_course_main.py --center`, `tools/test_course_main.py`, `tools/test_wireless_calibration.py`, `tools/test_wireless_dhcp_lwip.py`. These scripts currently contain local macOS SDK assumptions; adjust SDKROOT for another host. They test software and simulated inputs, not physical track acceptance.
