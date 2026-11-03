@@ -1,3 +1,64 @@
+## 2026-11-03 — v5.56 scanned departure, right-first rejoin and rolling bends
+
+Evidence: `AAI10-motion-2026-11-03T08-15-28-377Z.txt`, v5.55. The retained
+run accepted a single crossing (first ink 11 mm), recorded approach heading
++4 degrees, chose align_dir=-1, and reached an encoder-estimated -108-degree
+alignment. It then stopped with AVOID_ALIGNED_PATH_BLOCKED: valid sonar17.0cm,
+GP28 strong, no invalid encoder transitions. The v5.55 approach-heading sign
+rule caused the left preference; the stop was a close object on that heading,
+not a lost-line or encoder fault. This export includes duplicate retained results.
+
+Changes:
+- Restore explicit right-first perpendicular alignment regardless of accumulated
+  approach-heading bias. The existing bounded opposite sweep remains only if
+  the right sweep finds no tape. A close object still blocks accepted-heading
+  travel. Spatial ink checks and axle positioning remain.
+- Stop at the existing20cm approach threshold, then collect three settled
+  observations at each50/70/90/110/125-degree servo position. Estimate observed
+  obstacle span and whether adjacent rays bound the right edge. This is not an
+  exact width measurement. Include the between-ray angular gap,15-degree beam
+  uncertainty,100mm half-body-plus-buffer, and150mm front-tip pivot clearance.
+  Select a45..90-degree right departure, compute diagonal travel to the lateral
+  corridor, and turn back by the same nominal angle. Account for projected
+  forward travel when checking progress past the obstacle. Unknown right edge
+  uses the prior90-degree/250mm fallback; further lateral extensions remain
+  bounded by600mm. A visible but broad edge can require more than250mm.
+- After each200mm parallel leg, stop and look with the leftmost125-degree
+  servo position (current mounting convention). Two valid far samples with no
+  near sample, plus a previously observed object, permit another100mm forward
+  margin. Missing/no-return echoes alone do not qualify. The car then turns
+  towards the object for full side scans; repeated clear evidence is required
+  before returning to the tape. The fixed left ray is oblique, not a90-degree
+  side sensor. Forward monitoring resumes before translation.
+- Stable open straight following can ramp600->1000cps (previous max800), after
+  600ms stability at300cps/s. Weak tape, right-sensor hints and uncertain sonar
+  remove boost. Measured-direction rolling bends retain a600cps outer-wheel
+  target with stronger inner-wheel slowing, up to650ms,540counts(~40mm) per
+  wheel and400 differential counts(~18degrees). Direction hints last1.5s.
+  Unknown direction, repeated loss, faults, nearby barcode capture and exhausted
+  bounds still use stopped search; this is not unlimited blind forward travel.
+  An approach warning slows the car but no longer disables a confirmed rolling
+  bend; committed obstacle stops and initial rejoin verification remain precise.
+- Add AVOID PLAN and AVOID LEFT logs, new phase names and matching browser text.
+
+Validation: sanitized planner cases for narrow/wide/unknown/missing/invalid
+rays; complete55-degree planned bypass simulation including diagonal projection,
+left check,100mm margin, repeated side scans and resumed following; no-return,
+one-far and mixed-near/far checks;14 alignment cases confirming right-first
+with positive/negative odometry bias;21 obstacle cases; centred bend/steering
+regressions including recovery beyond the old20mm/8degree limit;45 production
+main-loop cases; wireless protocol/concurrency and mocked-browser tests passed.
+Strict Pico W build and UF2 structure/version/embedded page verified. Main-loop
+fixtures allow the extra initial scan time; hardware stop/stall limits were not
+relaxed. These simulations do not establish physical clearance or speed stability.
+
+Physical v5.56 validation is pending. First test a straight-strip bottle, then
+repeat on a bend, recording video and the single combined download. Confirm
+actual servo direction, rejoin direction, no contact and continued following.
+Publication checkpoint: source, tests, UF2 and verification record prepared on
+`yixuan/scan-bypass-v5-56` for the requested main merge. No robot operation,
+serial session or flashing was performed. Physical validation remains pending.
+
 ## 2026-11-03 — v5.55 route confirmation and endpoint assistance
 
 Evidence: videos `20261103_115816.mp4` and `20261103_120004.mp4`, with exports

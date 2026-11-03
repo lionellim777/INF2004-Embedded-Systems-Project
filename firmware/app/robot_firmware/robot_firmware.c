@@ -519,9 +519,9 @@ static bool button_fell(button_t *button, uint pin, uint64_t now_us)
 static void print_controls(void)
 {
 #ifdef ROBOCAR_WIRELESS_CALIBRATION
-    printf("\nAAI10 MOTION INTEGRATION v5.55 WIRELESS | obstacle bypass test | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.56 WIRELESS | obstacle bypass test | %s %s\n", __DATE__, __TIME__);
 #else
-    printf("\nAAI10 MOTION INTEGRATION v5.55 USB | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.56 USB | %s %s\n", __DATE__, __TIME__);
 #endif
     printf("Starts STOPPED. Existing IR, sonar, servo and terrain settings retained.\n");
     printf("Batch 5: CPR2543 wheel60mm track115mm; turn early290 L90+65 R180-60.\n");
@@ -820,7 +820,7 @@ int main(void)
                         motion_init(&motion);motion.kind=MOTION_AVOID;motion.phase=MOTION_ACTIVE;
                         motion.start=enc;motion.start_us=now_us;
                         obstacle_bypass_begin(&avoidance,enc,now_us,baseline);
-                        printf("[AVOID BEGIN] barcode=DISABLED direction=RIGHT rejoin=APPROACH_HEADING probe_mm=60 min_ink_mm=8 heading_limit_deg=120 endpoint_pwm_cap=0.32 align_window_deg=60..115 stable_ms=80 baseline=%ld sensor_lead_mm=120 offset_initial_mm=250 warning_cm=45 approach_cm=20 min_pivot_cm=12 max_offset_mm=600 max_along_mm=1200 outward_step_mm=100 along_step_mm=200 speed_target_cps=600 cruise_max_cps=800 cruise_stable_ms=1000 cruise_ramp_cps_s=200 cruise_clear_cm=60 transit_max_cps=800 transit_pwm_cap=0.28 straight_pwm_cap=0.24 alignment_pwm_cap=0.32 turn_assist_cap=0.60 turn_skew_hold_counts=120 bypass_R90_counts=1100 bypass_L90_counts=1090 side_confirmation=REPEAT_SWEEP.\n",(long)baseline);
+                        printf("[AVOID BEGIN] barcode=DISABLED direction=RIGHT rejoin=RIGHT_FIRST departure=SCAN_PLANNED probe_mm=60 min_ink_mm=8 width_is_estimate=1 left_servo=125 tail_margin_mm=100 endpoint_pwm_cap=0.32 align_window_deg=60..115 stable_ms=80 baseline=%ld sensor_lead_mm=120 offset_fallback_mm=250 planned_min_offset_mm=200 warning_cm=45 approach_cm=20 min_pivot_cm=12 max_offset_mm=600 max_along_mm=1200 outward_step_mm=100 along_step_mm=200 speed_target_cps=600 cruise_max_cps=1000 cruise_stable_ms=600 cruise_ramp_cps_s=300 cruise_clear_cm=60 transit_max_cps=800 transit_pwm_cap=0.28 straight_pwm_cap=0.24 alignment_pwm_cap=0.32 turn_assist_cap=0.60 turn_skew_hold_counts=120 bypass_R90_counts=1100 bypass_L90_counts=1090 side_confirmation=REPEAT_SWEEP.\n",(long)baseline);
                     }else motion_state=ready?"IR_SAMPLING_UNAVAILABLE":"CENTER_BASELINE_NOT_READY";
                 } else if (pending == MOTION_NONE || scan_kind(pending)) {
                     motion_init(&motion);
@@ -958,6 +958,12 @@ int main(void)
                     (long)(((int64_t)motion_left_position(&avoidance.align_origin,enc)-motion_right_position(&avoidance.align_origin,enc))*90/2000),
                     avoidance.align_direction,avoidance.align_rejected,(long)centre_blackness,(long)avoidance.reference);
             if((avoidance.phase!=before||out.stop)&&avoidance.leg.kind!=MOTION_NONE)printf("[AVOID LEG] phase=%s L=%ld/%ld R=%ld/%ld invalid=%lu/%lu.\n",obstacle_bypass_phase(before),(long)motion_left_position(&avoidance.leg,enc),(long)avoidance.leg.left.target,(long)motion_right_position(&avoidance.leg,enc),(long)avoidance.leg.right.target,(unsigned long)enc.left_invalid,(unsigned long)enc.right_invalid);
+            if(scan!=avoidance.scan_serial&&before==AVOID_SCAN_INITIAL)
+                printf("[AVOID PLAN] right_edge_known=%u width_bounded=%u observed_span_mm=%u turn_right_deg=%u lateral_mm=%u diagonal_mm=%u forward_mm=%u rays_cm=%.1f/%.1f/%.1f/%.1f/%.1f good=%u/%u/%u/%u/%u; 100mm body+buffer,150mm pivot clearance,15deg beam margin; unknown edge uses90deg.\n",
+                    avoidance.plan.right_edge_known,avoidance.plan.width_bounded,avoidance.plan.observed_width_mm,avoidance.departure_deg,avoidance.outward_mm,avoidance.departure_travel_mm,avoidance.departure_forward_mm,
+                    avoidance.plan_cm[0],avoidance.plan_cm[1],avoidance.plan_cm[2],avoidance.plan_cm[3],avoidance.plan_cm[4],avoidance.plan_good[0],avoidance.plan_good[1],avoidance.plan_good[2],avoidance.plan_good[3],avoidance.plan_good[4]);
+            if(avoidance.phase!=before&&before==AVOID_CHECK_LEFT)
+                printf("[AVOID LEFT] servo=125 far=%u/%u side_seen=%u next=%s; oblique ray is not clearance proof.\n",avoidance.left_far,avoidance.left_samples,avoidance.side_seen,obstacle_bypass_phase(avoidance.next));
             if(scan!=avoidance.scan_serial)printf("[AVOID SCAN] phase=%s nearest_cm=%.1f blocked=%u no_echo=%u/15 center_clear=%u side_seen=%u clear_checks=%u nearest_angle=%u blocked_angle=%u far_rays=%u far_samples=%u last_side_mm=%u. NO_ECHO alone is not clearance.\n",
                 obstacle_bypass_phase(before),avoidance.scan_min_cm,avoidance.scan_blocked,avoidance.scan_no_echo,avoidance.scan_center_clear,avoidance.side_seen,avoidance.clear_checks,avoidance.scan_nearest_angle,avoidance.scan_blocked_angle,avoidance.scan_far_rays,avoidance.scan_far_samples,avoidance.last_side_seen_mm);
             if(completed!=avoidance.completed)printf("[AVOID COMPLETE] count=%u GP28 tape confirmed; following resumed.\n",avoidance.completed);
