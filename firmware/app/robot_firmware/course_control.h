@@ -22,6 +22,7 @@ typedef struct {
     center_trim_t center_trim;
     int32_t center_reference;
     unsigned cruise_limit_cps;
+    unsigned recovery_limit_counts; /* 0: normal120; rejoin may request up to240 */
     uint64_t steady_line_us;
     unsigned trim_attempts,trim_reversals,trim_no_responses;
     bool center_search_started;

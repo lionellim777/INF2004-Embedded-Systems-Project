@@ -6,13 +6,14 @@ The goal is an autonomous two-wheel robot that follows a line, decodes navigatio
 
 ## Current status
 
-Latest checkpoint: **v5.53 wireless calibration**, 3 November 2026.
-Includes bounded bend continuation, a 25 cm initial obstacle detour, right-first
-perpendicular tape alignment, stronger feedback-controlled turns and retained
-per-wheel failure reports. Latest school runs exposed found-tape rejection on
-no-echo readings and right-wheel non-progress during turns. v5.53 addresses these
-in software; **physical validation is pending**. See [progress and evidence](docs/development-status.md)
-and [test instructions](docs/testing/obstacle-v5_35-bypass.md).
+Latest checkpoint: **v5.54 wireless calibration**, 3 November 2026.
+Includes a 25 cm initial obstacle detour, right-first perpendicular alignment,
+and bounded loaded-turn assistance. v5.53 completed the observed straight-strip
+bypass, but the bend run lost the line during rejoin verification. v5.54 retains
+confirmed recovery direction and uses slower verification with a wider bounded
+search. **v5.54 physical validation is pending**; top cruise speed is unchanged.
+See [progress and evidence](docs/development-status.md) and
+[test instructions](docs/testing/obstacle-v5_35-bypass.md).
 The [ready-to-flash UF2s and verification records](firmware/releases/README.md)
 include the current build and historical checkpoints.
 This remains a Pico SDK calibration prototype; the final µT-Kernel port and full
@@ -28,9 +29,9 @@ barcodes are disabled in obstacle mode. See the
 | IMU level calibration and multi-hump state machine | Bench tested |
 | Three IR sensors | Current mounting: GP26 dedicated barcode sensor; GP28 directly over route tape; GP27 to its right. Half barcode narrow/wide elements are 3/9 mm; reported GP26 clearance is 2 mm. Optical separation remains unresolved. |
 | Line following | Centre-sensor control, encoder feedback, bounded recovery, GP20 start/stop, crossing handling and diagnostics implemented. Operator reports completed home routes; frequent recovery and final line-loss stops remain in logs. |
-| Wheel encoders and motion | About 2543 counts/revolution; 30 cm and 90/180-degree calibration incorporated into moving firmware. School runs recorded right-wheel non-progress during loaded turns. v5.53 increases bounded turn effort and preserves per-wheel fault evidence; physical validation pending. |
+| Wheel encoders and motion | About 2543 counts/revolution; 30 cm and 90/180-degree calibration incorporated into moving firmware. School runs recorded right-wheel non-progress during loaded turns. v5.53 increases bounded turn effort and preserves per-wheel fault evidence. Subsequent straight-strip bypass completed; broader repeatability remains unverified. |
 | Barcode navigation | Dedicated GP26 acquisition at 2 kHz; framed Code 39 A-Z decoder; independent course capture and configurable Y/Z actions. Earlier complete A/Z captures pass replay. Latest moving half-A/Z reads fail; no claim of reliable half-size or turning acceptance. |
-| Obstacle bypass and line recovery | Bounded right-side bypass and perpendicular tape alignment implemented. Earlier home runs resumed following. v5.53 fixes school-track no-echo tape rejection and loaded turn stalls; repeat straight/bend acceptance remains pending. |
+| Obstacle bypass and line recovery | Bounded right-side bypass and perpendicular tape alignment implemented. Earlier home runs resumed following. v5.53 straight-strip bypass completed, while the bend rejoin lost tape. v5.54 improves recovery-direction handoff and verification; physical retests pending. |
 | Wi-Fi/MQTT telemetry | Local Wi-Fi access point, browser controls and downloadable logs implemented. This calibration page is not the final MQTT subsystem. |
 
 Detailed evidence and limitations are recorded in [docs/development-status.md](docs/development-status.md).

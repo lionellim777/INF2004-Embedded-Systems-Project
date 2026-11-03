@@ -1,3 +1,17 @@
+## v5.54 retest — 3 November 2026
+
+Flash `firmware/releases/robocar_motion_integration_v5_54_wireless.uf2` and
+refresh the page to v5.54. Keep GP28 centred over tape, GP27 to its right and
+GP26 for barcodes. Select **Follow track + avoid obstacle**, prepare, then GP20.
+
+Repeat bottle-on-bend and bottle-on-straight tests. After rejoining, allow it
+to continue into the next left bend. Record whether it keeps following and
+download the log before switching off. Look for `[AVOID COMPLETE]`, subsequent
+following/search states, and the final stop reason. v5.54 is not yet physically
+validated. Rejoin now uses 450 cps and a wider bounded correction; normal cruise
+speed and the 25 cm initial detour remain unchanged. It still stops on exhausted
+recovery or faults; it does not implement a new symmetric two-sensor layout.
+
 ## v5.53 — found tape with no echo; shorter initial detour
 
 Use the v5.53 release UF2. The initial lateral encoder target is 25 cm; measure its actual foam travel if practical. Once the car finds stable tape, two completed no-return readings can now permit the monitored probe/axle-advance/right-first alignment sequence. It no longer rejects that tape merely because no distant object reflects ultrasound. A missing ECHO rising edge, stale data or sensor fault does not qualify. Close-object stops remain. Slow turns can apply up to 60% drive under load with feedback; physical turn precision and clearance still need testing.

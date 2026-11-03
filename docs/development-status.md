@@ -1,3 +1,34 @@
+## 2026-11-03 — v5.54 rejoin alignment and recovery-direction handoff
+
+Publication checkpoint: source, tests, UF2 and verification record on
+`yixuan/obstacle-rejoin-v5-53` (branch retained for this follow-up).
+
+Physical evidence: `AAI10-motion-2026-11-03T03-36-16-690Z.txt` reports
+`CENTER_LINE_NOT_REACQUIRED` in VERIFY_LINE, after a roughly 102-degree right
+alignment and a left trim that reversed right. Range at stop was valid 92.3cm;
+this was a bounded line-search failure, not a sonar stop. The second export
+`AAI10-motion-2026-11-03T03-39-11-210Z.txt` includes the previous result plus a
+new successful bypass (`completed=1`) ending at the browser stop. Later bends
+repeated RIGHT then LEFT searches; `BendTries=0`. GP27 stayed white in those
+samples. Detecting tape once does not establish a sustained aligned heading.
+
+Changes: prefer recent measured recovery/optical-improvement direction over an
+unproven reversed trim; retain confirmed search direction as a timed hint.
+VERIFY_LINE uses 450 cps instead of 600 and a 240-count first search leg instead of
+120. Its reverse sweep, 3-second search deadline, 10-second verification deadline,
+encoder and obstacle guards remain. Restore normal 120-count search after
+verified completion. Barcode proximity still limits search to 60. Initial
+bypass stays 250 mm; motor targets/top cruise and physical mounting unchanged.
+
+Validation: sanitized centre steering/bend tests, including left recovery after
+an unsuccessful right trial and tape 150 counts into rejoin correction, pass.
+Obstacle scenarios, 11 perpendicular geometry cases, 45 production-main scenarios
+and the Pico W firmware build pass. Physical bend and
+straight-strip reruns remain pending; no guarantee of all-course completion or
+higher speed is claimed. GP28 remains centred, GP27 right, GP26 barcode. A future
+symmetric two-sensor edge controller requires mounting measurements and a
+separate controller change; it is not enabled in this build.
+
 ## 3 November 2026 — v5.53 school-track rejoin and loaded-turn fixes
 
 Publication checkpoint: source, tests and progress notes since v5.47 are packaged on `yixuan/obstacle-rejoin-v5-53`, with the v5.53 UF2 in `firmware/releases/`. Earlier entries' unpublished status describes their state when written. This checkpoint does not claim a successful v5.53 physical run or final-course acceptance.

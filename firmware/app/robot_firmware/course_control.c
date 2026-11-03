@@ -126,7 +126,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
                 c->bend_direction=good_direction;c->bend_hint_us=now;
             }
             if(!active && c->center_trim.active)c->trim_attempts++;
-            if(!reversed && c->center_trim.reversed){c->trim_reversals++;c->bend_hint_us=0;}
+            if(!reversed && c->center_trim.reversed)c->trim_reversals++;
             /* A small trim not producing20 differential counts is not a
              * wheel stall. Brake and enter the existing bounded recovery;
              * actual encoder stall/control-time guards remain unchanged. */
@@ -193,9 +193,14 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
     if(c->phase==COURSE_FOLLOW && !ir.left){
         c->bend_active=c->bend_ready=false;c->bend_ready_us=0;c->drive.center_bend=false;
         c->phase=COURSE_LOST;c->center_search_started=true;
-        int direction=ir.right?1:c->center_trim.active?c->center_trim.direction:
+        /* A trial that just reversed is not a confirmed direction. Prefer
+         * the most recent measured recovery/optical improvement over it. */
+        bool fresh_hint=c->bend_hint_us&&now-c->bend_hint_us<=1500000u;
+        int direction=ir.right?1:fresh_hint?c->bend_direction:
+                      c->center_trim.active&&!c->center_trim.reversed&&!c->center_trim.exhausted?c->center_trim.direction:
                       c->center_trim.last_good?c->center_trim.last_good:-1;
         center_search_begin(&c->center_search,direction,l,r,now);
+        if(c->recovery_limit_counts)c->center_search.limit=c->recovery_limit_counts>240?240:(int)c->recovery_limit_counts;
         if(near_barcode(c,now))c->center_search.limit=60;
         center_trim_clear(&c->center_trim);
     }
@@ -220,6 +225,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         if(c->center_search.found){
             c->center_search_started=false;c->phase=COURSE_FOLLOW;
             center_trim_clear(&c->center_trim);c->center_trim.last_good=c->center_search.direction;
+            c->bend_direction=c->center_search.direction;c->bend_hint_us=now;
             if(after_turn)c->turns++;else c->recoveries++;
             c->candidate=false;c->clear_tracking=false;
             c->latched=true;c->exit_l=l;c->exit_r=r;c->both_us=now;c->entry_l=l;c->entry_r=r;

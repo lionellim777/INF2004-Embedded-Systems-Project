@@ -91,6 +91,7 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     }else if(p==AVOID_VERIFY){
         course_begin(&a->line,(course_config_t){'s','s',SENSOR_LEAD_MM},enc,now);
         course_set_center_reference(&a->line,a->reference);
+        a->line.recovery_limit_counts=240;
     }
 }
 void obstacle_bypass_begin(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t now,int32_t reference)
@@ -294,7 +295,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         /* Near-object approach and perpendicular rejoin require the existing
          * precise recovery; rolling bend continuation belongs to open following. */
         a->line.bend_disabled=a->phase==AVOID_VERIFY||a->approach_warning;
-        course_set_cruise_limit(&a->line,a->phase==AVOID_FOLLOW&&a->approach_warning?450:
+        course_set_cruise_limit(&a->line,a->phase==AVOID_VERIFY||a->approach_warning?450:
             a->phase==AVOID_FOLLOW&&a->fast_clear>=2?800:600);
         if(a->phase==AVOID_FOLLOW&&a->approach_pending){
             if(a->approach_hits<2&&now-a->approach_us<APPROACH_CONFIRM_US)
@@ -323,6 +324,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
                    motion_left_position(&a->line.reference,enc)>=1080&&
                    motion_right_position(&a->line.reference,enc)>=1080){
                     a->completed++;a->phase=AVOID_FOLLOW;
+                    a->line.recovery_limit_counts=0;
                 }
             }else a->hit_us=0;
             if(now-a->phase_us>10000000)return fail(a,"AVOID_LINE_ALIGNMENT_FAILED");

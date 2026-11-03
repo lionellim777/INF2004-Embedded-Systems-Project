@@ -11,7 +11,7 @@ await page.route('http://192.168.4.1/**',async r=>{
  if(offline){await r.abort();return;}
  if(u.pathname==='/'){await r.fulfill({contentType:'text/html',body:fs.readFileSync('firmware/app/robot_firmware/wireless/calibration.html','utf8')});return;}
  if(u.pathname==='/logs'){
-  let body=u.searchParams.get('since')==='0'?'AAI10 MOTION INTEGRATION v5.53 WIRELESS\nRun=0 State=STOPPED\n':'';
+  let body=u.searchParams.get('since')==='0'?'AAI10 MOTION INTEGRATION v5.54 WIRELESS\nRun=0 State=STOPPED\n':'';
   body+=reply;reply='';await r.fulfill({headers:{'X-Boot':boot,'X-Next':'80','X-Gap':'0','X-Idle':idle?'1':'0'},body});return;
  }
  if(u.pathname==='/result'){resultRequests++;await r.fulfill({body:continuous?'[MOTION STOP] GP20\n[MOTION SETTLED] CONTINUOUS_SCAN\n[BARCODE RESULT] mode=CONTINUOUS reads=2 sequence=AZ\n':'[OPTICAL RESULT] motors=OFF samples=5000 raw=172..2782 max_gap_us=1017 empty_bins=0 aborted=0 sampling_ok=1\n'});return;}
@@ -61,7 +61,7 @@ await page.screenshot({path:'build/wireless-host-tests/calibration-desktop.png',
 await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(200);await page.screenshot({path:'build/wireless-host-tests/calibration-mobile.png',fullPage:true});
 assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
 const downloadPromise=page.waitForEvent('download');await page.locator('#download').click();await(await downloadPromise).saveAs('build/wireless-host-tests/browser-test-download.txt');
-const saved=fs.readFileSync('build/wireless-host-tests/browser-test-download.txt','utf8');assert(saved.includes('v5.53'));assert(saved.includes('[OPTICAL RESULT]'));assert(saved.includes('[OPTICAL DATA]'));assert(saved.includes('Physical observations supplied separately in chat.'));
+const saved=fs.readFileSync('build/wireless-host-tests/browser-test-download.txt','utf8');assert(saved.includes('v5.54'));assert(saved.includes('[OPTICAL RESULT]'));assert(saved.includes('[OPTICAL DATA]'));assert(saved.includes('Physical observations supplied separately in chat.'));
 for(const ch of ['f','l','r','u']){await page.locator('#test-mode').selectOption(ch);await page.locator('#prepare').click();assert.equal(commands.at(-1),'/command/'+ch);assert((await page.locator('#start-help').innerText()).includes('press GP20'));}
 await page.locator('#test-mode').selectOption('course');assert(await page.locator('#optical-panel').isHidden());
 await page.locator('#prepare').click();assert.equal(commands.at(-1),'/mission/s/s/120');

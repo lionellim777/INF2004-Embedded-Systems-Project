@@ -30,6 +30,25 @@ static line_check_output_t lose(int direction){
     return o;
 }
 int main(void){
+    /* Reproduce left-bend loss after an unsuccessful right trim reversal.
+     * Recent confirmed left recovery must win; a live right sensor still wins. */
+    for(int right=0;right<2;right++){
+        setup();c.bend_disabled=true;c.bend_direction=-1;c.bend_hint_us=now;
+        c.center_trim.active=true;c.center_trim.reversed=true;c.center_trim.direction=1;
+        c.center_trim.last_good=-1;
+        line_check_output_t o=step(0,right,0,0,10000);
+        assert(!o.stop&&c.phase==COURSE_LOST&&c.center_search.direction==(right?1:-1));
+    }
+    /* Rejoin-only wider correction can find tape beyond the old120-count
+     * boundary, then hands its observed direction back to the follower. */
+    setup();c.bend_disabled=true;c.recovery_limit_counts=240;
+    line_check_output_t recovery=step(0,false,0,0,10000);
+    assert(!recovery.stop&&c.center_search.limit==240);
+    recovery=step(0,false,-80,80,100000);
+    recovery=step(800,false,-70,70,100000);
+    assert(!recovery.stop&&c.center_search.confirming&&!c.center_search.reversed);
+    recovery=step(800,false,0,0,100000);
+    assert(!recovery.stop&&c.phase==COURSE_FOLLOW&&c.bend_direction==-1&&c.bend_hint_us==now);
     for(int dir=-1;dir<=1;dir+=2){
         setup();hint(dir);line_check_output_t o=lose(dir);
         for(int i=0;i<6;i++){
