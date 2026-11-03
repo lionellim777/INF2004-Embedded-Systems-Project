@@ -27,6 +27,7 @@ target_link_libraries(barcode_straight_test
     pico_stdlib
     hardware_adc
     hardware_clocks
+    hardware_flash
     hardware_pwm
     hardware_sync
 )
