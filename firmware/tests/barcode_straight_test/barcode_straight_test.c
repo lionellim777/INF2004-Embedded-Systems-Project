@@ -4,9 +4,10 @@
  * Drives straight for a set distance (default 400 mm) at the course scanning
  * speed (600 counts/s per wheel, about 44 mm/s) while the offset GP26 sensor
  * reads a Code 39 barcode placed beside the path. Uses the same sampler,
- * 12-sample filter, reader and decoder as the course firmware. The black/
- * white levels can be the course firmware's (226/220) or a mid level set
- * between white paper and ink; 'l' switches them and the choice is kept in
+ * 12-sample filter, reader and decoder as the course firmware. Black/white
+ * can come from fixed levels (the course firmware's 226/220, or a mid level),
+ * levels set from the measured white, or "swing": a rise or drop from the
+ * last gap or bar. 'l' switches between them and the choice is kept in
  * flash. Line sensors, sonar, servo, IMU and Wi-Fi are not used.
  *
  * Wiring:
@@ -187,23 +188,49 @@ _Static_assert(OPTICAL_FLASH_BYTES <= FLASH_SECTOR_SIZE,
  * and sets the levels relative to it. Margins from raw traces on this car:
  * white stayed within about +550 of its resting value (paper edge drift),
  * and the faintest narrow bar of the small barcode peaked about +1260
- * above it. +850 / +650 sit between the two. */
+ * above it. +850 / +650 sit between the two.
+ *
+ * "swing" follows the barcode itself: a bar starts when the reading rises
+ * 700 above the lowest point of the current gap, and a gap starts when it
+ * drops 700 below the highest point of the current bar. On the track, narrow
+ * gaps read 2000-2500 (never white) but still dropped 1000+ from the bars
+ * beside them; the floor and paper drift stayed within about +550. A bar
+ * must also reach the "auto" level (measured white +850), so the slow grey
+ * rise seen just before the first bar does not start it early; anything at
+ * or below white +650 is always a gap. A bar must also rise at least half
+ * way from the gap's lowest point to the previous bar's highest: after a
+ * wide white gap the sensor rises slowly, and without this the narrow bar
+ * that follows read about 25 ms long (86 ms against 62 ms) and the letter
+ * was rejected. */
+typedef enum {
+    LEVEL_FIXED,
+    LEVEL_RELATIVE,  /* on/off are margins above the measured white. */
+    LEVEL_SWING,     /* on is the rise/drop that starts a bar/gap. */
+} level_mode_t;
+
 typedef struct {
     uint16_t on;
     uint16_t off;
-    bool relative;  /* on/off are margins above the measured white. */
+    level_mode_t mode;
     const char *p_name;
 } levels_t;
 
 static const levels_t k_levels[] = {
-    { BARCODE_DRIVE_BLACK_ON, BARCODE_DRIVE_BLACK_OFF, false, "course" },
-    { 1600u, 1400u, false, "mid" },
-    { 850u, 650u, true, "auto" },
+    { BARCODE_DRIVE_BLACK_ON, BARCODE_DRIVE_BLACK_OFF, LEVEL_FIXED, "course" },
+    { 1600u, 1400u, LEVEL_FIXED, "mid" },
+    { 850u, 650u, LEVEL_RELATIVE, "auto" },
+    { 850u, 650u, LEVEL_SWING, "swing" },
 };
 
 enum {
     LEVEL_COUNT = sizeof(k_levels) / sizeof(k_levels[0]),
-    LEVEL_DEFAULT = 2,
+    LEVEL_DEFAULT = 3,
+    SWING_AMOUNT = 700,
+    /* In swing mode the sampler sees only these two values. */
+    SWING_SAMPLER_BLACK = 4095,
+    SWING_SAMPLER_WHITE = 0,
+    SWING_SAMPLER_ON = 2048,
+    SWING_SAMPLER_OFF = 2047,
     ADC_FULL_SCALE = 4095,
     WHITE_SAMPLES = 31,
     WHITE_SPACING_US = 50000,  /* 31 readings span the last 1.5 s of waiting. */
@@ -222,6 +249,51 @@ static white_baseline_t g_white;
 static uint16_t g_level_on;
 static uint16_t g_level_off;
 static uint16_t g_level_white;
+static uint16_t g_swing;  /* 0 unless the swing mode is in use. */
+static uint16_t g_swing_black;  /* A bar must reach at least this. */
+static uint16_t g_swing_white;  /* At or below this is always a gap. */
+
+/* Swing detector, run by the sampling alarm. */
+typedef struct {
+    bool black;
+    bool started;
+    uint16_t extreme;  /* Lowest point of this gap, or highest of this bar. */
+    uint16_t last_bar_max;  /* Highest point of the previous bar, 0 if none. */
+} swing_t;
+
+static swing_t g_swing_state;
+
+static uint16_t swing_step(swing_t *p_swing, uint16_t level)
+{
+    if (!p_swing->started) {
+        p_swing->started = true;
+        p_swing->black = false;
+        p_swing->extreme = level;
+        p_swing->last_bar_max = 0u;
+    } else if (p_swing->black) {
+        if (level > p_swing->extreme) {
+            p_swing->extreme = level;
+        } else if (((uint32_t)level + g_swing <= p_swing->extreme) ||
+                   (level <= g_swing_white)) {
+            p_swing->black = false;
+            p_swing->last_bar_max = p_swing->extreme;
+            p_swing->extreme = level;
+        }
+    } else {
+        uint32_t half = (p_swing->last_bar_max > p_swing->extreme)
+            ? ((uint32_t)p_swing->last_bar_max - p_swing->extreme) / 2u : 0u;
+
+        if (level < p_swing->extreme) {
+            p_swing->extreme = level;
+        } else if (((uint32_t)level >= (uint32_t)p_swing->extreme + g_swing) &&
+                   ((uint32_t)level >= (uint32_t)p_swing->extreme + half) &&
+                   (level >= g_swing_black)) {
+            p_swing->black = true;
+            p_swing->extreme = level;
+        }
+    }
+    return p_swing->black ? SWING_SAMPLER_BLACK : SWING_SAMPLER_WHITE;
+}
 
 static void white_add(uint16_t level, uint64_t now_us)
 {
@@ -264,7 +336,8 @@ static bool white_value(uint16_t *p_median, uint16_t *p_spread)
 static bool levels_select(const levels_t *p_levels)
 {
     g_level_white = 0u;
-    if (!p_levels->relative) {
+    g_swing = 0u;
+    if (p_levels->mode == LEVEL_FIXED) {
         g_level_on = p_levels->on;
         g_level_off = p_levels->off;
         return true;
@@ -282,6 +355,13 @@ static bool levels_select(const levels_t *p_levels)
     g_level_white = white;
     g_level_on = (uint16_t)(white + p_levels->on);
     g_level_off = (uint16_t)(white + p_levels->off);
+    if (p_levels->mode == LEVEL_SWING) {
+        g_swing = SWING_AMOUNT;
+        g_swing_black = g_level_on;
+        g_swing_white = g_level_off;
+        g_level_on = SWING_SAMPLER_ON;
+        g_level_off = SWING_SAMPLER_OFF;
+    }
     return true;
 }
 
@@ -298,6 +378,8 @@ static repeating_timer_t g_sample_timer;
 static bool g_sample_ready;
 static volatile uint16_t g_raw_latest;
 static volatile uint32_t g_sample_us;
+static volatile uint16_t g_filtered_min;  /* Over the current run. */
+static volatile uint16_t g_filtered_max;
 static volatile uint32_t g_adc_max_us;
 static barcode_signal_t g_signal;
 static barcode_sampler_t g_sampler;
@@ -526,6 +608,17 @@ static bool sample_alarm(repeating_timer_t *p_timer)
 
     g_raw_latest = raw;
     g_sample_us = start_us;
+    if (g_sampler.enabled) {
+        if (filtered < g_filtered_min) {
+            g_filtered_min = filtered;
+        }
+        if (filtered > g_filtered_max) {
+            g_filtered_max = filtered;
+        }
+        if (g_swing > 0u) {
+            filtered = swing_step(&g_swing_state, filtered);
+        }
+    }
     barcode_sampler_sample(&g_sampler, filtered, start_us);
     if (g_optical.armed && g_sampler.enabled && (g_sampler.stats.edges > 0u)) {
         barcode_optical_trigger(&g_optical, start_us);
@@ -619,6 +712,9 @@ static bool barcode_begin(void)
     if (fresh) {
         g_origin_us = time_us_32();
         g_signal = (barcode_signal_t){0};
+        g_swing_state.started = false;
+        g_filtered_min = UINT16_MAX;
+        g_filtered_max = 0u;
         barcode_sampler_begin_levels(&g_sampler, g_level_on, g_level_off);
         barcode_optical_arm(&g_optical);
         g_adc_max_us = 0u;
@@ -642,7 +738,7 @@ static bool barcode_begin(void)
     g_rejected_logged = 0u;
     g_timeouts_logged = 0u;
 
-    if (raw > g_level_off) {
+    if ((g_swing == 0u) && (raw > g_level_off)) {
         printf("[WARN] GP26 is not on white (raw=%u). Reading starts after 250 ms of white.\n",
                (unsigned)raw);
     }
@@ -651,10 +747,11 @@ static bool barcode_begin(void)
 
 static void print_summary(uint32_t number, const run_summary_t *p_run)
 {
-    printf("[RUN %lu] power_on=%u levels=%u/%u white=%u reads=%lu sequence=%s rejected=%lu timeouts=%lu edges=%lu "
+    printf("[RUN %lu] power_on=%u levels=%s%u/%u white=%u reads=%lu sequence=%s rejected=%lu timeouts=%lu edges=%lu "
            "raw=%u..%u max_gap_us=%lu integrity_fault=%u end=%s target_mm=%u "
            "counts_L/R=%ld/%ld nominal_mm=%.0f widths_ms=",
            (unsigned long)number, (unsigned)p_run->boot,
+           (p_run->black_off == 0u) ? "swing" : "",
            (unsigned)p_run->black_on, (unsigned)p_run->black_off,
            (unsigned)p_run->white,
            (unsigned long)p_run->reads,
@@ -750,8 +847,8 @@ static void finish_run(const motion_control_t *p_motion, const char *p_reason)
     run.rejected = g_capture.rejected;
     run.timeouts = g_capture.timeouts;
     run.edges = p_stats->edges;
-    run.raw_min = (p_stats->samples > 0u) ? p_stats->raw_min : 0u;
-    run.raw_max = p_stats->raw_max;
+    run.raw_min = (g_filtered_max > 0u) ? g_filtered_min : 0u;
+    run.raw_max = g_filtered_max;
     run.max_gap_us = p_stats->max_gap_us;
     run.integrity_fault = g_capture.integrity_fault;
     run.distance_mm = g_distance_mm;
@@ -759,8 +856,8 @@ static void finish_run(const motion_control_t *p_motion, const char *p_reason)
     run.right_counts = motion_right_position(p_motion, sample);
     (void)snprintf(run.end_reason, sizeof(run.end_reason), "%s", p_reason);
     run.boot = (uint16_t)g_state.boot_count;
-    run.black_on = g_level_on;
-    run.black_off = g_level_off;
+    run.black_on = (g_swing > 0u) ? g_swing : g_level_on;
+    run.black_off = (g_swing > 0u) ? 0u : g_level_off;
     run.white = g_level_white;
     run.width_count = g_capture.saved_runs;
     for (uint32_t i = 0u; i < run.width_count; ++i) {
@@ -784,10 +881,18 @@ static void finish_run(const motion_control_t *p_motion, const char *p_reason)
 static void print_levels(const char *p_label)
 {
     const levels_t *p_levels = &k_levels[g_state.level_index];
+    bool relative = (p_levels->mode != LEVEL_FIXED);
 
+    if (p_levels->mode == LEVEL_SWING) {
+        printf("%s (%s): bar = rise of %u (and half way to the last bar's highest) from the gap's lowest "
+               "and >= measured white+%u; gap = drop of %u from the bar's highest or <= measured white+%u\n",
+               p_label, p_levels->p_name, (unsigned)SWING_AMOUNT, (unsigned)p_levels->on,
+               (unsigned)SWING_AMOUNT, (unsigned)p_levels->off);
+        return;
+    }
     printf("%s (%s): black>=%s%u white<=%s%u\n", p_label, p_levels->p_name,
-           p_levels->relative ? "measured white+" : "", (unsigned)p_levels->on,
-           p_levels->relative ? "measured white+" : "", (unsigned)p_levels->off);
+           relative ? "measured white+" : "", (unsigned)p_levels->on,
+           relative ? "measured white+" : "", (unsigned)p_levels->off);
 }
 
 static void print_help(void)

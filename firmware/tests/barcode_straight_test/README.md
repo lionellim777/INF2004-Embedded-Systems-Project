@@ -47,19 +47,26 @@ USB is optional during runs; the car can run on its battery alone.
 
 ## Black/white levels
 
-`l` cycles through three settings; the choice is kept in flash and each run
-records the levels it used (`levels=on/off white=`).
+`l` cycles through four settings; the choice is kept in flash and each run
+records the levels it used (`levels=on/off white=`, or `levels=swing700/0`).
 
 - `course`: the course firmware's fixed 226/220.
 - `mid`: fixed 1600/1400.
-- `auto` (default): during the 3 s countdown the car measures the white
-  paper under GP26 (median of 31 readings) and uses white + 850 / white + 650.
-  If the reading is not steady, the run does not start; keep the car still
-  on white and press GP20 again.
+- `auto`: during the 3 s countdown the car measures the white paper under
+  GP26 (median of 31 readings) and uses white + 850 / white + 650. If the
+  reading is not steady, the run does not start; keep the car still on white
+  and press GP20 again.
+- `swing` (default): white is measured as in `auto`. A bar starts when the
+  reading rises 700 above the lowest point of the gap before it, at least
+  half way back to the previous bar's highest point, and is at least
+  white + 850. A gap starts when the reading drops 700 below the highest
+  point of the bar before it, or falls to white + 650.
 
 The auto margins come from raw traces on this car: white stayed within about
 +550 of its resting value, and the faintest narrow bar of the small barcode
-peaked about +1260 above it.
+peaked about +1260 above it. On the track, narrow gaps read 1800-2500, above
+any fixed white level, but still dropped 1000 or more from the bars beside
+them; `swing` is meant to separate those.
 
 ## Reading the output
 
