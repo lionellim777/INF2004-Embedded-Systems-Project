@@ -369,6 +369,7 @@ static void optical_finish(bool aborted, bool driving)
 static course_control_t course;
 static center_baseline_t center_baseline;
 static bool course_run;
+static bool straight_selected, straight_run; /* course reading, straight drive, no line */
 static bool avoid_run;
 static obstacle_bypass_t avoidance;
 static int32_t blackness(uint16_t raw,int32_t white,int32_t black);
@@ -684,15 +685,22 @@ int main(void)
              } else if(ch=='o') {
                 if(!ROBOCAR_CENTER_LINE)printf("[SELECT] Obstacle mode requires the GP28 centre layout.\n");
                 else if(running||settling_until_us)printf("[SELECT] Rejected while running/settling.\n");
-                else {selected=MOTION_AVOID;printf("[SELECT] OBSTACLE_BYPASS; right-side bypass; barcodes disabled; floor only; GP20 starts.\n");}
+                else {selected=MOTION_AVOID;straight_selected=false;printf("[SELECT] OBSTACLE_BYPASS; right-side bypass; barcodes disabled; floor only; GP20 starts.\n");}
              } else if(ch=='q') {
                 if(running || settling_until_us!=0u)printf("[SELECT] Rejected while running/settling.\n");
                 else {
                     course_config_t config=calibration_wifi_course_config();
                     if(course_config_valid(config)){
-                        selected_course=config;selected=MOTION_COURSE;
+                        selected_course=config;selected=MOTION_COURSE;straight_selected=false;
                         printf("[SELECT Y/Z] Y=%s Z=%s junction_advance_mm=%u timer=none travel_limit=160000counts; GP20 starts; actions trigger on barcode.\n",course_action_name(config.y_action),course_action_name(config.z_action),config.advance_mm);
                     }else printf("[SELECT] Use course settings on the web page.\n");
+                }
+            } else if(ch=='s') {
+                if(!ROBOCAR_CENTER_LINE)printf("[SELECT] Straight barcode run requires the GP28 centre layout.\n");
+                else if(running||settling_until_us)printf("[SELECT] Rejected while running/settling.\n");
+                else {
+                    selected_course=(course_config_t){'s','s',120};selected=MOTION_COURSE;straight_selected=true;
+                    printf("[SELECT] STRAIGHT_BARCODE %umm; drives straight, line ignored, barcodes recorded only; GP26 starts on white; GP20 starts.\n",COURSE_STRAIGHT_MM);
                 }
             } else if (ch == '?') {
                 print_controls();
@@ -702,6 +710,7 @@ int main(void)
                 if (running || settling_until_us != 0u) {
                     printf("[SELECT] Rejected while running/settling. Stop first.\n");
                 } else {
+                    straight_selected = false;
                     selected = ch == 'f' ? MOTION_STRAIGHT_30CM :
                         (ch == 'l' ? MOTION_LEFT_90 : (ch == 'r' ? MOTION_RIGHT_90 :
                         (ch == 'u' ? MOTION_RIGHT_180 : (ch == 'b' ? MOTION_BARCODE : (ch == 'c' ? MOTION_CONTINUOUS : MOTION_NONE)))));
@@ -736,6 +745,7 @@ int main(void)
                 motion_init(&motion);
                 pending = selected;
                 course_run = selected==MOTION_COURSE;
+                straight_run = course_run && straight_selected;
                 avoid_run = selected==MOTION_AVOID;
                 servo_set_test_angle(90);
                 max_loop_us = 0u;
@@ -848,7 +858,7 @@ int main(void)
                     began = true;
                     if (scan_kind(pending)) {
                         int32_t baseline=500,baseline_spread=0;
-                        bool baseline_ok=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE ||
+                        bool baseline_ok=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE || straight_run ||
                             center_baseline_value(&center_baseline,now_us,&baseline,&baseline_spread);
                         uint16_t gp26_white=0,gp26_spread=0;
                         bool swing_ok=barcode_white_value(&barcode_white,now_us,&gp26_white,&gp26_spread);
@@ -857,7 +867,7 @@ int main(void)
                         bool white = ir_latest[0] <= BARCODE_BLACK_OFF;
                         bool fresh = (uint32_t)(time_us_32() - ir_last_us) <= BARCODE_SAMPLE_GAP_US;
                         bool stream = pending==MOTION_CONTINUOUS || pending==MOTION_COURSE;
-                        bool aligned=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE ||
+                        bool aligned=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE || straight_run ||
                             (baseline_ok && blackness(ir_latest[1],CENTRE_IR_WHITE,CENTRE_IR_BLACK)>=IR_BLACK_LEVEL);
                         if (fresh && aligned && (white || stream)) {
                             barcode_origin_us=time_us_32();
@@ -907,6 +917,11 @@ int main(void)
                         if(course_run){
                             course_begin(&course,selected_course,enc,now_us);
                             course_set_center_reference(&course,baseline);
+                            if(straight_run){
+                                course_set_straight_mm(&course,COURSE_STRAIGHT_MM);
+                                if(began)printf("[STRAIGHT] %umm (%ld counts) straight, line ignored, barcode widths by encoder distance.\n",
+                                    COURSE_STRAIGHT_MM,(long)course.straight_counts);
+                            }
                             if(began && ROBOCAR_CENTER_LINE)
                                 printf("[CENTER BASELINE] median=%ld iqr=%ld samples=%u frozen_for_run=1.\n",
                                     (long)baseline,(long)baseline_spread,center_baseline.count);

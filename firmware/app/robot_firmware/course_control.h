@@ -20,6 +20,11 @@
  * and normal line recovery runs. 0 disables the hold. */
 #define COURSE_BARCODE_HOLD_MM 250u
 #define COURSE_BARCODE_HOLD_MAX_MM 400u
+/* Straight barcode run (web test): drive straight this far, ignoring the
+ * line, reading barcodes the same way as the course, then stop. Spec barcode
+ * is ~141 mm, so 400 mm leaves room to start and finish on white. */
+#define COURSE_STRAIGHT_MM 400u
+#define COURSE_STRAIGHT_MAX_MM 700u
 static inline int32_t course_mm_counts(unsigned mm)
 {return (int32_t)((int64_t)mm*COURSE_WHEEL_CPR*100/COURSE_WHEEL_CIRCUMFERENCE_MM_X100);}
 /* A two-sensor crossing is a candidate, not proof of a geometric junction. */
@@ -50,6 +55,7 @@ typedef struct {
     int32_t hold_limit_counts,hold_l,hold_r;
     bool hold_requested,hold_active,hold_spent,hold_blind;
     unsigned holds,hold_limits,hold_blind_holds;
+    int32_t straight_counts; /* 0: normal line following */
     uint64_t start_us,last_us,segment_us,phase_us,both_us,clear_us,seek_us;
     int32_t segment_l,segment_r,entry_l,entry_r,exit_l,exit_r,seek_l,seek_r;
     unsigned junctions,turns,route_updates,replacements,deferred_replacements;
@@ -81,4 +87,7 @@ void course_set_barcode_hold_mm(course_control_t *c,unsigned mm);
 /* Foreground, before course_step: true while the barcode reader is part way
  * through a symbol. A spent hold renews only after capturing goes false. */
 void course_barcode_capturing(course_control_t *c,bool capturing);
+/* After course_begin. 1..COURSE_STRAIGHT_MAX_MM: straight run, stops with
+ * STRAIGHT_DONE after that distance on both wheels. 0 restores following. */
+void course_set_straight_mm(course_control_t *c,unsigned mm);
 #endif

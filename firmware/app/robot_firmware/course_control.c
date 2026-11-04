@@ -41,6 +41,8 @@ void course_note_barcode_activity(course_control_t *c,uint64_t now)
 {c->barcode_seen=true;c->barcode_activity_us=now;}
 void course_set_barcode_hold_mm(course_control_t *c,unsigned mm)
 {c->hold_limit_counts=course_mm_counts(mm>COURSE_BARCODE_HOLD_MAX_MM?COURSE_BARCODE_HOLD_MAX_MM:mm);}
+void course_set_straight_mm(course_control_t *c,unsigned mm)
+{c->straight_counts=course_mm_counts(mm>COURSE_STRAIGHT_MAX_MM?COURSE_STRAIGHT_MAX_MM:mm);}
 void course_barcode_capturing(course_control_t *c,bool capturing)
 {
     c->hold_requested=capturing;
@@ -125,7 +127,10 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         return stopped(c,"COURSE_TRAVEL_LIMIT");
 #if ROBOCAR_CENTER_LINE
     if(c->center_level_valid)ir.left=c->center_visible;
-    bool holding=barcode_hold(c,l,r);
+    if(c->straight_counts>0 && c->phase==COURSE_FOLLOW &&
+       l>=c->straight_counts && r>=c->straight_counts)return stopped(c,"STRAIGHT_DONE");
+    /* A straight run holds for its whole length; the line is not followed. */
+    bool holding=c->straight_counts>0 ? c->phase==COURSE_FOLLOW : barcode_hold(c,l,r);
     if(holding&&!ir.left&&!c->hold_blind){c->hold_blind=true;c->hold_blind_holds++;}
     if(c->phase!=COURSE_FOLLOW||c->center_level<c->center_reference*90/100||
        ir.right||c->cruise_limit_cps<=600){

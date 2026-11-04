@@ -193,5 +193,17 @@ int main(void){
  o=step(false,false,0,0,10000);assert(c.phase==COURSE_LOST && !c.holds);
  reset();course_set_barcode_hold_mm(&c,10000);
  assert(c.hold_limit_counts==course_mm_counts(COURSE_BARCODE_HOLD_MAX_MM));
+ /* Straight run: no line needed, no trims or search, stops at the distance. */
+ reset();course_set_straight_mm(&c,100);
+ int32_t straight=course_mm_counts(100);
+ while(l<straight-60){
+  o=step(false,false,60,60,50000);
+  assert(!o.stop && c.phase==COURSE_FOLLOW && o.left>=0 && o.right>=0 && !c.drive.center_steer);
+ }
+ assert(!c.trim_attempts && !c.bend_attempts && !c.recoveries);
+ o=step(false,false,60,60,50000);
+ assert(o.stop && !strcmp(o.state,"STRAIGHT_DONE"));
+ reset();course_set_straight_mm(&c,10000);
+ assert(c.straight_counts==course_mm_counts(COURSE_STRAIGHT_MAX_MM));
  puts("PASS centred sensor: early optical steering and reversal, bounded local recovery beside barcodes, strong confirmation, travel/stall bounds, stop/defer policy, crossings and barcode hold limit.");
 }
