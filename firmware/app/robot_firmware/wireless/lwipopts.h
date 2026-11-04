@@ -27,6 +27,10 @@
 #define TCP_WND (4 * TCP_MSS)
 #define TCP_SND_BUF (4 * TCP_MSS)
 #define TCP_SND_QUEUELEN 32
+/* Every page poll is a new connection, so a lost packet waits this long before
+ * a resend. lwIP's 3000 ms default outlasts the page's poll timeout; 1000 ms
+ * is the RFC 6298 initial value. */
+#define LWIP_TCP_RTO_TIME 1000
 #define LWIP_NETIF_STATUS_CALLBACK 1
 #define LWIP_NETIF_LINK_CALLBACK 1
 #define LWIP_NETIF_HOSTNAME 1

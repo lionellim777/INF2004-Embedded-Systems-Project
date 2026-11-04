@@ -44,6 +44,10 @@ uint64_t time_us_64(void); uint32_t get_rand_32(void);
 void stdio_set_driver_enabled(stdio_driver_t*,bool);
 int cyw43_arch_init_with_country(int);void cyw43_arch_enable_ap_mode(const char*,const char*,int);
 void cyw43_arch_disable_ap_mode(void);void cyw43_arch_deinit(void);void cyw43_arch_poll(void);
+typedef struct {uint8_t ap_channel;} cyw43_t; extern cyw43_t cyw43_state;
+static inline void cyw43_wifi_ap_set_channel(cyw43_t*s,uint32_t c){s->ap_channel=(uint8_t)c;}
+#define CYW43_NONE_PM 0xa11140u
+int cyw43_wifi_pm(cyw43_t*,uint32_t);
 void tcp_arg(struct tcp_pcb*,void*);
 void tcp_sent(struct tcp_pcb*,err_t(*)(void*,struct tcp_pcb*,u16_t));
 void tcp_recv(struct tcp_pcb*,err_t(*)(void*,struct tcp_pcb*,struct pbuf*,err_t));

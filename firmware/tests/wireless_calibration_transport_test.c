@@ -20,8 +20,11 @@ uint64_t time_us_64(void){return now;}
 #endif
 uint32_t get_rand_32(void){return 123;}
 void stdio_set_driver_enabled(stdio_driver_t*d,bool v){(void)d;(void)v;}
-int cyw43_arch_init_with_country(int x){(void)x;return 0;}
-void cyw43_arch_enable_ap_mode(const char*a,const char*b,int c){(void)a;(void)b;(void)c;}
+cyw43_t cyw43_state;static uint32_t radio_pm=~0u;static bool ap_enabled;static unsigned ap_started_channel;
+/* Like the SDK: init resets the AP channel to 3; enable reads it. */
+int cyw43_arch_init_with_country(int x){(void)x;cyw43_state.ap_channel=3;return 0;}
+void cyw43_arch_enable_ap_mode(const char*a,const char*b,int c){(void)a;(void)b;(void)c;ap_enabled=true;ap_started_channel=cyw43_state.ap_channel;}
+int cyw43_wifi_pm(cyw43_t*s,uint32_t pm){assert(s==&cyw43_state);assert(ap_enabled);radio_pm=pm;return 0;}
 void cyw43_arch_disable_ap_mode(void){}void cyw43_arch_deinit(void){}void cyw43_arch_poll(void){
 #ifdef TEST_NETWORK_CORE1
     radio_poll_hook();
@@ -55,6 +58,10 @@ static void feed(client_t*c,const char*text,size_t n){struct pbuf p={(u16_t)n,(v
 static void drain(client_t*c){for(unsigned i=0;c->pcb && i<100;i++){size_t queued=c->queued;assert(client_sent(c,c->pcb,(u16_t)(queued-c->acknowledged))==ERR_OK);}assert(c->pcb==NULL);}
 static void http_tests(void){
     assert(calibration_wifi_init());
+    /* SDK default PM2 lets the radio nap; at range that drops/delays packets. */
+    assert(radio_pm==CYW43_NONE_PM);
+    /* Channel 3 overlaps the busy 1 and 6; 11 does not. */
+    assert(ap_started_channel==11u);
     client_t*c=open_client();core.selection_allowed=true;
     const char *req="POST /command/f HTTP/1.1\r\nHost: 192.168.4.1\r\nX-Calibrate: 1\r\nContent-Length: 0\r\n\r\n";
     /* Every byte arrives separately, as is legal on TCP. */

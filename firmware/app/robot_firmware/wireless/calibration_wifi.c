@@ -300,7 +300,13 @@ static bool network_init(void)
 {
     boot_id = get_rand_32();
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0) { return false; }
+    /* SDK default channel 3 overlaps busy channels 1 and 6; 11 does not.
+     * Init resets it, so set it here, before the AP starts. */
+    cyw43_wifi_ap_set_channel(&cyw43_state, 11u);
     cyw43_arch_enable_ap_mode(AP_NAME, AP_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
+    /* SDK default is PM2 power-save; keep the radio awake so distant clients
+     * don't see dropped or late packets. Must follow enable_ap_mode. */
+    (void)cyw43_wifi_pm(&cyw43_state, CYW43_NONE_PM);
     ip_addr_t gateway, mask;
     IP4_ADDR(&gateway, 192, 168, 4, 1);
     IP4_ADDR(&mask, 255, 255, 255, 0);
