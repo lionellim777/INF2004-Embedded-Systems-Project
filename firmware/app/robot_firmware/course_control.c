@@ -21,6 +21,7 @@ void course_begin(course_control_t *c,course_config_t config,encoder_sample_t en
     memset(c,0,sizeof(*c));c->config=config;c->reference.start=enc;
     c->start_us=c->last_us=c->segment_us=now;c->phase=COURSE_FOLLOW;
     c->drive.center_profile=ROBOCAR_CENTER_LINE;c->center_reference=500;
+    course_set_barcode_hold_mm(c,COURSE_BARCODE_HOLD_MM);
     if(!course_config_valid(config)){c->phase=COURSE_FAILED;c->fault="COURSE_BAD_CONFIG";}
 }
 void course_center_level(course_control_t *c,int32_t level)
@@ -38,7 +39,31 @@ void course_set_cruise_limit(course_control_t *c,unsigned cps)
 {c->cruise_limit_cps=cps<450?450:cps>1000?1000:cps;}
 void course_note_barcode_activity(course_control_t *c,uint64_t now)
 {c->barcode_seen=true;c->barcode_activity_us=now;}
+void course_set_barcode_hold_mm(course_control_t *c,unsigned mm)
+{c->hold_limit_counts=course_mm_counts(mm>COURSE_BARCODE_HOLD_MAX_MM?COURSE_BARCODE_HOLD_MAX_MM:mm);}
+void course_barcode_capturing(course_control_t *c,bool capturing)
+{
+    c->hold_requested=capturing;
+    if(!capturing){c->hold_active=c->hold_spent=c->hold_blind=false;}
+}
 #if ROBOCAR_CENTER_LINE
+/* Start, continue or end the barcode hold at these wheel positions. A bend
+ * already under way keeps its own budget; the hold starts after it ends. */
+static bool barcode_hold(course_control_t *c,int32_t l,int32_t r)
+{
+    if(!c->hold_requested||c->hold_spent||c->hold_limit_counts<=0||c->phase!=COURSE_FOLLOW){
+        c->hold_active=false;return false;
+    }
+    if(!c->hold_active){
+        if(c->bend_active)return false;
+        c->hold_active=true;c->hold_blind=false;c->hold_l=l;c->hold_r=r;c->holds++;
+        center_trim_clear(&c->center_trim);
+    }
+    if(l-c->hold_l>=c->hold_limit_counts||r-c->hold_r>=c->hold_limit_counts){
+        c->hold_active=false;c->hold_spent=true;c->hold_limits++;return false;
+    }
+    return true;
+}
 static bool near_barcode(const course_control_t *c,uint64_t now)
 {return c->barcode_seen && (now<c->barcode_activity_us || now-c->barcode_activity_us<2000000u);}
 #endif
@@ -100,6 +125,8 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         return stopped(c,"COURSE_TRAVEL_LIMIT");
 #if ROBOCAR_CENTER_LINE
     if(c->center_level_valid)ir.left=c->center_visible;
+    bool holding=barcode_hold(c,l,r);
+    if(holding&&!ir.left&&!c->hold_blind){c->hold_blind=true;c->hold_blind_holds++;}
     if(c->phase!=COURSE_FOLLOW||c->center_level<c->center_reference*90/100||
        ir.right||c->cruise_limit_cps<=600){
         c->steady_line_us=0;c->drive.center_cruise_cps=c->cruise_limit_cps&&c->cruise_limit_cps<600?c->cruise_limit_cps:600;
@@ -111,7 +138,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
     if(c->center_level_valid && c->phase==COURSE_FOLLOW && !c->bend_active){
         /* A weak GP28 plus GP27 black is a right-edge hint, not a crossing. */
         both=ir.right && c->center_level>=c->center_reference*80/100;
-        if(ir.left && !both && c->drive.launch_complete){
+        if(ir.left && !both && c->drive.launch_complete && !holding){
             bool active=c->center_trim.active,reversed=c->center_trim.reversed;
             /* A guessed trim direction is not evidence. Remember it only
              * after actual directed yaw AND an optical improvement. */
@@ -141,7 +168,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
      * previously established moving line. No indefinite blind forward drive. */
     if(c->phase==COURSE_FOLLOW){
         bool strong=c->center_level_valid&&c->center_level>=c->center_reference*85/100;
-        bool permitted=!c->bend_disabled&&!near_barcode(c,now)&&!both;
+        bool permitted=!c->bend_disabled&&!near_barcode(c,now)&&!both&&!holding;
         if(!permitted){c->bend_ready=false;c->bend_ready_us=0;}
         if(!c->bend_active&&permitted&&strong&&!ir.right&&c->drive.launch_complete){
             if(!c->bend_ready_us){c->bend_ready_us=now;c->bend_ready_l=l;c->bend_ready_r=r;}
@@ -190,7 +217,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
     }else {c->bend_active=c->bend_ready=false;c->bend_ready_us=0;c->drive.center_bend=false;}
     /* GP28 (ir.left legacy field) now sits directly on the tape. Both-white
      * is loss, not a centred state. Do not decode fragments during search. */
-    if(c->phase==COURSE_FOLLOW && !ir.left){
+    if(c->phase==COURSE_FOLLOW && !ir.left && !holding){
         c->bend_active=c->bend_ready=false;c->bend_ready_us=0;c->drive.center_bend=false;
         c->phase=COURSE_LOST;c->center_search_started=true;
         /* A trial that just reversed is not a confirmed direction. Prefer
@@ -287,7 +314,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
     if(c->phase==COURSE_CENTER){
         /* Nominal geometry: CPR2543, wheel60mm. 120mm is user-measured sensor
          * lead. Actual axle centering/coast needs track calibration. */
-        int32_t target=(int32_t)c->config.advance_mm*2543*100/18850;
+        int32_t target=course_mm_counts(c->config.advance_mm);
         if(now-c->phase_us>=4000000u)return stopped(c,"COURSE_CENTER_TIMEOUT");
         if(l-c->entry_l>=target && r-c->entry_r>=target){
             c->phase=COURSE_BRAKE;c->phase_us=now;return hold("COURSE_CENTER_BRAKE");
@@ -351,7 +378,8 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
     if(out.stop)return stopped(c,out.state);
 #if ROBOCAR_CENTER_LINE
     if(!c->drive.launch_complete)return out;
-    out.state=c->phase==COURSE_CENTER?"COURSE_CENTERING":both?"CENTER_CROSS_STRAIGHT":center_steer<0?"CENTER_TRIM_LEFT":
+    out.state=c->phase==COURSE_CENTER?"COURSE_CENTERING":both?"CENTER_CROSS_STRAIGHT":
+              holding?"CENTER_BARCODE_HOLD":center_steer<0?"CENTER_TRIM_LEFT":
               center_steer>0?"CENTER_TRIM_RIGHT":"CENTER_LINE_FOLLOW";
     return out;
 #endif

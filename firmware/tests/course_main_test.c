@@ -258,20 +258,26 @@ int main(int argc,char **argv)
     if(scenario==19){assert(strstr(output,"CENTER_LINE_NOT_REACQUIRED"));}
     if(scenario==21||scenario==22){assert(strstr(output,"CENTER_LOCAL_RECOVERY_EXHAUSTED"));assert(!course.recoveries);}
     if(scenario==23){assert(course.recoveries==1 && strstr(output,"EXTERNAL_STOP"));}
+    /* 24/25/26/32: GP28 weakens or is lost while GP26 is mid-barcode. The
+     * barcode hold drives straight, so no trim or recovery starts and the
+     * symbol is read whole. 32 places the strip by axle travel. */
+    if(scenario==24||scenario==25||scenario==26||scenario==32){
+        if(getenv("COURSE_MAIN_DUMP"))fputs(output,stderr);
+    }
     if(scenario==24||scenario==25){
-        assert(course.trim_attempts==1 && !course.recoveries);
+        if(!(!course.trim_attempts && !course.recoveries && course.holds>=1)){fputs(output,stderr);assert(0);}
         assert(strstr(output,"reads=1 sequence=Y") && !stream_paused_fragments);
         assert(course.junctions==2);
     }
     if(scenario==32){
-        assert(course.recoveries==1 && !stream_paused_fragments);
+        if(!(!course.recoveries && course.holds>=1 && course.hold_blind_holds>=1)){fputs(output,stderr);assert(0);}
+        assert(!stream_paused_fragments && !course.hold_limits);
         assert(!barcode_capture.motion_aborts && !barcode_capture.zero_distance_aborts && !barcode_capture.pause_timeouts);
-        assert(strstr(output,"reads=1 sequence=Z") && strstr(output,"width_source=TIME"));
+        if(!(strstr(output,"reads=1 sequence=Z") && strstr(output,"width_source=ENCODER_AXLE_DISTANCE"))){fputs(output,stderr);assert(0);}
     }
     if(scenario==26){
-        /* Optical timestamps remain usable while wheels stop: a moving
-         * printed strip under a stationary sensor must still be readable. */
-        assert(course.recoveries==1 && stream_paused_fragments==0);
+        if(!(!course.recoveries && course.holds>=1 && course.hold_blind_holds>=1)){fputs(output,stderr);assert(0);}
+        assert(stream_paused_fragments==0 && !course.hold_limits);
         assert(!barcode_capture.zero_distance_aborts && !barcode_capture.motion_aborts);
         if(!strstr(output,"reads=2 sequence=YY")){fputs(output,stderr);assert(0);}
     }

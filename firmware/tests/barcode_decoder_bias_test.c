@@ -146,11 +146,11 @@ int main(void){
         make(letters[0],0,w);w[i]=750000;assert(!both(w,&c));
     }
     for(unsigned gap=9;gap<=19;gap+=10){make(letters[0],0,w);w[gap]=300;assert(!both(w,&c));}
-    make(letters[0],0,w);for(unsigned i=0;i<29;i++)if(w[i]==300)w[i]=170;
+    make(letters[0],0,w);for(unsigned i=0;i<29;i++)if(w[i]==300)w[i]=150;
     assert(!both(w,&c));
-    make(letters[0],0,w);for(unsigned i=0;i<29;i++)if(w[i]==300)w[i]=180;
+    make(letters[0],0,w);for(unsigned i=0;i<29;i++)if(w[i]==300)w[i]=160;
     assert(both(w,&c) && c=='A');
-    for(unsigned i=0;i<29;i++)if(w[i]==180)w[i]=179;
+    for(unsigned i=0;i<29;i++)if(w[i]==160)w[i]=159;
     assert(!both(w,&c));
     for(unsigned i=0;i<29;i++)w[i]=100;
     assert(!both(w,&c));

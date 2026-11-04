@@ -35,11 +35,18 @@
 #include "ir_fault.h"
 #include "barcode_optical.h"
 #include "barcode_signal.h"
+#include "barcode_swing.h"
 #include "barcode_drive.h"
 #include "course_control.h"
 #include "obstacle_bypass.h"
 #include "terrain.h"
 #include "calibration_wifi.h"
+/* Centre-line course scans: 1 measures bar widths by encoder axle travel, so
+ * a slowdown or brief stop mid-barcode does not distort them; 0 uses time.
+ * Travel widths rely on the course barcode hold keeping the wheels forward. */
+#ifndef ROBOCAR_COURSE_DISTANCE_WIDTHS
+#define ROBOCAR_COURSE_DISTANCE_WIDTHS 1
+#endif
 
 enum {
     LEFT_MOTOR_A_PIN = 8,
@@ -287,6 +294,8 @@ static volatile uint32_t adc_max_us;
 static barcode_sampler_t barcode_sampler;
 static barcode_signal_t barcode_signal;
 static volatile uint16_t barcode_filtered;
+static barcode_swing_t barcode_swing;  /* Owned by the IRQ once the sampler starts. */
+static barcode_white_t barcode_white;
 static barcode_optical_t optical;
 static bool optical_pending;
 static bool optical_drive_pending, optical_drive_frozen, optical_drive_aborted;
@@ -313,10 +322,13 @@ static bool ir_sample_alarm(repeating_timer_t *timer)
     ir_latest[2] = line_sensor_read(RIGHT_IR_PIN);
     ir_last_us = start;
     barcode_filtered=barcode_signal_update(&barcode_signal,ir_latest[0]);
+    uint16_t barcode_level=barcode_filtered;
+    if(barcode_sampler.enabled && barcode_swing.enabled)
+        barcode_level=barcode_swing_step(&barcode_swing,barcode_level);
     if(barcode_sampler.enabled && barcode_sampler.motion.enabled){
         encoder_sample_t e=encoders_snapshot();
-        barcode_sampler_sample_motion(&barcode_sampler,barcode_filtered,start,e.left_raw,e.right_raw);
-    }else barcode_sampler_sample(&barcode_sampler, barcode_filtered, start);
+        barcode_sampler_sample_motion(&barcode_sampler,barcode_level,start,e.left_raw,e.right_raw);
+    }else barcode_sampler_sample(&barcode_sampler, barcode_level, start);
     if(optical.armed && barcode_sampler.enabled && barcode_sampler.stats.edges)
         barcode_optical_trigger(&optical,start);
     barcode_optical_sample(&optical, ir_latest[0], start);
@@ -547,7 +559,8 @@ static void print_controls(void)
     printf("Y/Z mission: web actions trigger on decoded barcode; delayed actions count future crossings. New read replaces waiting action; committed turn defers newest; STOP wins.\n");
     printf("Course advance default120mm from measured sensor lead; nominal encoder scale, centering/curves/junctions pending physical validation.\n");
     printf("Course barcode widths use encoder axle distance: forward steering/brief holds preserved; reverse excursions discard partial frames. Tight-curve sensor path remains unvalidated.\n");
-    printf("GP26 barcode BLACK filtered>=%u / WHITE filtered<=%u; 12-sample mean at2kHz, provisional low-contrast calibration. Raw optical test unchanged.\n",BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
+    printf("GP26 barcode: swing from white measured while stopped (rise/drop %u, bar>=white+%u, gap<=white+%u); fixed BLACK filtered>=%u / WHITE<=%u if GP26 is not steady. 12-sample mean at2kHz. Raw optical test unchanged.\n",
+           BARCODE_SWING_AMOUNT,BARCODE_SWING_BLACK_MARGIN,BARCODE_SWING_WHITE_MARGIN,BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
     printf("GP21=level calibration while stopped. Initial level calibration is automatic.\n");
     printf("IR order: barcode GP26 / line-left GP28 / line-right GP27. Barcode record-only in line check.\n");
     printf("o: obstacle bypass test, barcode actions OFF. Right-side floor test; GP20 start/abort.\n");
@@ -730,6 +743,7 @@ int main(void)
                 calibration_wifi_reset_timing();
                 arming_until_us = now_us + 3000000u;
                 center_baseline=(center_baseline_t){0};
+                barcode_white=(barcode_white_t){0};
                 last_countdown = 0u;
                 printf("[START] %s. GP20 aborts.\n", motion_name(selected));
             }
@@ -808,6 +822,7 @@ int main(void)
             motion_state = "MOTION_COUNTDOWN";
             if(ROBOCAR_CENTER_LINE && (pending==MOTION_COURSE||pending==MOTION_AVOID))
                 center_baseline_add(&center_baseline,centre_blackness,now_us);
+            if(scan_kind(pending))barcode_white_add(&barcode_white,left_raw,now_us);
             if (now_us >= arming_until_us) {
                 arming_until_us = 0u;
                 bool began;
@@ -835,6 +850,8 @@ int main(void)
                         int32_t baseline=500,baseline_spread=0;
                         bool baseline_ok=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE ||
                             center_baseline_value(&center_baseline,now_us,&baseline,&baseline_spread);
+                        uint16_t gp26_white=0,gp26_spread=0;
+                        bool swing_ok=barcode_white_value(&barcode_white,now_us,&gp26_white,&gp26_spread);
                         /* Sonar may have blocked since the earlier snapshot. */
                         uint32_t irq = save_and_disable_interrupts();
                         bool white = ir_latest[0] <= BARCODE_BLACK_OFF;
@@ -845,7 +862,14 @@ int main(void)
                         if (fresh && aligned && (white || stream)) {
                             barcode_origin_us=time_us_32();
                             barcode_signal=(barcode_signal_t){0};
-                            barcode_sampler_begin_levels(&barcode_sampler,BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
+                            /* Fixed levels remain only if GP26 was not steady while stopped. */
+                            if(swing_ok){
+                                barcode_swing_begin(&barcode_swing,gp26_white);
+                                barcode_sampler_begin_levels(&barcode_sampler,BARCODE_SWING_SAMPLER_ON,BARCODE_SWING_SAMPLER_OFF);
+                            }else{
+                                barcode_swing.enabled=false;
+                                barcode_sampler_begin_levels(&barcode_sampler,BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
+                            }
                             if(ROBOCAR_CENTER_LINE && pending==MOTION_COURSE){
                                 encoder_sample_t scan_start=encoders_snapshot();
                                 barcode_sampler_enable_motion(&barcode_sampler,scan_start.left_raw,scan_start.right_raw);
@@ -857,9 +881,17 @@ int main(void)
                         }
                         restore_interrupts(irq);
                         began = fresh && aligned && (white || stream);
+                        if(began){
+                            if(swing_ok)printf("[BARCODE LEVELS] swing white=%u spread=%u: bar=rise %u and >=%u, gap=drop %u or <=%u.\n",
+                                gp26_white,gp26_spread,BARCODE_SWING_AMOUNT,gp26_white+BARCODE_SWING_BLACK_MARGIN,
+                                BARCODE_SWING_AMOUNT,gp26_white+BARCODE_SWING_WHITE_MARGIN);
+                            else printf("[BARCODE LEVELS] fixed %u/%u: GP26 not steady while stopped (white=%u spread=%u).\n",
+                                BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF,gp26_white,gp26_spread);
+                        }
                         if(stream){
                             barcode_capture_begin_stream(&barcode_capture,barcode_origin_us);
-                            barcode_capture.distance_mode=false;
+                            barcode_capture.distance_mode=ROBOCAR_COURSE_DISTANCE_WIDTHS &&
+                                ROBOCAR_CENTER_LINE && pending==MOTION_COURSE;
                             barcode_capture.independent_optical=ROBOCAR_CENTER_LINE && pending==MOTION_COURSE;
                             /* Line following does not require barcode white.
                              * Ignore any partial symbol under the sensor at
@@ -982,6 +1014,7 @@ int main(void)
                 const int32_t fresh_levels[3]={left_blackness,centre_blackness,right_blackness};
                 roles=ir_roles(fresh_levels);
                 if(ROBOCAR_CENTER_LINE)course_center_level(&course,centre_blackness);
+                course_barcode_capturing(&course,barcode_sampler.enabled && barcode_capture.reader.active);
                 now_us=time_us_64();enc=encoders_snapshot();
             }
             int32_t left = motion_left_position(&motion, enc);
@@ -1137,6 +1170,8 @@ int main(void)
                 const course_control_t *bc=avoid_run?&avoidance.line:&course;
                 printf("[BEND RESULT] attempts=%u rolling_rejoins=%u fallback_searches=%u active=%u; counts belong to current course segment.\n",bc->bend_attempts,bc->bend_completed,bc->bend_fallbacks,bc->bend_active);
             }
+            if(course_run)printf("[BARCODE HOLD] holds=%u line_lost_during_hold=%u limit_reached=%u limit_counts=%ld; straight drive while a symbol is part read.\n",
+                course.holds,course.hold_blind_holds,course.hold_limits,(long)course.hold_limit_counts);
             diagnostics.active = false;
             printf("[TIMING] max_loop_us=%lu wifi_max_poll_us=%lu",
                    (unsigned long)max_loop_us, (unsigned long)calibration_wifi_max_poll_us());

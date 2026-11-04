@@ -169,5 +169,29 @@ int main(void){
  new_segment(&c,100,100,now);
  assert(!c.drive.launch_complete && !c.drive.started && !c.drive.speed_valid);
  assert(c.drive.launch_left_pwm>0.16f && c.drive.launch_right_pwm>0.20f);
- puts("PASS centred sensor: early optical steering and reversal, bounded local recovery beside barcodes, strong confirmation, travel/stall bounds, stop/defer policy and crossings.");
+ /* Barcode hold: centre loss mid-symbol keeps driving straight, up to the
+  * hold distance; then the normal search runs. It renews only after the
+  * reader goes idle. 0 mm disables it. */
+ reset();course_barcode_capturing(&c,true);
+ int32_t limit=course_mm_counts(COURSE_BARCODE_HOLD_MM);
+ assert(limit==c.hold_limit_counts && limit>3000);
+ o=step(false,false,0,0,10000);
+ assert(!o.stop && c.phase==COURSE_FOLLOW && c.hold_active && c.holds==1 && c.hold_blind_holds==1);
+ while(l<limit-60){
+  o=step(false,false,60,60,50000);
+  assert(!o.stop && c.phase==COURSE_FOLLOW && o.left>=0 && o.right>=0 && !c.drive.center_steer);
+ }
+ assert(!c.trim_attempts && !c.bend_attempts && !c.recoveries);
+ o=step(false,false,60,60,50000);
+ assert(c.phase==COURSE_LOST && c.hold_spent && c.hold_limits==1 && o.left==0 && o.right==0);
+ reset();course_barcode_capturing(&c,true);step(true,false,0,0,10000);
+ l=r=limit;o=step(true,false,0,0,10000);assert(c.hold_spent);
+ o=step(true,false,10,10,10000);assert(!c.hold_active && c.holds==1);
+ course_barcode_capturing(&c,false);course_barcode_capturing(&c,true);
+ o=step(true,false,10,10,10000);assert(c.hold_active && c.holds==2);
+ reset();course_set_barcode_hold_mm(&c,0);course_barcode_capturing(&c,true);
+ o=step(false,false,0,0,10000);assert(c.phase==COURSE_LOST && !c.holds);
+ reset();course_set_barcode_hold_mm(&c,10000);
+ assert(c.hold_limit_counts==course_mm_counts(COURSE_BARCODE_HOLD_MAX_MM));
+ puts("PASS centred sensor: early optical steering and reversal, bounded local recovery beside barcodes, strong confirmation, travel/stall bounds, stop/defer policy, crossings and barcode hold limit.");
 }

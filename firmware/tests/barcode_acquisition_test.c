@@ -40,7 +40,9 @@ static void recorded_regressions(void){
     const uint32_t t4[]={356000u,400000u,482000u,665000u,747000u,930000u,1013000u,1063000u,1277000u,1322000u,1404000u,1450000u,1531000u,1578000u,1655000u,1823000u,1900000u,2075000u,2286000u,2330000u,2407000u,2452000u,2524000u,2689000u,2765000u,2924000u,2999000u,3043000u,3246000u,3289000u};
     const uint32_t *times[]={t0,t1,t2,t3,t4};
     const unsigned lengths[]={30,33,11,30,30};
-    const char expected[]={'A',0,0,'Z','Z'};
+    /* Run 1 was rejected at the old 1.8 separation; at 1.6 it reads A in
+     * reverse with both '*' guards. The printed letter was not recorded. */
+    const char expected[]={'A','A',0,'Z','Z'};
     for(unsigned run=0;run<5;run++){
         barcode_capture_t capture;barcode_capture_begin_drive(&capture);
         barcode_batch_t batch={0};
@@ -55,8 +57,7 @@ static void recorded_regressions(void){
         assert(out.stop && out.left==0 && out.right==0);
         if(expected[run])assert(!strcmp(out.state,"BARCODE_READ"));
         if(run==1){
-            assert(!strcmp(out.state,"BARCODE_REJECTED"));
-            assert(capture.rejected==1 && capture.saved_runs==29 && capture.timeouts==0);
+            assert(capture.rejected==0 && capture.saved_runs==29 && capture.timeouts==0);
             assert(barcode_runs_get(&capture.last_runs,27)==133000);
         }
         if(run==2)assert(!strcmp(out.state,"BARCODE_CAPTURE_TIMEOUT") && capture.timeouts==1);

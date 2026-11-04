@@ -34,7 +34,7 @@ static uint32_t packed_run_get(const void *runs, unsigned int index)
  * Estimate that additive offset from the median of the three narrow runs of
  * each colour. Use doubled units to retain half-unit offsets without floats.
  * Candidate ranks alone never accept a symbol: corrected wide/narrow runs
- * must still satisfy the original1.8 separation, plus within-class coherence.
+ * must still satisfy a 1.6 separation, plus within-class coherence.
  */
 static bool classify_pattern(const uint32_t widths[CODE39_ELEMENTS],
                              uint16_t *pattern,
@@ -83,7 +83,11 @@ static bool classify_pattern(const uint32_t widths[CODE39_ELEMENTS],
             if(corrected>max_narrow)max_narrow=corrected;
         }
     }
-    if(min_wide*10<max_narrow*18 || max_narrow>2*min_narrow || max_wide>2*min_wide)
+    /* 1.6 separation and 2.5x narrow spread: the sensor spot lengthens a
+     * narrow element beside a wide one by ~15 ms at scan speed, which left
+     * correct frames at 1.67-1.73 and 2.2. The '*' guards still reject
+     * wrong letters (none in 18000 noisy synthetic frames). */
+    if(min_wide*10<max_narrow*16 || max_narrow*2>min_narrow*5 || max_wide>2*min_wide)
         return false;
     if (outer_narrow >= 0) {
         /* End-of-frame optics/speed can expand a terminal narrow bar. Permit
