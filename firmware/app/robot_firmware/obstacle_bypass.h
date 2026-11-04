@@ -9,7 +9,8 @@ typedef enum {
     AVOID_FOLLOW, AVOID_WAIT, AVOID_TURN_OUT, AVOID_SCAN_OUT, AVOID_MOVE_OUT,
     AVOID_TURN_FORWARD, AVOID_SCAN_FORWARD, AVOID_MOVE_ALONG, AVOID_TURN_LOOK,
     AVOID_SCAN_SIDE, AVOID_TURN_ALONG, AVOID_RETURN_LINE, AVOID_VERIFY, AVOID_CHECK_TAPE,
-    AVOID_TAPE_PROBE, AVOID_AXLE_ADVANCE, AVOID_ALIGN_TURN, AVOID_ALIGN_CONFIRM, AVOID_SCAN_INITIAL, AVOID_CHECK_LEFT, AVOID_CLEAR_TAIL, AVOID_FAILED
+    AVOID_TAPE_PROBE, AVOID_AXLE_ADVANCE, AVOID_ALIGN_TURN, AVOID_ALIGN_CONFIRM, AVOID_SCAN_INITIAL, AVOID_CHECK_LEFT, AVOID_CLEAR_TAIL,
+    AVOID_TURN_RETURN, AVOID_SCAN_RETURN, AVOID_TURN_CLEARANCE, AVOID_TURN_TO_LINE, AVOID_FAILED
 } avoid_phase_t;
 typedef struct {
     course_control_t line;
@@ -18,8 +19,12 @@ typedef struct {
     unsigned probe_first_black_mm;
     int route_heading_deg;
     obstacle_plan_t plan;
-    float plan_cm[5];
-    unsigned plan_good[5], departure_deg, departure_travel_mm, departure_forward_mm;
+    float plan_cm[OBSTACLE_PLAN_RAYS];
+    unsigned plan_near[OBSTACLE_PLAN_RAYS], plan_far[OBSTACLE_PLAN_RAYS], plan_no_return[OBSTACLE_PLAN_RAYS];
+    unsigned departure_deg, return_deg, departure_travel_mm, departure_forward_mm;
+    unsigned departure_done_mm, departure_step_mm;
+    unsigned edge_shift_count, clearance_adjustments;
+    bool edge_shift_active, angled_probe;
     unsigned left_samples, left_far;
     bool tail_margin_done, left_near;
     unsigned axle_mm;
@@ -48,13 +53,13 @@ typedef struct {
     uint32_t encoder_seen[2];
     uint64_t encoder_error_us[2];
     unsigned encoder_skips[2];
-    unsigned servo_angle, scan_index, samples, close_count, clear_checks, scan_center_clear;
+    unsigned servo_angle, scan_index, samples, close_count, moving_invalid, clear_checks, scan_center_clear, scan_center_no_return;
     unsigned scan_ray_far, scan_far_rays, scan_far_samples, scan_nearest_angle, scan_blocked_angle;
     unsigned last_side_seen_mm;
     unsigned offset_mm, along_mm, outward_mm;
     unsigned detected, completed, scans, no_echo, scan_no_echo, scan_serial;
     float scan_min_cm;
-    bool scan_blocked, side_seen, echo_valid;
+    bool scan_blocked, scan_core_blocked, side_seen, echo_valid;
     int32_t reference;
     const char *fault;
 } obstacle_bypass_t;

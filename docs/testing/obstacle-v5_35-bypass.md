@@ -1,3 +1,131 @@
+## v5.56 tape alignment after straight seeking — 4 November 2026
+
+The 09:09 log shows a qualified single tape crossing and axle advance,
+followed by failed alignment sweeps. Straight seeking was still using A
+to restrict tape acceptance: A=65 allowed only 45–90 degrees, although
+strong tape was logged near 110 degrees. Straight-seek alignment now accepts
+candidates in the bounded 25–115 degree sweep and pauses immediately for
+stationary confirmation instead of requiring 80 ms of black while rotating.
+Transient ink still resumes the sweep. This does not add any sonar sweeps
+or change the two scan stages. Physical axle placement, turn calibration
+and the separate right-wheel stall in the log remain to be checked.
+
+### Two scan stages
+
+Only the initial 5-degree edge scan and the forward-facing check after an
+angled 100 mm move command servo sweeps. After calculating A, turn right A
+and move 100 mm directly; then turn left A to restore the original heading
+and scan. A blocked check repeats this loop. Three completed centre
+no-returns (or the existing two valid far centre readings), with no valid
+blocked ray, start straight tape seeking. During straight seeking, keep the
+servo centred and poll sonar normally; do not sweep again. Tape qualification,
+live obstacle and encoder guards, and bounded straight travel remain active.
+An inconclusive initial edge stops rather than invoking the old lateral
+shift/side-scan fallback. No outward clearance sweep or automatic return turn
+is part of this normal sequence. Physical retest remains required.
+
+### Earlier straight seek behaviour
+
+After each checked angled step, turn left by A to restore the original
+heading and scan forward. If blocked, turn right by A and repeat a checked
+angled step. If clear, continue straight at the original heading in checked
+100 mm legs, looking for and verifying tape. Three completed centre
+no-returns or two valid far centre readings establish the forward clearance
+condition, subject to any valid blocked ray. The normal path no longer
+commands a left return turn or requires 250 mm lateral offset. Straight
+seeking remains bounded by the 1200 mm along-travel limit and the existing
+obstacle, sensing and encoder guards.
+
+### Earlier step check behaviour
+
+After each completed angled move of at most 100 mm, the car turns left by A
+once to face its original heading and performs a forward-facing scan. A
+detected object causes a right turn by the same A, one checked move of at
+most 100 mm, and another return to the original heading for a new scan. A clear scan (two
+valid far centre readings or three completed centre no-returns, with no
+blocked ray) causes a left turn by A toward the tape. The car scans that
+return path, moves while monitoring the sonar, and verifies black tape
+before resuming line following. No second left turn or two side-clear scans
+are required in this normal path. Even after a clear forward scan, the car
+needs at least 250 mm lateral offset before it can turn toward tape; the
+front-mounted line sensor and body would otherwise remain too close to the
+object and original tape. The car cannot reach straight tape by
+travelling parallel to it at its original heading from a lateral offset.
+Encoder turns and chassis clearance still need a supervised physical test.
+
+### Earlier three no-return rule
+
+The 07:55 run exposed an inconsistent rule: three completed sonar
+no-returns could propose an obstacle edge or confirm the object was no longer
+at the side, but the outward path scan still demanded two valid far echoes.
+The path scans now accept either two valid far centre readings or three
+completed centre no-returns. A valid close reading still blocks the path.
+While moving, completed no-returns do not count as sensor-invalid readings;
+the car remains limited to checked moves of at most 100 mm and stops on valid
+close readings, stale sensing, sonar faults, or three unqualified invalid
+readings. This follows the agreed three no-return interpretation, which is
+not independent physical proof of a clear floor. Test with space around the
+car and record each checked move and body clearance.
+
+### Earlier original heading check behaviour
+
+The 06:24 run completed an angled outward move at A=70 degrees. One run then
+stopped at `SCAN_FORWARD`: the centre sonar had no valid distance, so the car
+could not safely start the old parallel leg. The new sequence finishes its
+checked angled departure, turns left by A to face the original track
+direction, then turns left 90 degrees to aim the forward sonar at the object's
+side. The servo alone reaches only 35 degrees left of the chassis, so that
+extra chassis turn is required for a direct side check. If the object remains,
+the car restores the original heading, turns right by A, scans the outward
+path and moves at most 100 mm. It repeats this while the object remains,
+subject to the 600 mm lateral limit. Two clear stopped side scans after an
+observed object start the existing scanned, monitored return toward the
+tape. Completed centre no-returns can support the side check, but invalid
+readings or no-returns never authorise motion without the return-path scan.
+The car must turn toward the tape to cross it: travelling in the original
+heading while offset would run parallel to the tape. Observe each turn and
+body clearance during a supervised test; encoder turns and sonar beam width
+remain uncalibrated.
+
+### Earlier side angle development behaviour
+
+The 06:07 run found the right edge and planned A=60 degrees. After turning,
+the centre path had valid readings near 110 cm, but the 125-degree oblique
+ray measured 27–29 cm and fell just inside the provisional body corridor.
+The controller stopped with zero outward travel. An isolated blockage on
+that ray now turns the car another 10 degrees right and repeats the stopped
+path scan. This is allowed at most twice, before outward travel only, and
+only when the centre has at least two valid clear readings and there is no
+close or other blocked ray. Thus A=60 may become 70 or 80 degrees; the
+initial 5-degree edge margin is 15 or 25 degrees after adjustment. A blocked
+centre, a very close echo, or uncertain clearance still stops the car. The
+short turn and physical body clearance need a supervised car test.
+
+### Earlier echo edge behaviour
+
+The stopped initial scan now samples 90 to 50 servo degrees in 5 degree steps.
+Two valid near readings followed by two valid far readings at the next
+rightward angle locate the right edge. Three completed no-return readings at
+that next angle can instead propose a candidate edge. A candidate permits a
+turn and stopped path scan, but movement still needs two valid clear centre
+readings and no blocked ray. Candidate edges also require an observed object
+on the side before the car can return to the line. The calculated angle A
+includes the body clearance, beam uncertainty and an additional 5 degrees.
+Other no echoes remain unknown. If the edge remains unbounded, the car turns right, checks
+the path, moves 60 mm, turns left and scans again. It can repeat this up to
+300 mm of lateral shift. If the obstacle disappears from the forward scan,
+the car checks its left side before travelling alongside. Unconfirmed paths
+stop the run. Once an edge is found, the car checks the outward path before
+each move of at most 100 mm, turns left by A to travel
+parallel, and uses the inverse of A after repeated side clearance to seek tape.
+In the earlier build, outward, forward and return scans required valid centre clearance before moving.
+
+For the first supervised run, use a single narrow object on a straight tape
+section and leave ample floor space on both sides. Record the initial scan,
+actual turn angle, each outward step, closest body clearance, side checks and
+return turn. Download the log; `[AVOID PLAN]` and `[AVOID RESULT]` show the
+confirmed edge and A. These dimensions are provisional until the car is tested.
+
 ## v5.56 retest — 3 November 2026
 
 Flash `firmware/releases/robocar_motion_integration_v5_56_wireless.uf2`, refresh
