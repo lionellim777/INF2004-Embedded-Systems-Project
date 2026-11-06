@@ -12,4 +12,4 @@ python3 "$ROBOT_ROOT/tools/embed_calibration_page.py"
   -Dpicotool_DIR="$ROBOT_ROOT/build/encoder-inspection/_deps/picotool" \
   -DCMAKE_BUILD_TYPE=Release '-DCMAKE_C_FLAGS=-mcpu=cortex-m0plus -mthumb -Wall -Wextra -Werror'
 "$ROBOT_CMAKE" --build "$ROBOT_ROOT/build/motion-wireless" --parallel 8
-cp "$ROBOT_ROOT/build/motion-wireless/robot_firmware.uf2" "$ROBOT_ROOT/build/motion-wireless/robocar_motion_integration_v5_56_wireless.uf2"
+cp "$ROBOT_ROOT/build/motion-wireless/robot_firmware.uf2" "$ROBOT_ROOT/build/motion-wireless/robocar_motion_integration_v5_61_wireless.uf2"

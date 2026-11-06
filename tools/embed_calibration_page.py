@@ -8,4 +8,6 @@ for name in ['calibration','stationary']:
     (folder/(name+'_page.h')).write_text(
         '/* Generated; edit '+name+'.html. */\n#ifndef CALIBRATION_PAGE_H\n#define CALIBRATION_PAGE_H\n'
         'static const char calibration_page[] =\n'+
-        '\n'.join(json.dumps(line,ensure_ascii=True) for line in text.splitlines(keepends=True))+';\n#endif\n')
+        # C translates trigraphs such as the JavaScript sequence ??' before
+        # parsing strings. Escape question marks without changing page bytes.
+        '\n'.join(json.dumps(line,ensure_ascii=True).replace('??',r'?\?') for line in text.splitlines(keepends=True))+';\n#endif\n')

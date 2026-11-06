@@ -17,7 +17,7 @@ static bool (*ir_callback)(repeating_timer_t*),(*guard_callback)(repeating_timer
 static int capture_printf(const char *fmt,...)
 {
     va_list ap;va_start(ap,fmt);int n=vsnprintf(output+output_n,sizeof(output)-output_n,fmt,ap);va_end(ap);
-    if(strncmp(fmt,"[OPTICAL",8)==0){
+    if(strncmp(fmt,"[OPTICAL",8)==0 || strncmp(fmt,"[SCAN ",6)==0 || strncmp(fmt,"[WAVEFORM MOTION]",17)==0){
         assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);
         assert(!in_alarm);
     }
@@ -37,6 +37,9 @@ static void advance(uint64_t us)
     while(clock_us<end){
         if(start_us&&avoid_run&&avoidance.sonar_wait){assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);}
         if(start_us&&course_run){
+            if(course.flow_follow && course.phase==COURSE_FOLLOW && course.bend_active){
+                assert(!pwm[4][1]&&!pwm[5][1]); /* Forward-only bend commands. */
+            }
             if(course.phase==COURSE_CENTER)ever_center=true;
             if(course.phase==COURSE_BRAKE||course.phase==COURSE_FAILED)
                 assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);
@@ -81,13 +84,35 @@ bool gpio_get(uint p)
         uint64_t width=scenario==39?60000:(echo_us/200000%2?38000:6000);
         return clock_us>=echo_us&&clock_us<echo_us+width;
     }
-    if(p==1){uint64_t width=(scenario==2||scenario>=34)&&start_us&&clock_us-start_us>500000?(scenario==44?600:1000):6000;return clock_us>=echo_us&&clock_us<echo_us+width;}
+    if(p==1){uint64_t width=(scenario==2||(scenario>=34&&scenario<=44))&&start_us&&clock_us-start_us>500000?(scenario==44?600:1000):6000;return clock_us>=echo_us&&clock_us<echo_us+width;}
     return false;
 }
 void adc_init(void){}void adc_gpio_init(uint p){(void)p;}void adc_select_input(uint p){adc_channel=p;}
 uint16_t adc_read(void)
 {
     if(adc_channel==0){
+        if(scenario>=45){
+            uint16_t paper=scenario==46?330:190;
+            if(!start_us || clock_us-start_us<1200000)return paper;
+            uint64_t t=clock_us-start_us-1200000;
+            if(scenario==50){
+                if(t<200000)return t%100000<40000?420:190;
+                t-=200000;
+            }
+            const unsigned pats[]={0x094,scenario>=50?0x0d0:0x109,0x094};unsigned index=0;
+            for(unsigned ch=0;ch<3;ch++){
+                for(int bit=8;bit>=0;bit--){unsigned width=(pats[ch]&(1u<<bit))?204000:68000;
+                    if(t<width){
+                        if(scenario==48 && index<2)return paper;
+                        if(index%2)return scenario==46?1800:scenario==45?215:200;
+                        return scenario==46?3300:scenario==45?265:width==68000?260:1900;
+                    }
+                    t-=width;index++;
+                }
+                if(ch<2){if(t<68000)return scenario==46?1800:scenario==45?215:200;t-=68000;index++;}
+            }
+            return paper;
+        }
         if(scenario==32){
             /* Physical strip fixed to the floor: stopped wheels freeze colour.
              * One full Z, widths based on mean axle travel, not elapsed time. */
@@ -118,6 +143,10 @@ uint16_t adc_read(void)
     }
     if((scenario==7||scenario==8||scenario==12||scenario==14) && course.phase==COURSE_SEEK)return adc_channel==2?2000:180;
 #if ROBOCAR_CENTER_LINE
+    if(scenario==51 && start_us && clock_us-start_us>=1800000 && clock_us-start_us<1940000)
+        return adc_channel==2?1000:260;
+    if(scenario==52 && start_us && clock_us-start_us>=1800000 && clock_us-start_us<1940000)
+        return adc_channel==2?1000:180; /* Weak centre, no right-side ink. */
     if(scenario==20 && adc_channel==2)return 180;
     if(scenario==28 && !start_us && adc_channel==2)return clock_us/50000%2?180:2000;
     if(scenario==27 && adc_channel==2){
@@ -151,9 +180,14 @@ bool add_repeating_timer_us(int64_t us,bool(*cb)(repeating_timer_t*),void*p,repe
 bool add_repeating_timer_ms(int32_t us,bool(*cb)(repeating_timer_t*),void*p,repeating_timer_t*t){(void)us;(void)p;(void)t;guard_callback=cb;return true;}
 void stdio_init_all(void){}bool stdio_usb_connected(void){return false;}int getchar_timeout_us(uint32_t us){(void)us;return -1;}
 void calibration_wifi_capture_init(void){}bool calibration_wifi_init(void){return true;}
-void calibration_wifi_poll(bool allowed){(void)allowed;if(scenario==4&&!block_done&&start_us&&clock_us-start_us>500000){block_done=true;advance(200000);assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);}}
+void calibration_wifi_poll(bool allowed){(void)allowed;
+    if(scenario==52&&!block_done&&start_us&&clock_us-start_us>1700000){
+        block_done=true;course.bend_direction=1;course.bend_hint_us=clock_us;
+        course.bend_source="RECOVERY_PRIOR";course.center_trim.last_good=1;
+    }
+    if(scenario==4&&!block_done&&start_us&&clock_us-start_us>500000){block_done=true;advance(200000);assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);}}
 int calibration_wifi_getchar(void){
-    if(!command_sent){command_sent=true;return scenario>=34?'o':(scenario>=29&&scenario<=31)?'v':'q';}
+    if(!command_sent){command_sent=true;return scenario>=34&&scenario<=44?'o':(scenario>=29&&scenario<=31)?'v':'q';}
     if(scenario==29 && optical_pending && clock_us>4000000 && !input_count++){return 'x';}
     if((scenario>=29&&scenario<=31))return -1;
     if(scenario==36&&avoidance.phase==AVOID_SCAN_OUT&&!input_count++)return 'x';
@@ -162,6 +196,9 @@ int calibration_wifi_getchar(void){
 }
 course_config_t calibration_wifi_course_config(void){return (course_config_t){scenario>=16?'s':scenario==11?'b':scenario==12?'R':scenario==13?'x':(scenario==14||scenario==15)?'l':scenario>=7?'r':'s',scenario==14?'R':scenario==15?'x':'s',120};}
 uint32_t calibration_wifi_max_poll_us(void){return 0;}void calibration_wifi_help(void){}void calibration_wifi_reset_timing(void){}
+static unsigned exported_samples;
+void calibration_wifi_set_waveform(const uint16_t *samples,unsigned count,const char *details,uint32_t id,uint32_t hash)
+{(void)id;(void)hash;exported_samples=count;if(count){assert(samples&&details&&strstr(details,"[WAVEFORM PROFILE]"));}}
 void encoders_init(void){}encoder_sample_t encoders_snapshot(void){
     if((scenario==42||scenario==43)&&avoidance.phase==AVOID_TURN_OUT&&motion_left_position(&avoidance.leg,(encoder_sample_t){(uint32_t)-(int32_t)left_count,(uint32_t)(int32_t)right_count,0,0})>400)injected_right_invalid=scenario==42?1:3;
     return (encoder_sample_t){(uint32_t)-(int32_t)left_count,(uint32_t)(int32_t)right_count,scenario==5&&start_us&&clock_us-start_us>500000,injected_right_invalid};}
@@ -172,8 +209,10 @@ static void independent_phase_level(bool black,unsigned duration)
 {
     for(unsigned t=0;t<duration;t+=BARCODE_SAMPLE_US){
         clock_us+=BARCODE_SAMPLE_US;
+        left_count+=0.3;right_count+=0.3; /* physical forward600 counts/s */
         barcode_sampler_sample(&barcode_sampler,black?2100:190,(uint32_t)clock_us);
-        barcode_sampler.stats.motion_breaks++; /* deliberately reversing metadata */
+        waveform_sample(black?2100:190,(uint32_t)clock_us);
+        barcode_sampler.stats.motion_breaks++; /* old diagnostics cannot suppress the new reader */
         if(clock_us%10000u==0)barcode_drain(false);
     }
 }
@@ -188,14 +227,16 @@ static void independent_phase_test(void)
         stream_logged=0;stream_paused_fragments=0;barcode_trace_count=0;
         barcode_trace_overflow=false;
         barcode_sampler_begin_levels(&barcode_sampler,226,220);
+        waveform_enabled=true;waveform_head=waveform_tail=waveform_divider=0;waveform_overflow=false;
+        barcode_waveform_begin(&waveform);
         barcode_capture_begin_stream(&barcode_capture,0);
         barcode_capture.independent_optical=true;barcode_capture.waiting_gap=true;
         independent_phase_level(false,400000);
         const unsigned patterns[]={0x094,0x0d0,0x094};
         for(unsigned ch=0;ch<3;ch++){
             for(int bit=8;bit>=0;bit--)
-                independent_phase_level(!(bit%2),(patterns[ch]&(1u<<bit))?45000:15000);
-            if(ch<2)independent_phase_level(false,15000);
+                independent_phase_level(!(bit%2),(patterns[ch]&(1u<<bit))?90000:30000);
+            if(ch<2)independent_phase_level(false,30000);
         }
         independent_phase_level(false,400000);barcode_drain(false);
         assert(barcode_capture.event_count==1 && barcode_capture.events[0].letter=='Z');
@@ -205,14 +246,44 @@ static void independent_phase_test(void)
     }
     puts("PASS production barcode drain during LOST/TURN/SEEK/BRAKE; Z decoded and action deferred without resetting capture.");
 }
+static void waveform_fault_test(void)
+{
+    course_run=true;course=(course_control_t){0};course.phase=COURSE_FOLLOW;
+    waveform_enabled=true;waveform_head=waveform_tail=waveform_divider=0;waveform_overflow=false;
+    barcode_waveform_begin(&waveform);barcode_sampler_begin_levels(&barcode_sampler,226,220);
+    barcode_capture_begin_stream(&barcode_capture,0);
+    /* More than a second without a drain must fail closed, never silently
+     * lose grey samples and emit an actionable letter. */
+    for(unsigned i=0;i<2200;i++){clock_us+=500;waveform_sample(190,(uint32_t)clock_us);}
+    barcode_drain(false);
+    assert(waveform_overflow && barcode_capture.integrity_fault && !barcode_capture.event_count && !course.route_updates);
+    waveform_head=waveform_tail=waveform_divider=0;waveform_overflow=false;
+    barcode_waveform_begin(&waveform);barcode_capture_begin_stream(&barcode_capture,0);
+    independent_phase_level(false,400000);independent_phase_level(true,20000);
+    clock_us+=4000;independent_phase_level(true,20000);barcode_drain(false);
+    assert((waveform.timing_faults || barcode_sampler.stats.gap_fault) && barcode_capture.integrity_fault && !barcode_capture.event_count && !course.route_updates);
+    puts("PASS production waveform queue overflow and missing grey samples block route actions.");
+}
 #endif
 int main(int argc,char **argv)
 {
     assert(argc==2);scenario=(unsigned)atoi(argv[1]);
 #if ROBOCAR_CENTER_LINE
     if(scenario==33){independent_phase_test();return 0;}
+    if(scenario==49){waveform_fault_test();return 0;}
 #endif
     if(!setjmp(done))firmware_main();
+    if(scenario>=45){
+        assert(start_us && stop_us && !pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);
+        assert(waveform_enabled && !barcode_capture.integrity_fault && exported_samples);
+        assert(strstr(output,"[WAVEFORM RESULT] reader=LOCAL_EXTREMA"));
+        if(scenario==48)assert(!barcode_capture.event_count && !course.route_updates);
+        else assert(barcode_capture.event_count==1 && barcode_capture.events[0].letter==(scenario>=50?'Z':'A'));
+        if(scenario==50)assert(waveform.saved.profile[0].windows>1);
+        if(scenario==51)assert(course.bend_attempts==1 && course.bend_completed==1 && !course.recoveries && course.right_previews==1);
+        if(scenario==52)assert(block_done && !course.bend_attempts && !course.right_previews && !course.recoveries);
+        puts("PASS production waveform: faint bars, high floor/grey gaps, variable bar contrast or incomplete-frame rejection.");return 0;
+    }
     if(scenario>=34){
         assert(start_us&&stop_us);
         assert(!pwm[4][0]&&!pwm[4][1]&&!pwm[5][0]&&!pwm[5][1]);
@@ -254,24 +325,23 @@ int main(int argc,char **argv)
         assert(course.center_reference==667 && !course.trim_attempts && !course.recoveries);
         assert(strstr(output,"frozen_for_run=1") && strstr(output,"fixed_ref=667"));
     }
-    if(scenario==18){assert(course.recoveries>=1 && strstr(output,"EXTERNAL_STOP"));}
+    if(scenario==18){assert(!course.recoveries && course.loss_coasts==1 && strstr(output,"EXTERNAL_STOP"));}
     if(scenario==19){assert(strstr(output,"CENTER_LINE_NOT_REACQUIRED"));}
-    if(scenario==21||scenario==22){assert(strstr(output,"CENTER_LOCAL_RECOVERY_EXHAUSTED"));assert(!course.recoveries);}
-    if(scenario==23){assert(course.recoveries==1 && strstr(output,"EXTERNAL_STOP"));}
+    if(scenario==21||scenario==22){assert(strstr(output,"CENTER_LINE_NOT_REACQUIRED"));assert(!course.recoveries && course.center_search.limit==120);}
+    if(scenario==23){assert(!course.recoveries && course.loss_coasts==1 && strstr(output,"EXTERNAL_STOP"));}
     if(scenario==24||scenario==25){
         assert(course.trim_attempts==1 && !course.recoveries);
         assert(strstr(output,"reads=1 sequence=Y") && !stream_paused_fragments);
         assert(course.junctions==2);
     }
     if(scenario==32){
-        assert(course.recoveries==1 && !stream_paused_fragments);
+        assert(!course.recoveries && course.loss_coasts==1 && !stream_paused_fragments);
         assert(!barcode_capture.motion_aborts && !barcode_capture.zero_distance_aborts && !barcode_capture.pause_timeouts);
-        assert(strstr(output,"reads=1 sequence=Z") && strstr(output,"width_source=TIME"));
+        assert(strstr(output,"reads=1 sequence=Z") && strstr(output,"width_source=PROJECTED_GP26_DISTANCE"));
     }
     if(scenario==26){
-        /* Optical timestamps remain usable while wheels stop: a moving
-         * printed strip under a stationary sensor must still be readable. */
-        assert(course.recoveries==1 && stream_paused_fragments==0);
+        /* A short centre-sensor gap coasts without resetting the barcode reader. */
+        assert(!course.recoveries && course.loss_coasts==1 && stream_paused_fragments==0);
         assert(!barcode_capture.zero_distance_aborts && !barcode_capture.motion_aborts);
         if(!strstr(output,"reads=2 sequence=YY")){fputs(output,stderr);assert(0);}
     }
@@ -283,7 +353,7 @@ int main(int argc,char **argv)
     const char *expected=scenario<18?reasons[scenario]:scenario==18?"EXTERNAL_STOP":"CENTER_LINE_NOT_REACQUIRED";
 #if ROBOCAR_CENTER_LINE
     if(scenario==9)expected="CENTER_LINE_NOT_REACQUIRED";
-    if(scenario==21||scenario==22)expected="CENTER_LOCAL_RECOVERY_EXHAUSTED";
+    if(scenario==21||scenario==22)expected="CENTER_LINE_NOT_REACQUIRED";
     if(scenario==23||scenario==24||scenario==25||scenario==26||scenario==27||scenario==32)expected="EXTERNAL_STOP";
 #endif
     if(!strstr(output,expected)){fputs(output,stderr);assert(0);}

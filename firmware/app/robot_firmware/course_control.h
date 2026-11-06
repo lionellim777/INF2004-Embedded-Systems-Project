@@ -35,6 +35,12 @@ typedef struct {
     uint64_t bend_hint_us, bend_ready_us, bend_start_us, bend_strong_us;
     int32_t bend_ready_l, bend_ready_r, bend_l, bend_r;
     unsigned bend_attempts, bend_completed, bend_fallbacks;
+    /* Current mounting is centre+right, not a symmetric straddling pair. */
+    bool flow_follow, right_level_valid, right_preview, right_preview_tracking, loss_coast;
+    int32_t right_level,coast_l,coast_r;
+    uint64_t right_preview_since,coast_us;
+    unsigned right_previews,loss_coasts;
+    const char *bend_source,*bend_exit;
     uint64_t start_us,last_us,segment_us,phase_us,both_us,clear_us,seek_us;
     int32_t segment_l,segment_r,entry_l,entry_r,exit_l,exit_r,seek_l,seek_r;
     unsigned junctions,turns,route_updates,replacements,deferred_replacements;
@@ -61,4 +67,6 @@ void course_set_center_reference(course_control_t *c,int32_t level);
  * clearance permission. Optical stability and recovery always take priority. */
 void course_set_cruise_limit(course_control_t *c,unsigned cps);
 void course_note_barcode_activity(course_control_t *c,uint64_t now);
+void course_enable_flow_follow(course_control_t *c,bool enabled);
+void course_right_level(course_control_t *c,int32_t level);
 #endif

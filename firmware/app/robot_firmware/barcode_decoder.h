@@ -23,4 +23,15 @@ bool barcode_decode_code39_letter(
 /* Reads packed capture directly, without a second 29-element array. */
 bool barcode_decode_code39_packed(const barcode_runs_t *runs, char *letter);
 
+/* Diagnostic inspection of the strict path. Does not change acceptance, and
+ * may report an outer-bar width failure for a frame the bounded fallback reads. */
+enum { BARCODE_WIDTH_OK, BARCODE_WIDTH_RANGE, BARCODE_WIDTH_TIE,
+    BARCODE_WIDTH_OFFSET, BARCODE_WIDTH_SEPARATION, BARCODE_WIDTH_NARROW_SPREAD,
+    BARCODE_WIDTH_WIDE_SPREAD, BARCODE_WIDTH_OUTER };
+typedef struct {
+    uint16_t patterns[3];
+    uint8_t width_reason[3], guards, separators, reversed, score;
+} barcode_decode_diagnostic_t;
+void barcode_inspect_code39(const uint32_t runs[29],barcode_decode_diagnostic_t *out);
+
 #endif

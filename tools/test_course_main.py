@@ -31,6 +31,6 @@ for name in ['hardware/adc.h','hardware/sync.h','hardware/clocks.h','hardware/pw
 env=dict(os.environ,SDKROOT='/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk')
 center='--center' in sys.argv
 exe=build/('course_center_main_test' if center else 'course_main_test')
-sources=['obstacle_bypass.c','course_control.c','motion_control.c','barcode_acquisition.c','barcode_reader.c','barcode_decoder.c','run_diagnostics.c','navigation_commands.c']
+sources=['obstacle_bypass.c','course_control.c','motion_control.c','barcode_acquisition.c','barcode_reader.c','barcode_decoder.c','barcode_waveform.c','run_diagnostics.c','navigation_commands.c']
 subprocess.run(['clang','-std=c11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-DROBOCAR_WIRELESS_CALIBRATION=1','-DROBOCAR_CENTER_LINE='+str(int(center)),'-I'+str(stubs),'-I'+str(app),str(root/'firmware/tests/course_main_test.c')]+[str(app/s) for s in sources]+['-lm','-o',str(exe)],check=True,env=env)
-for scenario in range(45 if center else 18):subprocess.run([str(exe),str(scenario)],check=True,env=env)
+for scenario in range(53 if center else 18):subprocess.run([str(exe),str(scenario)],check=True,env=env)

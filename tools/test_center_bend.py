@@ -8,7 +8,7 @@ app = root / 'firmware/app/robot_firmware'
 build = root / 'build/center-bend-host-tests'
 build.mkdir(parents=True, exist_ok=True)
 env = dict(os.environ, SDKROOT='/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk')
-for name in ['center_bend_test', 'center_course_test']:
+for name in ['center_bend_test', 'center_course_test', 'flow_bend_test']:
     exe = build / name
     subprocess.run(['clang', '-std=c11', '-Wall', '-Wextra', '-Werror',
                     '-fsanitize=address,undefined', '-I'+str(app),

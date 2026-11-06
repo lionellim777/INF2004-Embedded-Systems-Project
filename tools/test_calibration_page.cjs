@@ -5,16 +5,27 @@ const browser=await chromium.launch({headless:true,executablePath:'/Applications
 try {
 const page=await browser.newPage({viewport:{width:1100,height:1000}});
 let boot='00112233',offline=false,idle=true,commands=[],errors=[],reply='',continuous=false,resultRequests=0;
+let waveMode='none',waveRequests=0;
+const waveWords=Array.from({length:9000},(_,i)=>0x2000+i);
+let waveHash=2166136261;for(const word of waveWords){waveHash=Math.imul(waveHash^(word&255),16777619)>>>0;waveHash=Math.imul(waveHash^(word>>>8),16777619)>>>0;}
 page.on('pageerror',e=>errors.push(e.message));
 await page.route('http://192.168.4.1/**',async r=>{
  const u=new URL(r.request().url());
  if(offline){await r.abort();return;}
  if(u.pathname==='/'){await r.fulfill({contentType:'text/html',body:fs.readFileSync('firmware/app/robot_firmware/wireless/calibration.html','utf8')});return;}
  if(u.pathname==='/logs'){
-  let body=u.searchParams.get('since')==='0'?'AAI10 MOTION INTEGRATION v5.56 WIRELESS\nRun=0 State=STOPPED\n':'';
+  let body=u.searchParams.get('since')==='0'?'AAI10 MOTION INTEGRATION v5.61 WIRELESS\nRun=0 State=STOPPED\n':'';
   body+=reply;reply='';await r.fulfill({headers:{'X-Boot':boot,'X-Next':'80','X-Gap':'0','X-Idle':idle?'1':'0'},body});return;
  }
  if(u.pathname==='/result'){resultRequests++;await r.fulfill({body:continuous?'[MOTION STOP] GP20\n[MOTION SETTLED] CONTINUOUS_SCAN\n[BARCODE RESULT] mode=CONTINUOUS reads=2 sequence=AZ\n':'[OPTICAL RESULT] motors=OFF samples=5000 raw=172..2782 max_gap_us=1017 empty_bins=0 aborted=0 sampling_ok=1\n'});return;}
+ if(u.pathname==='/waveform'){
+  waveRequests++;if(waveMode==='none'){await r.fulfill({status:404,body:'No frozen scan'});return;}
+  const offset=Number(u.searchParams.get('offset')),words=waveWords.slice(offset,offset+256);
+  if(waveMode==='corrupt'&&!offset)words[0]^=1;
+  const id=waveMode==='changed'&&offset?88:77;
+  const body=(offset?'':'[WAVEFORM SNAPSHOT] id=77 samples=9000\n[WAVEFORM PROFILE] test=1\n')+'[WAVEFORM CHUNK] id='+id+' offset='+offset+' count='+words.length+' total=9000 fnv='+waveHash.toString(16).padStart(8,'0')+' packed='+words.map(v=>v.toString(16).padStart(4,'0')).join('')+'\n';
+  await r.fulfill({headers:{'X-Boot':boot},body});return;
+ }
  if(u.pathname.startsWith('/command/')||u.pathname.startsWith('/mission/')){
   assert.equal(r.request().method(),'POST');assert.equal(r.request().headers()['x-calibrate'],'1');commands.push(u.pathname);await r.fulfill({status:202,body:'Request queued.'});return;
  }
@@ -22,7 +33,8 @@ await page.route('http://192.168.4.1/**',async r=>{
 });
 await page.goto('http://192.168.4.1/');await page.waitForFunction(()=>document.getElementById('connection').className==='online');
 assert.equal(await page.locator('button:visible').count(),3);assert.equal(await page.locator('#recover').count(),0);
-assert.equal(await page.locator('#test-mode').inputValue(),'o');assert(!(await page.locator('#technical').getAttribute('open')));
+assert.equal(await page.locator('#test-mode').inputValue(),'course');
+await page.locator('#test-mode').selectOption('o');assert(!(await page.locator('#technical').getAttribute('open')));
 await page.locator('#prepare').click();assert.equal(commands.at(-1),'/command/o');
 assert(await page.locator('#optical-panel').isHidden());assert(await page.locator('#course-options').isHidden());
 // Exercise the actual firmware acknowledgement, including the word disabled.
@@ -61,7 +73,7 @@ await page.screenshot({path:'build/wireless-host-tests/calibration-desktop.png',
 await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(200);await page.screenshot({path:'build/wireless-host-tests/calibration-mobile.png',fullPage:true});
 assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
 const downloadPromise=page.waitForEvent('download');await page.locator('#download').click();await(await downloadPromise).saveAs('build/wireless-host-tests/browser-test-download.txt');
-const saved=fs.readFileSync('build/wireless-host-tests/browser-test-download.txt','utf8');assert(saved.includes('v5.56'));assert(saved.includes('[OPTICAL RESULT]'));assert(saved.includes('[OPTICAL DATA]'));assert(saved.includes('Physical observations supplied separately in chat.'));
+const saved=fs.readFileSync('build/wireless-host-tests/browser-test-download.txt','utf8');assert(saved.includes('v5.61'));assert(saved.includes('[OPTICAL RESULT]'));assert(saved.includes('[OPTICAL DATA]'));assert(saved.includes('Physical observations supplied separately in chat.'));
 for(const ch of ['f','l','r','u']){await page.locator('#test-mode').selectOption(ch);await page.locator('#prepare').click();assert.equal(commands.at(-1),'/command/'+ch);assert((await page.locator('#start-help').innerText()).includes('press GP20'));}
 await page.locator('#test-mode').selectOption('course');assert(await page.locator('#optical-panel').isHidden());
 await page.locator('#prepare').click();assert.equal(commands.at(-1),'/mission/s/s/120');
@@ -79,7 +91,11 @@ assert(!(await page.locator('#message').innerText()).includes('slide'));
 reply='[OPTICAL RESULT] motors=OFF samples=5000 raw=180..2400 max_gap_us=1010 empty_bins=0 aborted=0 sampling_ok=1 source=DRIVE\n[OPTICAL DATA] bin=0 190:240\n[OPTICAL END] window_ms=10\n';
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('Recording saved'));
 assert.deepEqual(await page.evaluate(()=>opticalBins[0]),[190,240]);
-continuous=true;const streamDownload=page.waitForEvent('download');await page.locator('#download').click();await(await streamDownload).saveAs('build/wireless-host-tests/browser-stream-download.txt');assert(fs.readFileSync('build/wireless-host-tests/browser-stream-download.txt','utf8').includes('reads=2 sequence=AZ'));assert(fs.readFileSync('build/wireless-host-tests/browser-stream-download.txt','utf8').includes('source=DRIVE'));
+continuous=true;idle=true;await page.waitForFunction(()=>robotIdle);const streamDownload=page.waitForEvent('download');await page.locator('#download').click();await(await streamDownload).saveAs('build/wireless-host-tests/browser-stream-download.txt');assert(fs.readFileSync('build/wireless-host-tests/browser-stream-download.txt','utf8').includes('reads=2 sequence=AZ'));assert(fs.readFileSync('build/wireless-host-tests/browser-stream-download.txt','utf8').includes('source=DRIVE'));
+waveMode='good';waveRequests=0;const fullWave=page.waitForEvent('download');await page.locator('#download').click();await(await fullWave).saveAs('build/wireless-host-tests/browser-waveform-download.txt');
+const waveSaved=fs.readFileSync('build/wireless-host-tests/browser-waveform-download.txt','utf8');assert(waveSaved.includes('[WAVEFORM COMPLETE] samples=9000 checksum=OK'));assert(waveSaved.includes('offset=8960 count=40'));assert.equal(waveRequests,36);
+for(const bad of ['corrupt','changed']){waveMode=bad;const broken=page.waitForEvent('download');await page.locator('#download').click();const path='build/wireless-host-tests/browser-waveform-'+bad+'.txt';await(await broken).saveAs(path);assert(fs.readFileSync(path,'utf8').includes('[WAVEFORM EXPORT INCOMPLETE]'));assert((await page.locator('#message').innerText()).includes('incomplete'));}
+waveMode='none';
 offline=true;await page.waitForFunction(()=>document.getElementById('connection').className==='offline');assert(await page.locator('#prepare').isDisabled());
 const cached=await page.evaluate(()=>downloadedResult);assert(cached.includes('reads=2'));
 await page.evaluate(()=>recover());assert.equal(await page.evaluate(()=>downloadedResult),cached);
