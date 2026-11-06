@@ -231,9 +231,9 @@ static void curved_matrix(void)
     for(unsigned t=0;t<50;t++){left++;right++;clock_us+=2000;assert(!barcode_waveform_update_motion(&w,2100,clock_us,(uint32_t)-left,(uint32_t)right,&letter));}
     left-=20;right-=20;clock_us+=2000;assert(!barcode_waveform_update_motion(&w,2100,clock_us,(uint32_t)-left,(uint32_t)right,&letter));
     left+=40;right-=40;clock_us+=2000;assert(!barcode_waveform_update_motion(&w,2100,clock_us,(uint32_t)-left,(uint32_t)right,&letter));
-    assert(w.motion_fault && w.motion_faults && !reads);
-    barcode_waveform_save_partial(&w);assert(w.saved.reason==WAVE_MOTION && w.attempts[0].reason==WAVE_MOTION);
-    puts("PASS52 analytic right-bend A-Z/orientation scans with offset sensor; lateral path mismatch cannot produce a letter.");
+    assert(!w.motion_fault && !w.motion_faults && w.lateral_recrosses && !reads);
+    barcode_waveform_save_partial(&w);assert(w.saved.reason==WAVE_STOPPED_PARTIAL && !w.saved.letter);
+    puts("PASS52 analytic right-bend A-Z/orientation scans with offset sensor; lateral shift alone does not invent a letter or invalidate long bars.");
 }
 static void spatial_sequence(void)
 {
@@ -270,9 +270,84 @@ static void recorded_half_z(const char *path)
     assert(barcode_waveform_decode(&w,&letter) && letter=='Z');
     puts("PASS archived physical half-Z decoder-input fixture:2202 samples, FNVbec1cc17, pattern Z; batch replay only.");
 }
+static void new_bend_fixture(const char *path)
+{
+    begin();FILE*f=fopen(path,"rb");assert(f);uint16_t words[16384];
+    unsigned n=(unsigned)fread(words,2,16384,f);fclose(f);assert(n==4924);
+    uint32_t hash=2166136261u;
+    for(unsigned i=0;i<n;i++){hash=(hash^(words[i]&255))*16777619u;hash=(hash^(words[i]>>8))*16777619u;}
+    assert(hash==0x9a48ce7eu);w.motion=true;w.count=n/2;
+    for(unsigned i=0;i<w.count;i++){w.sample[i]=words[2*i];w.position[i]=(int16_t)words[2*i+1];}
+    char letter=0;assert(barcode_waveform_decode(&w,&letter) && letter=='Z');
+    assert((w.coherent_mask&0xcu)==0xcu);
+    /* The earlier half-A has a complete bounded-width A candidate. */
+    uint32_t a[29]={19762,61431,72229,72455,70852,68604,20829,119475,26725,60867,71206,67327,21000,123666,25564,47770,26600,62891,66804,64133,26238,58806,71261,73630,67544,70343,9750,131311,15219};
+    assert(!barcode_decode_code39_letter(a,&letter));
+    assert(barcode_decode_code39_coherent(a,&letter) && letter=='A');
+    /* Exhaust invalid guard ranks; no amount of bounded jitter may invent *. */
+    unsigned rejected=0;
+    for(unsigned guard=0;guard<512;guard++){
+        if(guard==0x094 || guard==0x052)continue;
+        for(unsigned i=0;i<29;i++){unsigned ch=i/10,e=i%10,p=ch==1?0x109:guard;
+            a[i]=(e<9 && (p&(1u<<(8-e))))?80000:40000;}
+        assert(!barcode_decode_code39_coherent(a,&letter));rejected++;
+    }
+    for(unsigned i=0;i<29;i++){unsigned ch=i/10,e=i%10,p=ch==1?0x109:0x094;
+        a[i]=(e<9 && (p&(1u<<(8-e))))?56000:40000;}
+    assert(!barcode_decode_code39_coherent(a,&letter)); /*1.4 ratio */
+    printf("PASS captured bend Z consensus and half-A width candidate; %u invalid guard pairs and1.4 ratio rejected. Batch evidence only.\n",rejected);
+}
+static void geometry_model_matrix(void)
+{
+    unsigned decoded=0;
+    for(unsigned c=0;c<26;c++)for(unsigned reverse=0;reverse<2;reverse++)for(unsigned size=0;size<2;size++){
+        uint32_t runs[29];unsigned pat[]={0x094,patterns[c],0x094};
+        unsigned n=size?81000:40500;
+        for(unsigned i=0;i<29;i++){
+            bool wide=i%10<9 && (pat[i/10]&(1u<<(8-i%10)));
+            /* Edge bias cancels at adjacent black-bar centres, unlike raw
+             * narrow-black duration. Narrow appearance can be <old8 counts. */
+            int bias=(int)(n*85/100);runs[i]=n*(wide?3u:1u)+(i%2?bias:-bias);
+        }
+        uint32_t ordered[29];for(unsigned i=0;i<29;i++)ordered[i]=runs[reverse?28-i:i];
+        char letter=0;assert(barcode_decode_code39_geometry(ordered,&letter) && letter=='A'+(int)c);decoded++;
+        ordered[14]+=n*2;assert(!barcode_decode_code39_geometry(ordered,&letter)); /* missing/expanded interior element */
+    }
+    unsigned rejected=0;
+    for(unsigned g=0;g<512;g++){
+        if(g==0x094||g==0x052)continue;
+        uint32_t runs[29];for(unsigned i=0;i<29;i++)runs[i]=(i%10<9 && ((i/10==1?0x109:g)&(1u<<(8-i%10))))?121500:40500;
+        char letter=0;assert(!barcode_decode_code39_geometry(runs,&letter));rejected++;
+    }
+    printf("PASS geometry model:%u A-Z/orientation/print-size biased frames; expanded interior elements and %u invalid guard pairs rejected.\n",decoded,rejected);
+}
+static void long_bar_recross(void)
+{
+    for(unsigned outside=0;outside<2;outside++){
+        begin();w.motion=true;float x=-300;bool backed=false;unsigned reverse=0;
+        for(unsigned tick=0;tick<4000;tick++){
+            if(x>=980&&!backed){backed=true;reverse=50;}
+            x+=reverse?-1:1;if(reverse)reverse--;
+            float y=backed?(outside?2100.0f:135.0f):0; /* ~156mm or10mm */
+            uint16_t raw=190;int at=(int)x;
+            for(unsigned i=0;i<29&&at>=0;i++){
+                unsigned p=i/10==1?0x0d0:0x094;
+                int width=(i%10<9 && (p&(1u<<(8-i%10))))?120:40;
+                if(at<width){if(!outside || !backed)raw=i%2?200:2100;break;}
+                at-=width;
+            }
+            clock_us+=2000;w.sensor_x=x;w.sensor_y=y;char letter=0;
+            if(barcode_waveform_update(&w,raw,clock_us,&letter)){assert(letter=='Z');reads++;}
+        }
+        if(outside)assert(!reads); /* after leaving the print, guard is missing */
+        else assert(reads==1 && !w.motion_faults && w.lateral_recrosses);
+    }
+    puts("PASS10mm transverse recross within simulated260mm bars; leaving the printed band cannot complete a partial frame.");
+}
 int main(int argc,char **argv)
 {
-    assert(argc==2);recorded_half_z(argv[1]);
+    geometry_model_matrix();long_bar_recross();
+    assert(argc==3);recorded_half_z(argv[1]);new_bend_fixture(argv[2]);
     spatial_sequence();curved_matrix();spatial_matrix();matrix();rejection_and_recovery();noisy_corpus();prefix_and_export();
     for(unsigned i=0;i<sizeof(recorded)/sizeof(recorded[0]);i++)for(unsigned reverse=0;reverse<2;reverse++){
         begin();samples(190,600000);

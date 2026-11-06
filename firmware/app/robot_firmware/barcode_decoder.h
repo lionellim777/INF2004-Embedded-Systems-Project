@@ -34,4 +34,7 @@ typedef struct {
 } barcode_decode_diagnostic_t;
 void barcode_inspect_code39(const uint32_t runs[29],barcode_decode_diagnostic_t *out);
 
+/* Waveform-only model candidate; caller must enforce two-profile consensus. */
+bool barcode_decode_code39_coherent(const uint32_t runs[29],char *letter);
+bool barcode_decode_code39_geometry(const uint32_t runs[29],char *letter);
 #endif

@@ -1,3 +1,19 @@
+## 2026-11-07 — v5.63 barcode decoder accepted on the current home setup
+
+**Barcode decoding: implementation complete and physically validated for the
+current full-A / half-A / right-bend half-Z test.** Two distinct physical runs
+both accepted exactly `AAZ`:6/6 target reads, zero sampling-integrity faults,
+and normal `OBSTACLE_STOP` outcomes. The user confirms the Z scans traversed the
+bend; their captures include20/25deg measured yaw. Freeze v5.63 as the working
+barcode baseline and move on to remaining integration work.
+
+This closes the tested decoding feature, not universal reliability or physical
+A-Z coverage. Barcode-triggered navigation, final-course/RTOS/telemetry integration
+and obstacle-mode barcode policy remain separate. The raw waveform download was
+incomplete, but both accepted event sets and run summaries are retained.
+[Acceptance record and source log](testing/barcode-v5_63-acceptance.md).
+[Current remaining project work](project-next-steps.md).
+
 ## 2026-11-03 — v5.56 scanned departure, right-first rejoin and rolling bends
 
 Evidence: `AAI10-motion-2026-11-03T08-15-28-377Z.txt`, v5.55. The retained

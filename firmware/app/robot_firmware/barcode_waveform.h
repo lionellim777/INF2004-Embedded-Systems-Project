@@ -27,22 +27,23 @@ typedef struct {
 } barcode_wave_profile_t;
 typedef struct {
     uint16_t sample[2u*BARCODE_WAVE_SAMPLES],count,paper;
-    bool motion;
+    bool motion; uint8_t coherent_mask,geometry_mask; uint16_t signal_range;
     uint32_t start_us,leading_us,white_us,duration_us,checksum;
     uint8_t reason;
     char letter;
     barcode_wave_profile_t profile[6];
 } barcode_wave_snapshot_t;
 typedef struct {
-    uint32_t start_us,duration_us; uint16_t samples,raw_min,raw_max,lateral_mm,yaw_deg; uint8_t reason; char letter;
+    uint32_t start_us,duration_us; uint16_t samples,raw_min,raw_max,lateral_mm,yaw_deg; uint8_t reason,coherent_mask,geometry_mask; char letter;
     barcode_wave_profile_t best;
 } barcode_wave_attempt_t;
 #define BARCODE_WAVE_ATTEMPTS 32u
 typedef struct {
     uint16_t sample[BARCODE_WAVE_SAMPLES];
     int16_t position[BARCODE_WAVE_SAMPLES];
+    uint32_t edge_work[95],fit_work[29],geometry_work[29];
     bool motion, motion_seen, motion_fault, odometry_fault, recrossing;
-    uint32_t left_raw,right_raw,motion_faults,recrosses,stationary_samples,white_counts;
+    uint32_t left_raw,right_raw,motion_faults,recrosses,stationary_samples,white_counts,lateral_recrosses;
     uint8_t frame_reason; bool partial_saved; float start_yaw;
     float pose_x,pose_y,yaw,sensor_x,sensor_y,axis_cos,axis_sin,origin_x,origin_y;
     float frontier_y,max_lateral,max_yaw; int32_t progress,frontier,white_frontier;
@@ -54,7 +55,7 @@ typedef struct {
     uint32_t last_runs[BARCODE_CODE39_RUN_COUNT];
     uint16_t last_prominence, last_extrema;
     uint16_t profile_extrema[6];
-    uint8_t complete_profiles;
+    uint8_t complete_profiles,coherent_mask,geometry_mask;
     uint32_t capture_start_us;
     barcode_wave_profile_t profile[6];
     barcode_wave_snapshot_t saved;

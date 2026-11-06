@@ -3,7 +3,7 @@
 Batch pattern replay does not prove a moving path or missing quiet zone valid.
 """
 from pathlib import Path
-import json, os, re, struct, subprocess, sys
+import json, os, re, struct, subprocess, sys, argparse
 
 root=Path(__file__).resolve().parents[1]
 app=root/'firmware/app/robot_firmware'
@@ -30,7 +30,12 @@ env=dict(os.environ,SDKROOT='/Library/Developer/CommandLineTools/SDKs/MacOSX26.5
 subprocess.run(['clang','-std=c11','-O1','-Wall','-Wextra','-Werror',
     '-fsanitize=address,undefined','-I'+str(app),str(driver),str(app/'barcode_waveform.c'),
     str(app/'barcode_decoder.c'),'-lm','-o',str(exe)],check=True,env=env)
-for name in sys.argv[1:]:
+parser=argparse.ArgumentParser()
+parser.add_argument('--expect',help='Expected batch letters, one per log; - means no acceptance assertion')
+parser.add_argument('files',nargs='+')
+args=parser.parse_args()
+if args.expect and len(args.expect)!=len(args.files):parser.error('--expect must contain one letter per log')
+for input_index,name in enumerate(args.files):
     text=Path(name).read_text()
     header=re.search(r'^\[WAVEFORM SNAPSHOT\].*',text,re.M)
     if not header:raise ValueError(f'{name}: missing frozen snapshot')
@@ -46,7 +51,7 @@ for name in sys.argv[1:]:
         for byte in (word&255,word>>8):checksum=((checksum^byte)*16777619)&0xffffffff
     assert f'{checksum:08x}'==meta['fnv']
     packed=build/(Path(name).stem+'.bin');packed.write_bytes(struct.pack('<'+'H'*len(words),*words))
-    expected=meta['letter'] if meta['result']=='ACCEPTED' else '-'
+    expected=args.expect[input_index] if args.expect else (meta['letter'] if meta['result']=='ACCEPTED' else '-')
     print(json.dumps({'file':Path(name).name,'samples':len(words),'checksum':'verified',
         'saved_result':meta['result'],'saved_letter':meta['letter']},sort_keys=True),flush=True)
     subprocess.run([str(exe),str(packed),expected,'motion' if meta.get('encoding')=='ADC12_MS4_POS16' else 'time'],check=True,env=env)

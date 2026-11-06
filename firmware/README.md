@@ -2,7 +2,7 @@
 
 ## Application
 
-`app/robot_firmware` contains the current integration milestone. It is not yet the final autonomous application and currently uses an early two-sensor line-following loop.
+`app/robot_firmware` contains the v5.63 Pico SDK calibration baseline: GP28 centre/GP27 right following, dedicated GP26 barcode decoding, encoder control, terrain monitoring, separate obstacle-bypass mode and local Wi-Fi diagnostics. Barcode decoding is physically validated on the current AAZ home route. The final combined mission and µT-Kernel/MQTT integration remain pending; see `../docs/project-next-steps.md`.
 
 ## Hardware tests
 

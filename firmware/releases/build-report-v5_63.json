@@ -1,0 +1,110 @@
+{
+  "version": "v5.63",
+  "file": "firmware/releases/robocar_motion_integration_v5_63_wireless.uf2",
+  "base_commit": "d0ecf835594276b3dbd10a15a827483a8e441fca",
+  "uncommitted_workspace": true,
+  "bytes": 1136128,
+  "blocks": 2219,
+  "sha256": "a4e2eccb6fb4e74cd49a6d25214bc1be1807c7e8c23de6664ecd32dac1f6a2a3",
+  "linked_text_bytes": 568016,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 223436,
+  "main_stack_reservation_bytes": 4096,
+  "target": "Pico W/RP2040; GP26 barcode, GP28 centre, GP27 right; WiFi core1",
+  "build": "Release -Wall -Wextra -Werror; local candidate, not flashed by agent",
+  "measurements": {
+    "half_narrow_mm": 3,
+    "half_wide_mm": 9,
+    "full_narrow_mm": 6,
+    "full_wide_mm": 18,
+    "black_white_same_ratio": true,
+    "reported_bar_height_mm_approx": 260,
+    "flat_rectangular_Z": true,
+    "route_tape_width_mm": 18,
+    "GP27_right_of_GP28_mm": 20,
+    "GP26_forward_mm": 80,
+    "GP26_left_mm": 85
+  },
+  "physical_v5_62_results": [
+    {
+      "run": 1,
+      "sequence": "",
+      "end": "CENTER_LINE_NOT_REACQUIRED"
+    },
+    {
+      "run": 2,
+      "sequence": "A",
+      "end": "OBSTACLE_STOP"
+    },
+    {
+      "run": 3,
+      "sequence": "A",
+      "end": "OBSTACLE_STOP"
+    }
+  ],
+  "changes": [
+    "Encoder-domain15-black-centre template model for all A-Z/directions, measured3:1 black/white geometry and3/6mm narrow scale +/-25%. Every centre and adjacent spacing residual <=0.65 modules; two-profile consensus and ambiguity rejection.",
+    "Apparent raw spatial width floor4mean counts; time-only floor8ms unchanged; failed-window widths retained.",
+    "Lateral shift along a long flat bar is telemetry rather than an unconditional3mm frame invalidation; optical/framing checks remain.",
+    "Flow-only expanding search adds480/720-count sweeps after120/240, endpoints roughly+/-360 (~27deg); original3s overall deadline and fault checks retained. Legacy/obstacle/commanded-turn policy unchanged.",
+    "Move decoder/drain workspace and retained main controller objects off stack; reserve4KiB main stack."
+  ],
+  "checks": [
+    "UF2 block magic/family/index/payload/contiguous flash bounds; version/feature markers; source HTML equals compiled header and is embedded in UF2.",
+    "Checksummed failed v5.62 recordings assert batch output A/Z/Z, respectively half-A from run1 and half-Z from runs2/3. This is not a full-course AAZ run.",
+    "104 A-Z/orientation/print-size edge-biased geometry cases; interior expansion and510 invalid guard cases reject.",
+    "Simulated10mm lateral recross within long bars accepted; leaving simulated print before final guard rejected. Existing832 contrast cases,3000 noisy cases,52 spatial and52 analytic bend cases plus negative framing/motion cases pass.",
+    "Expanded-search reach/bounds and original confirmation/global deadline regressions; controller suites.",
+    "53 centred/18 legacy actual-main cases;15 barcode/motion suites; obstacle and wireless/core1 checks.",
+    "Mock Chrome controls/mobile/9000-word waveform download, corrupt/change failures."
+  ],
+  "physical_status": "Two user-performed home-track AAZ passes verified from distinct accepted event sets;6/6 target reads including half-Z during turning. Current setup accepted; broader mission/physical coverage separate.",
+  "limits": [
+    "New geometric tolerances and nominal wheel geometry are provisional; physical false-positive tests remain required.",
+    "Model assumes a flat3:1 print with approximately known initial scan axis. Large skew, slip, missing stripes and leaving the bar band can fail.",
+    "No centred placement within reported bar height is assumed; lateral motion is accepted only when optical framing/model checks succeed.",
+    "The wider sweep can expire at the3s overall deadline before completing; no unbounded retry or guaranteed bend reacquisition.",
+    "Original invalidated full-A raw signal was not retained; its new result cannot be retrospectively established.",
+    "Prominence profiles share a measurement. Agreement is not an independent physical scan. Observed waveform work reached71037us in these two runs; worst-case execution time and stack high-water remain unverified."
+  ],
+  "procedure": "docs/testing/barcode-v5_63-measured-geometry.md",
+  "source_sha256": {
+    "barcode_waveform.c": "2e99dcf7cfbea3c4f521085deb3c9798b1f96154626cc8bf36cfcc33435b719f",
+    "barcode_waveform.h": "ef1012d20b2eee591ec727af0467260ef2f34de43a3f4af5ae273bf40fb92d3b",
+    "robot_firmware.c": "8b5a1adff95c07e09332024c31c9e96a8ad2a55ae09dd5a076d483b1300d7b84",
+    "course_control.c": "480ada0c3904c17b555ff489043a716aea1cf1638cc79b8c34c44254d7b6de6c",
+    "course_control.h": "41e580fd8f8d0ad2ffd88e4a95d09245fbca4d31d5043ca4b1b1640f05e2913d",
+    "center_trim.h": "1859d3962a7e81c8e3604f83573c9ca4872c7d29b18940bffef3b8ea5cd7c765",
+    "wireless/calibration.html": "b270d19f6f2874ae0cc99ceadc77ce3beb5076185e5cf35e5f5d484effe7f9e6",
+    "wireless/calibration_page.h": "12262618e7eb321526b25fc231c7b829599856e0b635a48595cfe8771b079ef9",
+    "center_search.h": "b20c3852ba5a85fae21ab63b6bfe448489285c30262665f79d93f7f75a99c5fa",
+    "barcode_decoder.c": "a4b11993a33edfb0cfef9c18d403fd235a2458d6094adf3d1e8e3a81cbc3afdd",
+    "barcode_decoder.h": "70b38e15cedce879a394761ba26b03fb18e3aad942aea4eeeb15167b84247c06",
+    "CMakeLists.txt": "13637ea567f9176815df2cab3ad0d2ce5e1d1598992ac79fb2f993c63fc19a4f"
+  },
+  "physical_validation": {
+    "date_local": "2026-11-07",
+    "build_time_status": "No physical v5.63 run performed. Replay validates stored scanner inputs, not live path/control timing or reliability.",
+    "source_log": "docs/testing/logs/20261107-v5_63-two-AAZ-runs.txt",
+    "accepted_sequences": [
+      "AAZ",
+      "AAZ"
+    ],
+    "target_reads": 6,
+    "integrity_faults": 0,
+    "outcomes": [
+      "OBSTACLE_STOP",
+      "OBSTACLE_STOP"
+    ],
+    "raw_waveform_export": "INCOMPLETE: Failed to fetch; no new raw-signal checksum verification",
+    "evidence": "docs/testing/barcode-v5_63-acceptance.md",
+    "observed_max_waveform_work_us": [
+      71037,
+      70022
+    ],
+    "observed_max_loop_us": [
+      80760,
+      82161
+    ]
+  }
+}

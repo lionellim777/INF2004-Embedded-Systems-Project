@@ -1,0 +1,66 @@
+{
+  "version": "v5.62",
+  "file": "firmware/releases/robocar_motion_integration_v5_62_wireless.uf2",
+  "base_commit": "d0ecf835594276b3dbd10a15a827483a8e441fca",
+  "uncommitted_workspace": true,
+  "bytes": 1131008,
+  "blocks": 2209,
+  "sha256": "c6855d22130ae82802f70be34ac255e5d91f06ffa34d23fd8d3dd1210c31418f",
+  "linked_text_bytes": 565480,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 219628,
+  "target": "Pico W / GP26 barcode, GP28 centre, GP27 right; WiFi core1",
+  "build": "Release -Wall -Wextra -Werror; local candidate, not flashed by agent",
+  "physical_input_results": [
+    {
+      "run": 1,
+      "sequence": "A",
+      "stop": "CENTER_CONFIRMATION_TIMEOUT",
+      "recoveries": 16
+    },
+    {
+      "run": 2,
+      "sequence": "AA",
+      "stop": "OBSTACLE_STOP",
+      "recoveries": 19
+    }
+  ],
+  "diagnosis": "Lost optical candidate during stopped search confirmation caused terminal timeout; frequent recoveries starved arc readiness. Half-A/Z ranked frames were rejected by worst-case width separation, with healthy sampling.",
+  "changes": [
+    "Flow-only stopped confirmation can return to bounded search; total/stage/sweep/coast safeguards retained.",
+    "Live timed right preview can arm after successful recovery despite short-segment readiness starvation; no arc on history alone.",
+    "Waveform-only width model: mean wide/narrow 2..3.5, narrow +/-35%, wide +/-25%, minimum class gap 1.3, old 2x spread guards. Exact31-extrema and two-profile agreement required; complete guards and separators retained. Legacy decoder unchanged.",
+    "High-contrast waveform retained over later low-contrast noise; confirmation_retries and coherent_mask diagnostic fields."
+  ],
+  "checks": [
+    "UF2 block magic/family/payload/index/contiguous flash bounds, compiled C page/source equality and complete embedded HTML.",
+    "Checksum-verified new bend-Z binary fixture batch-decodes Z with48/96 profiles; captured half-A widths form A model candidate (not proven two-profile acquisition).",
+    "510 invalid guard pairs and1.4 ratio rejected; existing832 waveform matrix,3000 noisy cases,52 motion and52 analytic bend cases plus negative framing/motion cases pass.",
+    "New confirmation loss/retry/reverse/reacquire/global deadline regressions; live-preview readiness-starvation case and no-side-ink negative.",
+    "53 centred/18 legacy actual-main cases;15 existing barcode/motion suites, controller and obstacle regressions.",
+    "Wireless transport/core1 and Chrome controls/mobile/9000-word export, checksum/capture-change checks."
+  ],
+  "physical_status": "v5.62 not physically tested. Frozen pattern replay does not establish motor/control path or AAZ consistency.",
+  "limits": [
+    "No100% bend/scan guarantee; all-white centre/right readings do not determine direction uniquely.",
+    "Bounded search can still stop for travel/time/stall/coast/control faults; no infinite retry.",
+    "Half-A original full waveform overwritten by paper noise; only candidate widths available.",
+    "New width fallback deliberately relaxes worst-case separation and needs physical false-positive trials.",
+    "Fixed projection, nominal wheel geometry, slip and missing/oblique stripes remain limitations.",
+    "Two prominence profiles share the same physical recording; agreement is not an independent scan."
+  ],
+  "procedure": "docs/testing/barcode-v5_62-recovery.md",
+  "source_sha256": {
+    "barcode_waveform.c": "d426959e177a70840a576c6e1021ff8112a0e3747cf06f2a8cd922acd599529c",
+    "barcode_waveform.h": "22542d46294b7b73bad80341e6b8006c810f6befcc3835a11f9781909861e85d",
+    "robot_firmware.c": "9514ac4c13e3877439cb1ba1c9b62d3552fdaa6dda2afc545359ed379a18f16a",
+    "course_control.c": "7b287c5bf42d0ba22ed091397c0bf2e3b4706fcbccbd2808fe6a8af5449b5758",
+    "course_control.h": "8b7885e9898f0b26de876a3f793608301993de5330f8719e5ea19206eb52a7ec",
+    "center_trim.h": "1859d3962a7e81c8e3604f83573c9ca4872c7d29b18940bffef3b8ea5cd7c765",
+    "wireless/calibration.html": "ee95904a8677175f2b26b762d88ca94f7ededb90d2fb5fc1ad8d6021a4a4f12a",
+    "wireless/calibration_page.h": "b0b4117d99db5f3553493c53ec0fa510e43a9f85b3dec81cb6fd1c8cac55f737",
+    "center_search.h": "059719d3ac6be05136ffaa7affaddd183da73d081b59afb84d99e32918a62cfb",
+    "barcode_decoder.c": "162c6f17c2dba5231ccf5c66eb6a4196f9e468af491e264ad957a5b25b7a7d29",
+    "barcode_decoder.h": "55fd89e34bfc2abfe98bf6ca71f7338e46e2028bed117e3b18fbecbd66b3cf9e"
+  }
+}

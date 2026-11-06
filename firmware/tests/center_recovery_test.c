@@ -44,6 +44,31 @@ int main(void){
  for(unsigned t=70000;t<=350000;t+=10000){o=center_search_step(&s,false,70,-70,t);assert(!o.stop && !o.left && !o.right);}
  o=center_search_step(&s,false,70,-70,360000);assert(o.stop && !s.found);
  assert(!strcmp(o.state,"CENTER_CONFIRMATION_TIMEOUT"));
+ /* Flow-only retry of an optical candidate lost during settling. Original
+  * sweep limits/deadline survive; budget exhaustion reverses normally. */
+ center_search_begin(&s,1,0,0,0);s.limit=60;s.retry_confirmation=true;
+ center_search_step(&s,true,55,-55,60000);
+ center_search_step(&s,false,70,-70,70000);
+ o=center_search_step(&s,false,70,-70,140000);
+ assert(!o.stop && !o.left && !o.right && !s.confirming && s.confirmation_retries==1);
+ assert(s.origin_l==0 && s.origin_r==0 && s.start_us==0 && s.stage_us==0);
+ o=center_search_step(&s,false,70,-70,150000);assert(s.reversed && !o.stop);
+ o=center_search_step(&s,true,0,0,210000);assert(s.confirming && !o.stop);
+ o=center_search_step(&s,true,0,0,270000);assert(s.found && !o.stop);
+ center_search_begin(&s,1,0,0,0);s.retry_confirmation=true;
+ for(unsigned t=200000;t<=3000000;t+=200000)o=center_search_step(&s,t%400000==0,0,0,t);
+ assert(o.stop && !s.found); /* retries never extend total3s deadline */
+ /* After both short sweeps, flow-only search may revisit the original
+  * direction farther, keeping the same overall3s deadline. */
+ center_search_begin(&s,1,0,0,0);s.extended_recovery=true;
+ o=center_search_step(&s,false,120,-120,200000);assert(s.reversed && !o.stop);
+ o=center_search_step(&s,false,-120,120,400000);assert(s.sweep==2 && s.direction==1 && !o.stop);
+ o=center_search_step(&s,true,220,-220,600000);assert(s.confirming && !o.stop);
+ o=center_search_step(&s,true,220,-220,660000);assert(s.found && !o.stop && s.start_us==0);
+ center_search_begin(&s,1,0,0,0);s.extended_recovery=true;
+ center_search_step(&s,false,120,-120,200000);center_search_step(&s,false,-120,120,400000);
+ o=center_search_step(&s,false,360,-360,600000);assert(!o.stop && s.sweep==3);
+ o=center_search_step(&s,false,-360,360,800000);assert(o.stop && !s.found);
  /* Excess coast, late control and new candidates outside the original sweep fail. */
  center_search_begin(&s,1,0,0,0);s.limit=60;
  center_search_step(&s,true,55,-55,60000);
