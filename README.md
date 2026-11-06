@@ -6,19 +6,18 @@ The goal is an autonomous two-wheel robot that follows a line, decodes navigatio
 
 ## Current status
 
-Latest checkpoint: **v5.56 wireless calibration**, 3 November 2026.
-Restores right-first rejoining, adds sonar-planned departure angles and left-side
-clearance checks, and raises stable straight cruise to1000cps with longer bounded
-moving bend corrections. Unknown object edges retain a perpendicular fallback.
-**Physical v5.56 validation is pending**.
-See [progress and evidence](docs/development-status.md) and
-[test instructions](docs/testing/obstacle-v5_35-bypass.md).
-The [ready-to-flash UF2s and verification records](firmware/releases/README.md)
-include the current build and historical checkpoints.
-This remains a Pico SDK calibration prototype; the final µT-Kernel port and full
-mission integration remain pending. Half-size barcode reliability is unresolved;
-barcodes are disabled in obstacle mode. See the
-[barcode investigation](docs/testing/barcode-v5_34-raised-height-analysis.md).
+Latest checkpoint: **v5.63 barcode baseline**,7 November2026.
+Two physical home-track runs each accepted full-A, half-A and half-Z on the right
+bend: **AAZ / AAZ,6/6 target reads**, without sampling-integrity faults. The
+measured3:1 print-geometry reader and bounded recovery are the working baseline.
+See [barcode acceptance](docs/testing/barcode-v5_63-acceptance.md),
+[progress](docs/development-status.md), and
+[remaining project work](docs/project-next-steps.md).
+The [UF2s and verification records](firmware/releases/README.md) contain the
+validated image and historical checkpoints. This remains a Pico SDK calibration
+prototype: final mission/µT-Kernel/MQTT integration is pending, and barcode reading
+is currently disabled in obstacle mode. Acceptance applies to the tested layout,
+not universal reliability or the whole final mission.
 
 | Subsystem | Status |
 | --- | --- |
@@ -26,12 +25,12 @@ barcodes are disabled in obstacle mode. See the
 | Servo safe range | Bench tested: 45-130 degrees; scans use 50-125 degrees |
 | Ultrasonic coarse/fine scanning | Bench tested with broad, front-facing targets |
 | IMU level calibration and multi-hump state machine | Bench tested |
-| Three IR sensors | Current mounting: GP26 dedicated barcode sensor; GP28 directly over route tape; GP27 to its right. Half barcode narrow/wide elements are 3/9 mm; reported GP26 clearance is 2 mm. Optical separation remains unresolved. |
-| Line following | Centre-sensor control, encoder feedback, bounded recovery, GP20 start/stop, crossing handling and diagnostics implemented. Operator reports completed home routes; frequent recovery and final line-loss stops remain in logs. |
+| Three IR sensors | GP26 dedicated barcode sensor (+80mm forward/+85mm left of powered axle); GP28 centred on18mm tape; GP27 is20mm right of GP28. Measured half3/9mm and full6/18mm bars/gaps. |
+| Line following | Centre/right control, encoder feedback, bounded expanding recovery and GP20 controls. Two AAZ home routes including the right bend completed; whole-course/junction acceptance remains. |
 | Wheel encoders and motion | About 2543 counts/revolution; 30 cm and 90/180-degree calibration incorporated into moving firmware. School runs recorded right-wheel non-progress during loaded turns. v5.53 increases bounded turn effort and preserves per-wheel fault evidence. Subsequent straight-strip bypass completed; broader repeatability remains unverified. |
-| Barcode navigation | Dedicated GP26 acquisition at 2 kHz; framed Code 39 A-Z decoder; independent course capture and configurable Y/Z actions. Earlier complete A/Z captures pass replay. Latest moving half-A/Z reads fail; no claim of reliable half-size or turning acceptance. |
+| Barcode decoding / navigation | Decoding accepted on the current home setup: AAZ twice, including half-Z during turning. A-Z host tests and configurable Y/Z route actions exist; final command mapping and physical navigation manoeuvres remain separate. |
 | Obstacle bypass and line recovery | Bounded right-side bypass and perpendicular tape alignment implemented. Earlier home runs resumed following. v5.53 straight-strip bypass completed, while the bend rejoin lost tape. v5.56 restores right-first rejoin and adds scan-planned departure with left-side clearance checks; physical retests pending. |
-| Wi-Fi/MQTT telemetry | Local Wi-Fi access point, browser controls and downloadable logs implemented. This calibration page is not the final MQTT subsystem. |
+| Wi-Fi/MQTT telemetry | Main has a local calibration AP/page/logs. `wifi-buddy-1` has standalone µT-Kernel/MQTT work and validation records; real-producer/final-robot integration remains. |
 
 Detailed evidence and limitations are recorded in [docs/development-status.md](docs/development-status.md).
 

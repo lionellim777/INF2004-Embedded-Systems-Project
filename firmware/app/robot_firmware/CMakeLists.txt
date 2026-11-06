@@ -53,5 +53,5 @@ endif()
 
 pico_enable_stdio_usb(robot_firmware 1)
 pico_enable_stdio_uart(robot_firmware 0)
-target_compile_definitions(robot_firmware PRIVATE PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
+target_compile_definitions(robot_firmware PRIVATE PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000 PICO_STACK_SIZE=0x1000)
 pico_add_extra_outputs(robot_firmware)

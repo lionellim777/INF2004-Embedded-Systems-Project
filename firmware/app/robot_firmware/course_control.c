@@ -188,8 +188,9 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         bool direction_confirmed=c->flow_follow ?
             (c->bend_direction==1 && c->right_preview) : recent;
         bool arc_entry=!ir.left || (c->flow_follow && c->center_level<c->center_reference*65/100);
-        if(!c->bend_active&&arc_entry&&permitted&&c->bend_ready&&direction_confirmed&&
-           !c->center_trim.exhausted&&c->drive.launch_complete){
+        bool measured_reentry=c->flow_follow && c->right_preview && c->recoveries && l>=200 && r>=200;
+        if(!c->bend_active&&arc_entry&&permitted&&(c->bend_ready||measured_reentry)&&direction_confirmed&&
+           (!c->center_trim.exhausted||measured_reentry)&&c->drive.launch_complete){
             c->bend_active=true;c->bend_ready=false;c->bend_ready_us=0;
             c->bend_start_us=now;c->bend_l=l;c->bend_r=r;c->bend_strong_us=0;
             c->bend_attempts++;center_trim_clear(&c->center_trim);
@@ -282,7 +283,11 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         int32_t reacquire=c->center_reference*(c->center_search.confirming?70:85)/100;
         if(reacquire<300)reacquire=300;
         bool strong=c->center_level_valid?c->center_level>=reacquire:ir.left;
+        c->center_search.retry_confirmation=c->flow_follow && !after_turn;
+        c->center_search.extended_recovery=c->flow_follow && !after_turn && !c->recovery_limit_counts;
         line_check_output_t search=center_search_step(&c->center_search,strong,l,r,now);
+        if(!strcmp(search.state,"CENTER_SEARCH_WIDEN"))c->wide_searches++;
+        if(!strcmp(search.state,"CENTER_CONFIRM_RETRY"))c->confirmation_retries++;
         if(search.stop)return stopped(c,!after_turn && c->center_search.limit==60 &&
             !strcmp(search.state,"CENTER_LINE_NOT_REACQUIRED")?"CENTER_LOCAL_RECOVERY_EXHAUSTED":search.state);
         if(c->center_search.found){

@@ -203,7 +203,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head><body>
 <div class="wrap">
-<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.61</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
+<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.63</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
 <main class="grid">
 
 <section id="controls" class="board" aria-label="Test controls">
@@ -679,7 +679,7 @@ el('download').onclick=async()=>{
  try{await recover();el('message').textContent='Collecting saved scan data…';wave=await waveformDownload();el('message').textContent='Log and saved scan data downloaded.';}
  catch(e){wave='[WAVEFORM EXPORT INCOMPLETE] '+e.message+'\n';el('message').textContent='Log saved, but scan data is incomplete. Download again before another run.';}
  finally{requestBusy=false;refreshButtons();}
- const metadata='AAI10 v5.61 wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';
+ const metadata='AAI10 v5.63 wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';
  const blob=new Blob([metadata,'RECOVERED RESULT (may duplicate log):\n',downloadedResult||'Current result unavailable; see captured live log.\n','\nFROZEN SCANNER DATA:\n',wave,'\nLIVE LOG:\n',transcript],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-motion-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 updateMode();

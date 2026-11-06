@@ -34,8 +34,9 @@ static uint32_t fraction(unsigned d,unsigned lo,unsigned hi)
 
 /* Iterate a monotonic spatial envelope when odometry is present. Samples at
  * a stop or behind the furthest observed position do not add stripe width or
- * duplicate stripes. Returning on a different lateral path invalidates the
- * frame rather than stitching unrelated traversals. Raw samples are retained. */
+ * duplicate stripes. With flat long bars, another lateral row can contain
+ * the same stripe sequence; optical framing and geometry must validate it.
+ * Raw samples are retained. */
 static bool series_next(const barcode_waveform_t *w,unsigned *index,int32_t *coordinate)
 {
     for(unsigned i=*index+1u;i<w->count;i++){
@@ -95,10 +96,11 @@ bool barcode_waveform_decode(barcode_waveform_t *w,char *letter)
     static const unsigned prominence[]={12,24,48,96,192,384};
     if(!w || !letter || w->count<3u || w->count>BARCODE_WAVE_SAMPLES)return false;
     if(w->motion && w->motion_fault)return false;
-    char accepted=0;unsigned best_score=0;bool conflict=false;
+    char geometry=0;unsigned geometry_profiles=0;uint32_t *geometry_runs=w->geometry_work;
+    char accepted=0,fit=0;uint32_t *fit_runs=w->fit_work;unsigned fit_profiles=0;unsigned best_score=0;bool conflict=false;
     w->complete_profiles=0;
     for(unsigned p=0;p<6;p++){
-        uint32_t edges[EXT_MAX];barcode_wave_profile_t *d=&w->profile[p];
+        uint32_t *edges=w->edge_work;barcode_wave_profile_t *d=&w->profile[p];
         *d=(barcode_wave_profile_t){0};
         unsigned count=extract_edges(w,prominence[p],edges,d);
         w->profile_extrema[p]=w->last_extrema=d->extrema;
@@ -108,13 +110,24 @@ bool barcode_waveform_decode(barcode_waveform_t *w,char *letter)
             uint32_t runs[29];bool bounded=true;d->windows++;
             for(unsigned i=0;i<29;i++){
                 runs[i]=edges[start+i+1u]-edges[start+i];
-                if(runs[i]<MIN_RUN_US || runs[i]>BARCODE_RUN_MAX_US){
-                    if(!d->code39.score){d->reason=runs[i]<MIN_RUN_US?WAVE_RUN_SHORT:WAVE_RUN_LONG;
+                if(runs[i]<(w->motion?4000u:MIN_RUN_US) || runs[i]>BARCODE_RUN_MAX_US){
+                    if(!d->code39.score){d->reason=runs[i]<(w->motion?4000u:MIN_RUN_US)?WAVE_RUN_SHORT:WAVE_RUN_LONG;
                         d->bad_run=(uint8_t)i;d->bad_width=runs[i];}
                     bounded=false;
                 }
             }
-            if(!bounded)continue;
+            if(!bounded){
+                /* Retain all29 apparent widths even when the absolute floor
+                 * fails, so later diagnostics do not replace them with zeros. */
+                if(!d->code39.score)memcpy(d->runs,runs,sizeof(runs));
+                continue;
+            }
+            char geometric=0;
+            if(w->motion && barcode_decode_code39_geometry(runs,&geometric)){
+                if(geometry && geometry!=geometric)conflict=true;
+                geometry=geometric;geometry_profiles|=1u<<p;
+                memcpy(geometry_runs,runs,sizeof(runs));
+            }
             w->complete_profiles|=(uint8_t)(1u<<p);
             barcode_decode_diagnostic_t hint;barcode_inspect_code39(runs,&hint);
             if(d->reason!=WAVE_ACCEPTED && (!d->code39.score || hint.score>d->code39.score)){
@@ -122,7 +135,14 @@ bool barcode_waveform_decode(barcode_waveform_t *w,char *letter)
                 d->reason=WAVE_CODE39;memcpy(d->runs,runs,sizeof(runs));
             }
             char candidate=0;
-            if(!barcode_decode_code39_letter(runs,&candidate))continue;
+            if(!barcode_decode_code39_letter(runs,&candidate)){
+                if(d->extrema==31u && barcode_decode_code39_coherent(runs,&candidate)){
+                    if(fit && fit!=candidate)conflict=true;
+                    fit=candidate;fit_profiles|=1u<<p;
+                    memcpy(fit_runs,runs,sizeof(runs));
+                }
+                continue;
+            }
             d->reason=WAVE_ACCEPTED;d->best_window=(uint16_t)(start/2u);
             d->code39=hint;memcpy(d->runs,runs,sizeof(runs));
             if(accepted && candidate!=accepted)conflict=true;
@@ -133,6 +153,21 @@ bool barcode_waveform_decode(barcode_waveform_t *w,char *letter)
             best_score=d->code39.score;memcpy(w->last_runs,d->runs,sizeof(d->runs));
         }
     }
+    unsigned geometry_votes=0;
+    for(unsigned bits=geometry_profiles;bits;bits>>=1)geometry_votes+=bits&1u;
+    if(geometry_votes>=2){
+        if(accepted && accepted!=geometry)conflict=true;
+        else if(!accepted){accepted=geometry;memcpy(w->last_runs,geometry_runs,sizeof(w->last_runs));}
+    }
+    w->geometry_mask=(uint8_t)geometry_profiles;
+    unsigned votes=0;for(unsigned bits=fit_profiles;bits;bits>>=1)votes+=bits&1u;
+    if(votes>=2){if(accepted && accepted!=fit)conflict=true;else if(!accepted){accepted=fit;memcpy(w->last_runs,fit_runs,sizeof(w->last_runs));}}
+    if(votes>=2 && accepted==fit){
+        for(unsigned p=0;p<6;p++)if(fit_profiles&(1u<<p)){
+            w->profile[p].reason=WAVE_ACCEPTED;w->last_prominence=(uint16_t)(12u<<p);
+        }
+    }
+    w->coherent_mask=(uint8_t)fit_profiles;
     w->last_conflict=conflict;
     if(conflict){w->ambiguous++;return false;}
     if(!accepted)return false;
@@ -159,6 +194,11 @@ static void snapshot(barcode_waveform_t *w,unsigned reason,char letter)
      * snapshot already exists; otherwise preserve the latest substantial
      * capture or any accepted frame. This does not change decode decisions. */
     if(!w->count || (!letter && s->count && w->frame_us<1000000u))return;
+    unsigned lo=4095,hi=0;
+    for(unsigned i=0;i<w->count;i++){unsigned v=LEVEL(w,i);if(v<lo)lo=v;if(v>hi)hi=v;}
+    /* Do not hide useful ink with a later paper-noise capture. */
+    if(!letter && s->count && hi-lo<100u && s->signal_range>=100u)return;
+    s->geometry_mask=w->geometry_mask;s->signal_range=(uint16_t)(hi-lo);s->coherent_mask=w->coherent_mask;
     s->motion=w->motion;s->count=w->count*(w->motion?2u:1u);s->paper=w->paper;s->start_us=w->capture_start_us;s->leading_us=w->leading_us;
     s->white_us=w->white_us;s->duration_us=w->frame_us;s->reason=(uint8_t)reason;s->letter=letter;
     for(unsigned i=0;i<w->count;i++){
@@ -186,10 +226,10 @@ unsigned barcode_waveform_details(const barcode_wave_snapshot_t *s,char *out,uns
     static const char *width_reasons[]={"OK","RANGE","RANK_TIE","NONPOSITIVE_OFFSET",
         "WIDE_NARROW_SEPARATION","NARROW_SPREAD","WIDE_SPREAD","OUTER_BAR"};
     if(!capacity)return 0;
-    int n=snprintf(out,capacity,"[WAVEFORM SNAPSHOT] id=%lu samples=%u readings=%u paper=%u start_us=%lu duration_us=%lu leading_us=%lu trailing_us=%lu result=%s letter=%c fnv=%08lx encoding=%s width_domain=%s selection=latest_accepted_or_capture_ge1s\n",
+    int n=snprintf(out,capacity,"[WAVEFORM SNAPSHOT] id=%lu samples=%u readings=%u paper=%u start_us=%lu duration_us=%lu leading_us=%lu trailing_us=%lu result=%s letter=%c fnv=%08lx encoding=%s width_domain=%s coherent_mask=0x%x geometry_mask=0x%x selection=latest_accepted_or_capture_ge1s\n",
         (unsigned long)s->start_us,s->count,s->count/(s->motion?2u:1u),s->paper,(unsigned long)s->start_us,(unsigned long)s->duration_us,
         (unsigned long)s->leading_us,(unsigned long)s->white_us,barcode_waveform_reason(s->reason),
-        s->letter?s->letter:'-',(unsigned long)s->checksum,s->motion?"ADC12_MS4_POS16":"ADC12_MS4",s->motion?"MEAN_COUNT1000_PROJECTED_GP26":"TIME_US");
+        s->letter?s->letter:'-',(unsigned long)s->checksum,s->motion?"ADC12_MS4_POS16":"ADC12_MS4",s->motion?"MEAN_COUNT1000_PROJECTED_GP26":"TIME_US",s->coherent_mask,s->geometry_mask);
     if(n<0 || (unsigned)n>=capacity){out[0]=0;return 0;}
     unsigned used=(unsigned)n;
     for(unsigned i=0;i<6;i++){
@@ -218,7 +258,7 @@ static void remember_attempt(barcode_waveform_t *w,unsigned reason,char letter)
     if(w->attempt_count==BARCODE_WAVE_ATTEMPTS){w->attempt_overflow++;return;}
     barcode_wave_attempt_t *a=&w->attempts[w->attempt_count++];
     *a=(barcode_wave_attempt_t){.start_us=w->capture_start_us,.duration_us=w->frame_us,
-        .samples=w->count,.reason=(uint8_t)reason,.letter=letter,.raw_min=4095,
+        .geometry_mask=w->geometry_mask,.coherent_mask=w->coherent_mask,.samples=w->count,.reason=(uint8_t)reason,.letter=letter,.raw_min=4095,
         .lateral_mm=(uint16_t)(w->max_lateral*MM_PER_COUNT),.yaw_deg=(uint16_t)(w->max_yaw*57.29578f)};
     for(unsigned i=0;i<w->count;i++){unsigned level=LEVEL(w,i);
         if(level<a->raw_min)a->raw_min=(uint16_t)level;
@@ -260,7 +300,7 @@ bool barcode_waveform_update(barcode_waveform_t *w,uint16_t raw,uint32_t now,cha
             w->position[0]=0;w->frontier_y=0;w->max_lateral=w->max_yaw=0;
             memset(w->profile,0,sizeof(w->profile));
             w->leading_us=w->white_us;w->white_us=0;w->frame_us=0;w->attempted=false;
-            w->frame_reason=WAVE_NONE;
+            w->frame_reason=WAVE_NONE;w->coherent_mask=0;w->geometry_mask=0;
         }else w->white_us=0;
         if(!w->recording)return false;
     }
@@ -274,10 +314,11 @@ bool barcode_waveform_update(barcode_waveform_t *w,uint16_t raw,uint32_t now,cha
         int32_t position=(int32_t)lroundf(x);
         if(position<w->frontier-4)w->recrossing=true;
         if(position>w->frontier){
-            /* Rejoin the previous traverse within one3mm narrow-bar width. */
-            if(w->recrossing && fabsf(y-w->frontier_y)*MM_PER_COUNT>3.0f){
-                w->motion_fault=true;w->motion_faults++;
-            }
+            /* Flat260mm-tall bars can be crossed at another lateral row.
+             * A3mm shift along a bar is not a lost stripe. Keep the shift as
+             * telemetry; require complete optical framing/model validation.
+             * No centred placement within the260mm height is assumed. */
+            if(w->recrossing && fabsf(y-w->frontier_y)*MM_PER_COUNT>3.0f)w->lateral_recrosses++;
             if(w->recrossing)w->recrosses++;
             w->recrossing=false;w->frontier=position;w->frontier_y=y;
         }else w->stationary_samples++;

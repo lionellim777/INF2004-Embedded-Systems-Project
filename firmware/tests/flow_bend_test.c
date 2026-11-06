@@ -28,6 +28,12 @@ static void right_entry(void)
 int main(void)
 {
     line_check_output_t o={0};
+    setup();c.bend_ready=false;c.bend_ready_us=0;c.recoveries=1;
+    for(unsigned i=0;i<4;i++)o=step(500,160,6,6,10000);
+    assert(c.bend_active && c.bend_attempts==1); /* live side survives readiness starvation */
+    setup();c.bend_ready=false;c.bend_ready_us=0;c.recoveries=1;
+    for(unsigned i=0;i<4;i++)o=step(500,0,6,6,10000);
+    assert(!c.bend_active && !c.bend_attempts); /* history alone remains insufficient */
     setup();course_note_barcode_activity(&c,now);right_entry();
     for(unsigned i=0;i<8;i++){
         line_check_output_t o=step(i>=4?800:0,160,10,3,20000);

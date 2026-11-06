@@ -8,7 +8,7 @@
 #define CAL_RESULT_TITLE "v5.7 stationary barcode / motors OFF / black>250 white<=220"
 #else
 #include "calibration_page.h"
-#define CAL_RESULT_TITLE "v5.61 wireless / motion-aware GP26 barcode widths + per-attempt diagnostics, timed right-edge arc gate / obstacle mode disables barcodes / frozen scan export available / course reader=LOCAL_EXTREMA grey500Hz mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..1000cps bounded-search"
+#define CAL_RESULT_TITLE "v5.63 wireless / motion-aware GP26 barcode widths + per-attempt diagnostics, timed right-edge arc gate / obstacle mode disables barcodes / frozen scan export available / course reader=LOCAL_EXTREMA grey500Hz mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..1000cps bounded-search"
 #endif
 #include "dhcpserver.h"
 #include "pico/cyw43_arch.h"

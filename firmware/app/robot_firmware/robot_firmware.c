@@ -384,7 +384,7 @@ static obstacle_bypass_t avoidance;
 static int32_t blackness(uint16_t raw,int32_t white,int32_t black);
 static void waveform_drain(void)
 {
-    waveform_sample_t batch[32];
+    static waveform_sample_t batch[32]; /* core0-only scratch, not IRQ stack */
     for(;;){
         unsigned count=0;
         uint32_t irq=save_and_disable_interrupts();
@@ -509,13 +509,13 @@ static void barcode_result(void)
                 waveform_details,waveform.saved.start_us,waveform.saved.checksum);
     }
     if(waveform_enabled){
-        printf("[WAVEFORM MOTION] domain=PROJECTED_GP26_COUNTS geometry_mm=80_forward/85_left wheel_mm=60 cpr=2543 track_mm=115 recrosses=%lu holds=%lu motion_faults=%lu attempts=%u attempt_overflow=%u; axle=powered_wheel_midpoint.\n",
-            (unsigned long)waveform.recrosses,(unsigned long)waveform.stationary_samples,
+        printf("[WAVEFORM MOTION] domain=PROJECTED_GP26_COUNTS geometry_mm=80_forward/85_left wheel_mm=60 cpr=2543 track_mm=115 recrosses=%lu lateral_recrosses=%lu holds=%lu motion_faults=%lu attempts=%u attempt_overflow=%u; axle=powered_wheel_midpoint.\n",
+            (unsigned long)waveform.recrosses,(unsigned long)waveform.lateral_recrosses,(unsigned long)waveform.stationary_samples,
             (unsigned long)waveform.motion_faults,waveform.attempt_count,waveform.attempt_overflow);
         for(unsigned i=0;i<waveform.attempt_count;i++){
             const barcode_wave_attempt_t *a=&waveform.attempts[i];const barcode_wave_profile_t *d=&a->best;
-            printf("[SCAN ATTEMPT] index=%u start_us=%lu duration_us=%lu samples=%u result=%s letter=%c raw=%u..%u lateral_mm=%u yaw_deg=%u extrema=%u windows=%u reversed=%u patterns=%03x/%03x/%03x width_reason=%u/%u/%u guards=%u separators=%u\n",
-                i,(unsigned long)a->start_us,(unsigned long)a->duration_us,a->samples,barcode_waveform_reason(a->reason),a->letter?a->letter:'-',a->raw_min,a->raw_max,a->lateral_mm,a->yaw_deg,
+            printf("[SCAN ATTEMPT] index=%u start_us=%lu duration_us=%lu samples=%u result=%s letter=%c coherent_mask=0x%x geometry_mask=0x%x raw=%u..%u lateral_mm=%u yaw_deg=%u extrema=%u windows=%u reversed=%u patterns=%03x/%03x/%03x width_reason=%u/%u/%u guards=%u separators=%u\n",
+                i,(unsigned long)a->start_us,(unsigned long)a->duration_us,a->samples,barcode_waveform_reason(a->reason),a->letter?a->letter:'-',a->coherent_mask,a->geometry_mask,a->raw_min,a->raw_max,a->lateral_mm,a->yaw_deg,
                 d->extrema,d->windows,d->code39.reversed,d->code39.patterns[0],d->code39.patterns[1],d->code39.patterns[2],
                 d->code39.width_reason[0],d->code39.width_reason[1],d->code39.width_reason[2],d->code39.guards,d->code39.separators);
             printf("[SCAN WIDTHS] index=%u units=mean_count1000 values=",i);
@@ -523,13 +523,13 @@ static void barcode_result(void)
             printf("\n");
         }
     }
-    if(waveform_enabled)printf("[WAVEFORM RESULT] reader=LOCAL_EXTREMA period_us=%u capture_limit=%u candidates=%lu rejected=%lu ambiguous=%lu buffer_full=%lu timing_faults=%lu queue_overflow=%u prominence=%u extrema=%u profiles_12_24_48_96_192_384=%u/%u/%u/%u/%u/%u complete_mask=0x%x max_work_us=%lu quiet_us=250000; physical acceptance pending.\n",
+    if(waveform_enabled)printf("[WAVEFORM RESULT] reader=LOCAL_EXTREMA period_us=%u capture_limit=%u candidates=%lu rejected=%lu ambiguous=%lu buffer_full=%lu timing_faults=%lu queue_overflow=%u prominence=%u extrema=%u profiles_12_24_48_96_192_384=%u/%u/%u/%u/%u/%u complete_mask=0x%x coherent_mask=0x%x geometry_mask=0x%x max_work_us=%lu quiet_us=250000; physical acceptance pending.\n",
         BARCODE_WAVE_PERIOD_US,BARCODE_WAVE_SAMPLES,(unsigned long)waveform.frames,
         (unsigned long)waveform.rejected,(unsigned long)waveform.ambiguous,(unsigned long)waveform.overflows,
         (unsigned long)waveform.timing_faults,waveform_overflow,waveform.last_prominence,waveform.last_extrema,
         waveform.profile_extrema[0],waveform.profile_extrema[1],waveform.profile_extrema[2],
         waveform.profile_extrema[3],waveform.profile_extrema[4],waveform.profile_extrema[5],
-        waveform.complete_profiles,(unsigned long)waveform_max_work_us);
+        waveform.complete_profiles,waveform.coherent_mask,waveform.geometry_mask,(unsigned long)waveform_max_work_us);
     if(barcode_capture.continuous){
         printf("[BARCODE RESULT] mode=CONTINUOUS reads=%u sequence=",barcode_capture.event_count);
         for(unsigned i=0;i<barcode_capture.event_count;i++)printf("%c",barcode_capture.events[i].letter);
@@ -610,9 +610,9 @@ static bool button_fell(button_t *button, uint pin, uint64_t now_us)
 static void print_controls(void)
 {
 #ifdef ROBOCAR_WIRELESS_CALIBRATION
-    printf("\nAAI10 MOTION INTEGRATION v5.61 WIRELESS | motion-aware barcode + per-attempt diagnostics | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.63 WIRELESS | motion-aware barcode + per-attempt diagnostics | %s %s\n", __DATE__, __TIME__);
 #else
-    printf("\nAAI10 MOTION INTEGRATION v5.61 USB | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.63 USB | %s %s\n", __DATE__, __TIME__);
 #endif
     printf("Starts STOPPED. Existing IR, sonar, servo and terrain settings retained.\n");
     printf("Batch 5: CPR2543 wheel60mm track115mm; turn early290 L90+65 R180-60.\n");
@@ -695,13 +695,13 @@ int main(void)
     selected = MOTION_STRAIGHT_30CM;
 #endif
     course_config_t selected_course={'s','s',120};
-    motion_control_t motion;
+    static motion_control_t motion;
     motion_init(&motion);
-    run_diagnostics_t diagnostics = {0};
-    barcode_reader_t barcode_reader;
+    static run_diagnostics_t diagnostics = {0};
+    static barcode_reader_t barcode_reader;
     barcode_reader_init(&barcode_reader);
     const char *motion_state = "STOPPED";
-    barcode_progress_t barcode_progress = {0};
+    static barcode_progress_t barcode_progress = {0};
 
     uint64_t previous_loop_us = 0u;
     uint32_t max_loop_us = 0u;
@@ -1230,10 +1230,10 @@ int main(void)
             if(avoid_run)printf("[AVOID RESULT] detected=%u completed=%u phase=%s offset_mm=%u along_mm=%u scans=%u no_echo=%u sonar_retries=%u sonar_resumes=%u encoder_skips=%u/%u tape_checks=%u rejected=%u axle_mm=%u align_dir=%d reverse_sweep=%u align_rejected=%u fault=%s outcome=%s; geometry provisional, physical clearance requires observation.\n",
                 avoidance.detected,avoidance.completed,obstacle_bypass_phase(avoidance.phase),avoidance.offset_mm,avoidance.along_mm,avoidance.scans,avoidance.no_echo,avoidance.sonar_retries,avoidance.sonar_resumes,avoidance.encoder_skips[0],avoidance.encoder_skips[1],avoidance.rejoin_attempts,avoidance.rejoin_rejected,avoidance.axle_mm,avoidance.align_direction,avoidance.align_reversed,avoidance.align_rejected,avoidance.fault?avoidance.fault:"NONE",motion_state);
             if(avoid_run)printf("[SONAR RESULT] last_status=%s last_pulse_us=%lu max_pulse_us=%lu measurement_window_us=45000.\n",sonar_status,(unsigned long)sonar_pulse_us,(unsigned long)sonar_max_pulse_us);
-            if(course_run)printf("[COURSE RESULT] encounters=%u turns=%u Y=%s Z=%s advance_mm=%u updates=%u replacements=%u deferred_replacements=%u pending=%c remaining=%u deferred=%c recoveries=%u trims=%u trim_reversals=%u trim_no_response=%u fixed_ref=%ld settle_coast=%ld/%ld sensor_layout=%s flow=%u arc_attempts=%u arc_rejoins=%u arc_fallbacks=%u previews=%u edge_coasts=%u arc_source=%s arc_exit=%s arc_gate=%s drift_max_cps=%u outcome=%s.\n",
+            if(course_run)printf("[COURSE RESULT] encounters=%u turns=%u Y=%s Z=%s advance_mm=%u updates=%u replacements=%u deferred_replacements=%u pending=%c remaining=%u deferred=%c recoveries=%u trims=%u trim_reversals=%u trim_no_response=%u fixed_ref=%ld confirmation_retries=%u wide_searches=%u settle_coast=%ld/%ld sensor_layout=%s flow=%u arc_attempts=%u arc_rejoins=%u arc_fallbacks=%u previews=%u edge_coasts=%u arc_source=%s arc_exit=%s arc_gate=%s drift_max_cps=%u outcome=%s.\n",
                 course.junctions,course.turns,course_action_name(course.config.y_action),course_action_name(course.config.z_action),course.config.advance_mm,
                 course.route_updates,course.replacements,course.deferred_replacements,course.pending_source?course.pending_source:'-',course.remaining_junctions,
-                course.deferred?course.deferred_source:'-',course.recoveries,course.trim_attempts,course.trim_reversals,course.trim_no_responses,(long)course.center_reference,(long)course.center_search.coast_l,(long)course.center_search.coast_r,ROBOCAR_CENTER_LINE?"GP28_CENTER":"STRADDLE",course.flow_follow,course.bend_attempts,course.bend_completed,course.bend_fallbacks,course.right_previews,course.loss_coasts,course.bend_source?course.bend_source:"NONE",course.bend_exit?course.bend_exit:"NONE",course.flow_follow?"TIMED_RIGHT":"HISTORY_LEGACY",course.flow_follow?150u:220u,motion_state);
+                course.deferred?course.deferred_source:'-',course.recoveries,course.trim_attempts,course.trim_reversals,course.trim_no_responses,(long)course.center_reference,course.confirmation_retries,course.wide_searches,(long)course.center_search.coast_l,(long)course.center_search.coast_r,ROBOCAR_CENTER_LINE?"GP28_CENTER":"STRADDLE",course.flow_follow,course.bend_attempts,course.bend_completed,course.bend_fallbacks,course.right_previews,course.loss_coasts,course.bend_source?course.bend_source:"NONE",course.bend_exit?course.bend_exit:"NONE",course.flow_follow?"TIMED_RIGHT":"HISTORY_LEGACY",course.flow_follow?150u:220u,motion_state);
             if(course_run||avoid_run){
                 const course_control_t *bc=avoid_run?&avoidance.line:&course;
                 printf("[BEND RESULT] attempts=%u rolling_rejoins=%u fallback_searches=%u active=%u; counts belong to current course segment.\n",bc->bend_attempts,bc->bend_completed,bc->bend_fallbacks,bc->bend_active);

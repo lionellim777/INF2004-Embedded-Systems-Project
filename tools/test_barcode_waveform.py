@@ -12,4 +12,4 @@ subprocess.run(['clang','-std=c11','-Wall','-Wextra','-Werror','-O1',
     '-fsanitize=address,undefined','-I'+str(app),
     str(root/'firmware/tests/barcode_waveform_test.c'),str(app/'barcode_waveform.c'),
     str(app/'barcode_decoder.c'),'-o',str(exe)],check=True,env=env)
-subprocess.run([str(exe),str(root/'docs/testing/fixtures/v5_58-half-Z-ADC12_MS4.bin')],check=True,env=env)
+subprocess.run([str(exe),str(root/'docs/testing/fixtures/v5_58-half-Z-ADC12_MS4.bin'),str(root/'docs/testing/fixtures/v5_61-bend-Z-ADC12_MS4_POS16.bin')],check=True,env=env)

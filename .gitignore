@@ -36,3 +36,6 @@ __pycache__/
 .env.*
 !.env.example
 
+
+# Recorded optical regression inputs, not build binaries.
+!docs/testing/fixtures/*.bin

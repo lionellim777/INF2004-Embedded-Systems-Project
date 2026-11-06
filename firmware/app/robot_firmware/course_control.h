@@ -29,7 +29,7 @@ typedef struct {
     bool center_level_valid,center_visible,barcode_seen;
     int32_t center_level;
     uint64_t barcode_activity_us;
-    unsigned recoveries;
+    unsigned recoveries,confirmation_retries,wide_searches;
     bool bend_disabled, bend_ready, bend_active;
     int bend_direction;
     uint64_t bend_hint_us, bend_ready_us, bend_start_us, bend_strong_us;
