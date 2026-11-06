@@ -1,0 +1,35 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_60_wireless.uf2",
+  "version": "v5.60",
+  "base_commit": "5fb1983ea0eee52a58a194246501b21e800c9c92",
+  "bytes": 1118208,
+  "blocks": 2184,
+  "sha256": "5ed07731286504b2ecf02944463016bafb06cc0240176419efc34f560d980b11",
+  "linked_text_bytes": 558904,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 177244,
+  "target": "Pico W / RP2040; GP26 barcode, GP28 centre, GP27 right; WiFi core1",
+  "build": "Release -Wall -Wextra -Werror; centred course flow enabled; not flashed by agent",
+  "physical_baseline": "Two reported v5.59 straight-section runs each: previews=0, arc_attempts=1, arc_rejoins=0, arc_source=CONFIRMED_RECOVERY, arc_exit=TIME_LIMIT; zero reads and final CENTER_LINE_NOT_REACQUIRED.",
+  "fix": "Hard course arc requires current timed GP27 preview; history only seeds gentle correction. Gentle trim enter90%/release95% and differential40..150 cps; old disabled-flow policy unchanged.",
+  "checks": [
+    "Full UF2 block magic/family/payload/index/count/contiguous flash bounds; version and policy markers; compiled embedded HTML matches source",
+    "Negative controller regression for recovery prior plus weak centre and white side, left/right history; full-black short spike rejection",
+    "Gentle trial reverses after measured yaw and worsening optical reading then tapers on improvement",
+    "Existing measured-side arc/bounds/STOP/deferred action cases",
+    "53 centred and18 legacy actual-main cases, including recent prior with no side ink and a live-side Z scan",
+    "Existing15 barcode/motion suites; obstacle planner/state/alignment regression",
+    "Wireless retained-result/chunk export/core1 checks",
+    "Mocked Chrome controls/mobile/complete and corrupt export checks",
+    "Latest failed snapshot checksum verified; batch pattern remains rejected"
+  ],
+  "physical_status": "No physical v5.60 validation. Initial lateral drift cause remains unresolved; the unsupported hard-arc escalation is identified in code/logs.",
+  "limits": [
+    "Equal encoder rotation does not prove tape-relative heading/position.",
+    "Centre/right mounting has no left-side observation when both sensors see white.",
+    "No guaranteed straight tracking or curve barcode success until tested.",
+    "Existing time/travel guards are software bounds, not measured stop clearance."
+  ],
+  "input_log": "docs/testing/logs/20261106-v5_59-straight-drift-two-runs.txt",
+  "procedure": "docs/testing/course-v5_60-drift-confidence.md"
+}

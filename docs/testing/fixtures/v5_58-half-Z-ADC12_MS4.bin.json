@@ -1,0 +1,8 @@
+{
+  "source_export": "AAI10-motion-2026-11-06T01-41-20-067Z.txt",
+  "encoding": "ADC12_MS4",
+  "samples": 2202,
+  "fnv1a_word_low_then_high": "bec1cc17",
+  "accepted_letter": "Z",
+  "provenance": "Decoder-input binary retained from earlier frozen export replay. Original Downloads text no longer present. This batch fixture verifies pattern decoding; it cannot reproduce movement or the full acquisition/quiet-zone history."
+}

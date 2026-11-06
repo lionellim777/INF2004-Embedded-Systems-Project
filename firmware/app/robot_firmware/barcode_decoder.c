@@ -38,12 +38,16 @@ static uint32_t packed_run_get(const void *runs, unsigned int index)
  */
 static bool classify_pattern(const uint32_t widths[CODE39_ELEMENTS],
                              uint16_t *pattern,
-                             uint32_t *white_threshold, int outer_narrow)
+                             uint32_t *white_threshold, int outer_narrow,
+                             uint8_t *reason)
 {
+    if(reason)*reason=BARCODE_WIDTH_OK;
+    *pattern=0;
+#define WIDTH_REJECT(code) do {if(reason)*reason=(code);return false;} while(0)
     uint32_t sorted[2][5] = {{0}};
     unsigned count[2] = {0};
     for (unsigned i=0;i<CODE39_ELEMENTS;i++) {
-        if (!widths[i] || widths[i]>BARCODE_RUN_MAX_US) return false;
+        if (!widths[i] || widths[i]>BARCODE_RUN_MAX_US) WIDTH_REJECT(BARCODE_WIDTH_RANGE);
         unsigned colour=i%2, insert=count[colour]++;
         while (insert && sorted[colour][insert-1]>widths[i]) {
             sorted[colour][insert]=sorted[colour][insert-1];--insert;
@@ -51,7 +55,7 @@ static bool classify_pattern(const uint32_t widths[CODE39_ELEMENTS],
         sorted[colour][insert]=widths[i];
     }
     /* Three narrow elements of each colour. Ties at the split are ambiguous. */
-    if (sorted[0][3]<=sorted[0][2] || sorted[1][3]<=sorted[1][2]) return false;
+    if (sorted[0][3]<=sorted[0][2] || sorted[1][3]<=sorted[1][2]) WIDTH_REJECT(BARCODE_WIDTH_TIE);
     int64_t offset=(int64_t)sorted[1][1]-sorted[0][1];
     int64_t min_narrow=INT64_MAX,max_narrow=0,min_wide=INT64_MAX,max_wide=0;
     int64_t outer_width=0, narrow[6];
@@ -61,12 +65,12 @@ static bool classify_pattern(const uint32_t widths[CODE39_ELEMENTS],
         unsigned colour=i%2;
         bool wide=widths[i]>=sorted[colour][3];
         int64_t corrected=2*(int64_t)widths[i]+(colour ? -offset : offset);
-        if (corrected<=0) return false;
+        if (corrected<=0) WIDTH_REJECT(BARCODE_WIDTH_OFFSET);
         *pattern=(uint16_t)((*pattern<<1) | (wide?1u:0u));
         /* Only the physical first/last narrow BLACK guard element may use
          * bounded expansion. Never reinterpret a ranked wide bar as narrow. */
         if ((int)i == outer_narrow) {
-            if (wide || colour) return false;
+            if (wide || colour) WIDTH_REJECT(BARCODE_WIDTH_OUTER);
             outer_width=corrected;
             continue;
         }
@@ -83,8 +87,9 @@ static bool classify_pattern(const uint32_t widths[CODE39_ELEMENTS],
             if(corrected>max_narrow)max_narrow=corrected;
         }
     }
-    if(min_wide*10<max_narrow*18 || max_narrow>2*min_narrow || max_wide>2*min_wide)
-        return false;
+    if(min_wide*10<max_narrow*18)WIDTH_REJECT(BARCODE_WIDTH_SEPARATION);
+    if(max_narrow>2*min_narrow)WIDTH_REJECT(BARCODE_WIDTH_NARROW_SPREAD);
+    if(max_wide>2*min_wide)WIDTH_REJECT(BARCODE_WIDTH_WIDE_SPREAD);
     if (outer_narrow >= 0) {
         /* End-of-frame optics/speed can expand a terminal narrow bar. Permit
          * ONE such bar per frame, with all other elements strict. It must be
@@ -92,11 +97,12 @@ static bool classify_pattern(const uint32_t widths[CODE39_ELEMENTS],
          * than every corrected wide element. Missing/extra runs are not fixed.
          * These are provisional acceptance bounds, not proof of the cause. */
         if(narrow_count!=5 || outer_width<=max_narrow ||
-           outer_width>3*narrow[2] || outer_width*5>min_wide*4) return false;
+           outer_width>3*narrow[2] || outer_width*5>min_wide*4) WIDTH_REJECT(BARCODE_WIDTH_OUTER);
     }
     /* Separator is white: compare in its original measurement domain. */
     *white_threshold=sorted[1][2]+(sorted[1][3]-sorted[1][2])/2u;
     return true;
+#undef WIDTH_REJECT
 }
 
 static char pattern_to_letter(uint16_t pattern)
@@ -134,7 +140,7 @@ static bool decode_direction(
         if(logical_outer>=0 && (unsigned)logical_outer/10u==character)
             outer=logical_outer%10;
         if (!classify_pattern(widths, &patterns[character],
-                              &thresholds[character], outer)) {
+                              &thresholds[character], outer, NULL)) {
             return false;
         }
     }
@@ -191,4 +197,24 @@ bool barcode_decode_code39_packed(const barcode_runs_t *runs, char *letter)
 {
     if (runs == NULL || letter == NULL) return false;
     return decode(runs,packed_run_get,letter);
+}
+
+void barcode_inspect_code39(const uint32_t runs[29],barcode_decode_diagnostic_t *out)
+{
+    *out=(barcode_decode_diagnostic_t){0};
+    for(unsigned reverse=0;reverse<2;reverse++){
+        barcode_decode_diagnostic_t d={0};uint32_t thresholds[3]={0};
+        d.reversed=(uint8_t)reverse;
+        for(unsigned ch=0;ch<3;ch++){
+            uint32_t widths[9];
+            for(unsigned e=0;e<9;e++)widths[e]=runs[reverse?28-ch*10-e:ch*10+e];
+            if(classify_pattern(widths,&d.patterns[ch],&thresholds[ch],-1,&d.width_reason[ch]))d.score++;
+        }
+        if(d.patterns[0]==CODE39_ASTERISK){d.guards|=1;d.score+=4;}
+        if(d.patterns[2]==CODE39_ASTERISK){d.guards|=2;d.score+=4;}
+        uint32_t a=runs[reverse?19:9],b=runs[reverse?9:19];
+        if(a && a<thresholds[0] && a<thresholds[1])d.separators|=1;
+        if(b && b<thresholds[1] && b<thresholds[2])d.separators|=2;
+        if(!reverse || d.score>out->score)*out=d;
+    }
 }

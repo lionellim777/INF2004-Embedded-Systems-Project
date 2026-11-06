@@ -1,0 +1,86 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_61_wireless.uf2",
+  "version": "v5.61",
+  "built_at_utc": "2026-11-06T03:07:50.623242+00:00",
+  "base_commit": "5fb1983ea0eee52a58a194246501b21e800c9c92",
+  "uncommitted_workspace": true,
+  "bytes": 1127936,
+  "blocks": 2203,
+  "sha256": "6c7d974d90a52ef74a3726f711caddb5436b58f960f2ae4a29e9391c947e8afc",
+  "linked_text_bytes": 563800,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 219468,
+  "target": "Pico W / RP2040; GP26 barcode, GP28 centre, GP27 right; WiFi core1",
+  "build": "Release -Wall -Wextra -Werror; centred course; local build, not flashed",
+  "physical_v5_60_results": [
+    {
+      "run": 1,
+      "reads": "",
+      "rejected": 5,
+      "recoveries": 23
+    },
+    {
+      "run": 2,
+      "reads": "A",
+      "rejected": 3,
+      "recoveries": 22
+    },
+    {
+      "run": 3,
+      "reads": "",
+      "rejected": 7,
+      "recoveries": 22
+    }
+  ],
+  "diagnosis": "Healthy sampling, time-domain width rejection. Third frozen waveform has plausible *Z* ranks but strict separation fails. Earlier half-A waveform not individually retained; its precise failure remains unconfirmed.",
+  "fix": "Synchronized wheel/ADC data; differential pose using GP26 +80mm forward/+85mm left; widths in forward spatial envelope; same-path recross/stop handling; lateral mismatch rejects frame; per-attempt ledger. v5.60 steering policy retained.",
+  "geometry": {
+    "sensor_forward_mm": 80,
+    "sensor_left_mm": 85,
+    "reference": "powered-wheel midpoint; not front caster",
+    "wheel_diameter_mm": 60,
+    "counts_per_revolution": 2543,
+    "track_mm": 115,
+    "wheel_geometry_status": "existing nominal values, not newly calibrated"
+  },
+  "checks": [
+    "Full UF2 magic/family/index/count/payload/contiguous flash bounds and version/feature markers",
+    "Compiled C web header exactly matches source HTML; whole source HTML present in UF2",
+    "52 analytic right-bend A-Z/orientation tests with offset GP26; lateral path mismatch rejects",
+    "52 spatial A-Z/orientation tests: 4x speed changes, 600ms hold, same-path recross; independent frozen spatial replay/checksum; encoder jump rejects",
+    "Two consecutive spatial frames A/Z retain separate ledger entries and reset projection origin",
+    "832 original waveform cases, 3000 noisy cases, prefix/partial/conflict/quiet/timing/storage negatives",
+    "53 centred and 18 legacy actual-main scenarios; reader continues and defers actions in LOST/TURN/SEEK/BRAKE",
+    "Existing controller, 15 barcode/motion suites, obstacle and packed storage regressions",
+    "Mock wireless/HTTP/core1 tests including 16384-word export bound and unchanged motor service guard",
+    "Mock Chrome controls/mobile and 9000-word/36-chunk export; checksum/capture-change failures",
+    "Five archived accepted A waveforms still replay A; prior successful half-Z 2202-word binary FNVbec1cc17 still replays Z",
+    "All three v5.60 exports checksum verified and remain rejected in time replay; their missing per-sample odometry cannot be reconstructed"
+  ],
+  "physical_status": "v5.61 not physically tested. User reports v5.60 traversed bend in all three runs; logs do not demonstrate the confidence-gated rolling arc firing.",
+  "limits": [
+    "No guarantee during arbitrary motion, wheel slip, off-barcode path or missed stripes.",
+    "Fixed scan-axis projection assumes approximately straight printed stripe axis aligned to initial car heading; large skew/curved print may fail.",
+    "Recross returning >3mm laterally from its old frontier invalidates frame; a fresh capture may follow.",
+    "Forward movement with either symbol orientation supported; whole backwards-driving scans unsupported.",
+    "3mm rejoin bound and nominal wheel geometry require physical validation.",
+    "Latest substantial full waveform only; up to32 attempt summaries, explicit overflow. Export word count is twice reading count in spatial mode.",
+    "16s frame limit, 8192 readings; production CPU max_work_us and physical stopping/clearance remain unmeasured."
+  ],
+  "input_logs": [
+    "docs/testing/logs/20261106-v5_60-barcode-run1.txt",
+    "docs/testing/logs/20261106-v5_60-barcode-run2.txt",
+    "docs/testing/logs/20261106-v5_60-barcode-run3.txt"
+  ],
+  "procedure": "docs/testing/barcode-v5_61-motion-aware.md",
+  "source_sha256": {
+    "barcode_waveform.c": "13f66536a40440006d3dc4925ad26c66f01e1c40493be6038227b841906db93f",
+    "barcode_waveform.h": "ec9ab6f2640dbf9e05b2b59189c309a250a7712eca4c095dfca1522d92c76870",
+    "robot_firmware.c": "a144e6fe7876cee7829d9ca5b40ae27ef2f5e98ea268e62f67b22955b5877218",
+    "course_control.c": "de48e722fafec32535516d9c6994b12b6e29d7b8b213be2fd69ec0d55de06ab4",
+    "course_control.h": "204d565e2d73454795e5c1558c467854916615ee919dacbc3a887f935ed9f5f0",
+    "center_trim.h": "1859d3962a7e81c8e3604f83573c9ca4872c7d29b18940bffef3b8ea5cd7c765",
+    "wireless/calibration.html": "448d6be38935f282b06129ad7c24372462e764941ec1eaeddb532d0c5128aece",
+    "wireless/calibration_page.h": "203daf07a446cc81c52164f4b4b98321800a29ae8f66c722469c75c24538e628"
+  }
+}

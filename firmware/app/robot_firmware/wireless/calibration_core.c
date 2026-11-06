@@ -28,10 +28,12 @@ void calibration_capture(calibration_core_t *c, const char *data, size_t length)
                     }
                     c->optical_result[0]=0;
                     c->motion_detail[0] = c->course_result[0] = c->stop[0] = c->settled[0] = c->summary[0] = c->timing[0] = c->barcode[0] = c->trace[0][0] = c->trace[1][0] = '\0';
+                    c->waveform[0]=0;
                 } else if (strncmp(c->line, "[MOTION STOP]", 13u) == 0 ||
                            strncmp(c->line, "[STOP]", 6u) == 0 || strncmp(c->line, "[SCAN STOP]", 11u) == 0) {
                     memcpy(c->stop, c->line, c->line_length + 1u);
                     c->motion_detail[0]=0;
+                    c->waveform[0]=0;
                     c->course_result[0] = c->settled[0] = c->summary[0] = c->timing[0] = c->barcode[0] = c->trace[0][0] = c->trace[1][0] = '\0';
                 } else if (strncmp(c->line, "[MOTION DETAIL]", 15u) == 0) {
                     memcpy(c->motion_detail,c->line,c->line_length+1u);
@@ -41,6 +43,8 @@ void calibration_capture(calibration_core_t *c, const char *data, size_t length)
                     memcpy(c->summary, c->line, c->line_length + 1u);
                 } else if (strncmp(c->line, "[BARCODE RESULT]", 16u) == 0) {
                     memcpy(c->barcode, c->line, c->line_length + 1u);
+                } else if (strncmp(c->line, "[WAVEFORM RESULT]", 17u) == 0) {
+                    memcpy(c->waveform, c->line, c->line_length + 1u);
                 } else if (strncmp(c->line, "[SCAN EDGES 1]", 14u) == 0) {
                     memcpy(c->trace[0], c->line, c->line_length + 1u);
                 } else if (strncmp(c->line, "[SCAN EDGES 2]", 14u) == 0) {

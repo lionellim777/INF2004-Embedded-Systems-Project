@@ -16,7 +16,7 @@ if(ROBOCAR_STATIONARY_BARCODE)
 else()
     add_executable(robot_firmware
         robot_firmware.c terrain.c encoders.c motion_control.c run_diagnostics.c course_control.c obstacle_bypass.c
-        barcode_decoder.c barcode_reader.c barcode_acquisition.c navigation_commands.c)
+        barcode_decoder.c barcode_reader.c barcode_acquisition.c barcode_waveform.c navigation_commands.c)
 endif()
 
 target_link_libraries(robot_firmware

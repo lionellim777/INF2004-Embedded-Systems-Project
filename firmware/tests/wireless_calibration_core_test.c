@@ -36,12 +36,19 @@ int main(void)
     calibration_capture(&c,barcode,strlen(barcode));assert(strcmp(c.barcode,barcode)==0);
     const char *stream="[BARCODE RESULT] mode=CONTINUOUS reads=2 sequence=AA rejected=0 timeouts=1 paused_fragments=1 last_ended_runs=11 last_ended_widths_us=20000,60000,20000 active_runs=0.\n";
     calibration_capture(&c,stream,strlen(stream));assert(strcmp(c.barcode,stream)==0);
+    const char *wave="[WAVEFORM RESULT] reader=LOCAL_EXTREMA rejected=0 timing_faults=0\n";
+    calibration_capture(&c,wave,strlen(wave));assert(strcmp(c.waveform,wave)==0);
+    const char *drive_dump="[OPTICAL START] source=DRIVE recorded_at_ms=500 motors=OFF\n";
+    calibration_capture(&c,drive_dump,strlen(drive_dump));
+    assert(strcmp(c.waveform,wave)==0); /* Retrospective plot must not erase it. */
     for(unsigned i=0;i<20000;i++)calibration_capture(&c,"Z",1);
     assert(strcmp(c.stop,stop)==0 && strcmp(c.settled,settled)==0);
     assert(strcmp(c.barcode,stream)==0);
+    assert(strcmp(c.waveform,wave)==0);
     calibration_capture(&c,"\n[MOTION GO] next\n",18);
     assert(!strcmp(c.previous_stop,stop)&&!strcmp(c.previous_detail,detail));
     assert(c.motion_detail[0]==0 && c.stop[0]==0 && c.settled[0]==0 && c.summary[0]==0 && c.timing[0]==0 && c.barcode[0]==0);
+    assert(!c.waveform[0]);
     const char *trace1="[SCAN EDGES 1] total=30 time_ms:level=10:B,20:W\n";
     const char *trace2="[SCAN EDGES 2] total=30 time_ms:level=\n";
     calibration_capture(&c,trace1,strlen(trace1));calibration_capture(&c,trace2,strlen(trace2));

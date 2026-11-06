@@ -17,12 +17,12 @@ typedef struct {
 } center_trim_t;
 static inline void center_trim_clear(center_trim_t *t)
 {int last=t->last_good;*t=(center_trim_t){.last_good=last};}
-static inline float center_trim_step(center_trim_t *t,int32_t level,int32_t reference,
-                                    bool right,int32_t l,int32_t r,uint64_t now)
+static inline float center_trim_step_profile(center_trim_t *t,int32_t level,int32_t reference,
+                                    bool right,int32_t l,int32_t r,uint64_t now,bool gentle)
 {
     if(reference<400)reference=400;
     if(reference>1000)reference=1000;
-    int32_t enter=reference*85/100,leave=reference*92/100;
+    int32_t enter=reference*(gentle?90:85)/100,leave=reference*(gentle?95:92)/100;
     if(level>=leave){
         if(t->active && !t->exhausted)t->last_good=t->direction;
         center_trim_clear(t);return 0;
@@ -58,9 +58,13 @@ static inline float center_trim_step(center_trim_t *t,int32_t level,int32_t refe
         t->entry_delta=delta;t->since=t->progress_since=now;
     }
     /* Taper differential speed near recovered tape; never a fixed full turn. */
-    float amount=60.0f+160.0f*(float)(leave-level)/(float)(leave-200);
-    if(amount>220)amount=220;
-    if(amount<60)amount=60;
+    float minimum=gentle?40.0f:60.0f,maximum=gentle?150.0f:220.0f;
+    float amount=minimum+(maximum-minimum)*(float)(leave-level)/(float)(leave-200);
+    if(amount>maximum)amount=maximum;
+    if(amount<minimum)amount=minimum;
     return amount*t->direction;
 }
+static inline float center_trim_step(center_trim_t *t,int32_t level,int32_t reference,
+                                    bool right,int32_t l,int32_t r,uint64_t now)
+{return center_trim_step_profile(t,level,reference,right,l,r,now,false);}
 #endif
