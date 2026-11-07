@@ -27,6 +27,8 @@ STATES = ['unconfigured','joining Wi-Fi','connecting to broker','subscribing','o
 ERRORS = ['none','radio initialization','association request','Wi-Fi/DHCP timeout','Wi-Fi link lost',
           'broker address/client allocation','TCP/MQTT connect request','broker login rejected',
           'subscription failed','broker connection timeout','subscription timeout','broker disconnected']
+WIFI_LINKS = {-3:'authentication failed',-2:'Wi-Fi name not found',-1:'connection failed',
+              0:'down',1:'joining',2:'waiting for IP address',3:'connected with IP address'}
 
 
 class Telemetry:
@@ -176,9 +178,10 @@ class USB:
                 if text.startswith('[RTOS_INFO]'):
                     fields=dict(item.split('=',1) for item in text.split()[1:] if '=' in item)
                     state,error=int(fields.get('network_state',0)),int(fields.get('network_error',0))
-                    key=(fields.get('version'),state,error)
+                    wifi=int(fields.get('wifi_link',0))
+                    key=(fields.get('version'),state,error,wifi)
                     if key!=self.last_network:
-                        print(f"Pico v{key[0]}: {STATES[state] if state<len(STATES) else state}; error: {ERRORS[error] if error<len(ERRORS) else error}",flush=True)
+                        print(f"Pico v{key[0]}: {STATES[state] if state<len(STATES) else state}; error: {ERRORS[error] if error<len(ERRORS) else error}; Wi-Fi: {WIFI_LINKS.get(wifi,wifi)}",flush=True)
                         self.last_network=key
         except (OSError,serial.SerialException,ValueError):
             self.device.close();self.device=None;self.capture.ready=False

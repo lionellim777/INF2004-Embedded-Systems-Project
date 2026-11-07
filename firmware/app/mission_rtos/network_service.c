@@ -26,6 +26,7 @@ static volatile uint16_t policy=200u;
  * candidate. No radio init/association is attempted until local configuration. */
 static const volatile uint8_t network_configured=RTOS_NETWORK_CONFIGURED;
 static volatile uint16_t flags; /* one network writer; aligned diagnostic reads */
+static volatile int8_t wifi_link; /* SDK states -3..3; USB diagnostic only */
 static uint32_t state_ms, status_ms, motion_ms, online_ms, boot_id;
 static uint8_t barcode_latest[BARCODE_RECORD_BYTES], result;
 static binary_command_frame_t command_frame;
@@ -43,6 +44,7 @@ static const char result_topic[]=RTOS_TOPIC_PREFIX "command_result";
 
 uint8_t network_state(void) { return (uint8_t)(policy>>13u); }
 uint8_t network_error(void) { return (uint8_t)((flags&ERROR_MASK)>>ERROR_SHIFT); }
+int8_t network_wifi_link(void) { return wifi_link; }
 static void error_code(uint8_t code)
 { flags=(uint16_t)((flags&~ERROR_MASK) | ((uint16_t)code<<ERROR_SHIFT)); }
 static void state(uint8_t value,uint32_t now)
@@ -146,6 +148,7 @@ static void step(uint32_t now)
 {
     uint8_t current=network_state();
     int link=cyw43_tcpip_link_status(&cyw43_state,CYW43_ITF_STA);
+    wifi_link=(int8_t)link;
     if ((flags&FAILED) || (current!=NETWORK_JOINING && current!=NETWORK_RETRYING && link!=CYW43_LINK_UP)) {
         fail(now,(flags&FAILED)?network_error():4); return;
     }

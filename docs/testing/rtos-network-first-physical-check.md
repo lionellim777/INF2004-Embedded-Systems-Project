@@ -49,6 +49,27 @@ The broker binds only the chosen Mac address and uses the configured topic ACLs.
    terrain and obstacle modules are not physically integrated into this target.
    If macOS asks for Python local-network access, allow it for this local test.
 
+### If Finder does not show RPI-RP2
+
+On 8 November the Mac enumerated an active RP2 Boot interface but would not
+mount its RPI-RP2 disk. The older disk-not-ejected notification did not identify
+the current cause. No disk formatting or firmware erase was needed.
+The official Raspberry Pi picotool v2.3.1 Mac release was downloaded into
+`build/dependencies/picotool-usb-2.3.1/` and its release SHA256 verified.
+USB PICOBOOT read, full-flash backup, firmware load/verify and reboot succeeded
+through the existing USB hub. The backup is under ignored
+`build/rtos-network-backup/`; local flash receipts are under
+`build/rtos-network-local/`. Finder is therefore optional for future flashing.
+See [Raspberry Pi's picotool documentation](https://github.com/raspberrypi/picotool).
+
+USB diagnostics now include `wifi_link`: `-3` authentication failure, `-2` no
+matching Wi-Fi name found, `-1` connection failure, `0` down, `1` joining,
+`2` awaiting an IP address, and `3` connected with an IP address. These are
+the SDK's states and distinguish an absent 2.4 GHz SSID from a DHCP timeout.
+Dual-band routers may advertise separate network names: a name ending in
+`_5G` can identify only the 5 GHz radio, even when the router also supports
+2.4 GHz. Choose the actual 2.4 GHz network name.
+
 If USB does not return, release BOOTSEL, disconnect USB and battery for about
 five seconds, then reconnect normally without holding BOOTSEL. If the console
 reports an error or never receives MQTT motion, stop at this stationary stage

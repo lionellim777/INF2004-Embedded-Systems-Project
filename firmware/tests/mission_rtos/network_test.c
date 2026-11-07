@@ -50,7 +50,7 @@ void board_read(uint8_t b[MOTION_RECORD_BYTES])
 static void online(uint32_t ms)
 {
  flags=INITIALIZED;policy=200;state(NETWORK_JOINING,ms);link=CYW43_LINK_UP;
- step(ms);assert(network_state()==NETWORK_CONNECTING);
+ step(ms);assert(network_state()==NETWORK_CONNECTING && network_wifi_link()==CYW43_LINK_UP);
  step(ms+1);assert(network_state()==NETWORK_SUBSCRIBING);
  step(ms+2);assert(network_state()==NETWORK_ONLINE);
 }
@@ -100,7 +100,11 @@ int main(void)
  client_connected=false;step(4030);assert(network_state()==NETWORK_RETRYING);
  online(10000);subscription_error=ERR_ARG;state(NETWORK_CONNECTING,11000);flags|=CONNECTED;
  step(11000);assert(network_state()==NETWORK_RETRYING && network_error()==8);
- puts("PASS actual MQTT service: explicit byte lengths, Z preservation, STOP-only commands, no start topic, period changes, backpressure, reconnect, subscription failure, clock wrap");
+ for (int diagnostic=-3;diagnostic<=3;++diagnostic) {
+  flags=INITIALIZED;state(NETWORK_JOINING,20000);link=diagnostic;
+  step(20001);assert(network_wifi_link()==diagnostic);
+ }
+ puts("PASS actual MQTT service: explicit byte lengths, Z preservation, STOP-only commands, no start topic, period changes, backpressure, reconnect, subscription failure, clock wrap, signed Wi-Fi diagnostics");
  for(unsigned i=0;i<transmitted;++i) {
   printf("PACKET %s ",sent[i].topic);
   for(size_t j=0;j<sent[i].length;++j)printf("%02x",sent[i].bytes[j]);

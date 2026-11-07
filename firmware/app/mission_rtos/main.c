@@ -59,7 +59,7 @@ static void observer_task(int start_code, void *context)
             last_stop=trace.sequence;
         }
         if (command=='?' || (uint32_t)(now-last_info)>=1000u) {
-            printf("[RTOS_INFO] version=" RTOS_FIRMWARE_VERSION " network_state=%u network_error=%u uptime_ms=%" PRIu32 "\n",network_state(),network_error(),now);
+            printf("[RTOS_INFO] version=" RTOS_FIRMWARE_VERSION " network_state=%u network_error=%u wifi_link=%d uptime_ms=%" PRIu32 "\n",network_state(),network_error(),network_wifi_link(),now);
             last_info=now;
         }
         if ((uint32_t)(now - last_print) >= 200u) {
