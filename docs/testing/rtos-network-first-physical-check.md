@@ -93,6 +93,10 @@ Wi-Fi/DHCP timeout, connection failure, login refusal and subscription failure.
 9. While stopped, type `b`, Enter. The owned broker pauses for two seconds and
    restarts. Wait for automatic reconnection and
    `MQTT: motion telemetry resumed after the interruption.`
+   The broker should report it restarted within a few seconds. The Pico can
+   take about 30 seconds to reconnect because of its retry backoff; avoid
+   repeatedly pressing `b` while waiting. A duplicate press during the pause
+   reports that a restart is already in progress.
    No new physical start should occur. The boot ID/uptime should show the Pico
    did not reset. Optionally repeat this after starting a bounded run to check
    that local control continues while the broker is unavailable; GP20 remains
@@ -100,6 +104,9 @@ Wi-Fi/DHCP timeout, connection failure, login refusal and subscription failure.
 10. Type `q`, Enter. The tool requests USB/MQTT stops and saves files under the
     printed `serial-output/rtos-network-<time>/` folder:
     `usb.log`, `usb.json`, `mqtt.jsonl` and `mqtt-summary.json`.
+    `broker.log` contains any broker startup errors. Quitting during the
+    restart pause cancels it and saves the capture without awaiting a stuck
+    broker shutdown.
     Confirm drive is off before lowering the car. Report whether drive stayed
     off after GP20/MQTT stop and during reconnection. The files can be read
     directly from this shared workspace; no manual upload is required.
@@ -114,6 +121,15 @@ Normal reruns offer to reuse settings and rebuild. If both settings and the
 Mac address are unchanged, `run_rtos_network.sh --reuse` skips the setup/build;
 it verifies the saved firmware and settings hashes before starting services.
 If the Mac address changes, rebuild so the Pico has the correct broker address.
+
+The 8 November restart check exposed a host-helper shutdown hang with an open
+TCP connection. The broker now runs as an owned child process with bounded
+termination; parent exit also closes it. Tests cover live binary traffic,
+an unfinished MQTT login, repeated restarts and cancellation. A subsequent
+stationary Pico check confirmed broker restart, automatic telemetry recovery,
+unchanged boot ID, retained stop latch and another accepted MQTT STOP. See
+[restart recovery evidence](rtos-v0_3-broker-restart-recovery.json). This helper
+fix does not require changing or reflashing the Pico firmware.
 
 Before this physical test, software verification covers target compilation with
 synthetic credentials, real loopback password/ACL tests, binary packet integrity,

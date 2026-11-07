@@ -1,0 +1,63 @@
+{
+  "date_local": "2026-11-08",
+  "source_parent_commit": "50dfef9",
+  "firmware_changed": false,
+  "firmware_reflash_required": false,
+  "problem": "Host broker restart entered shutdown and never completed while one TCP connection remained established; repeated b presses reported an existing pending restart",
+  "root_cause_evidence": "Previous helper reproduced the hang with an accepted TCP connection that sent no MQTT CONNECT; closing that peer released shutdown",
+  "python_server_reference": "https://docs.python.org/3.14/library/asyncio-eventloop.html#asyncio.Server.wait_closed",
+  "fix": "Run the authenticated local broker as an owned child process; bounded termination closes every socket. Parent stdin EOF exits the worker. Quit cancels a pending restart before saving logs.",
+  "software_tests": {
+    "old_shutdown_hang_reproduced": true,
+    "two_restart_cycles_with_binary_traffic_and_idle_tcp_peer": "PASS",
+    "robot_and_observer_automatic_reconnect": "PASS",
+    "parent_eof_worker_exit": "PASS",
+    "actual_console_b_then_q_saves_and_cleans_up": "PASS",
+    "usb_and_mqtt_command_gates": "PASS"
+  },
+  "live_pico_check": {
+    "checked_utc": "2026-11-07T17:40:28.992633+00:00",
+    "passed": true,
+    "broker_restart_seconds": 2.145,
+    "pico_boot_id_unchanged": true,
+    "pico_boot_id": 1405192666,
+    "pico_uptime_before_ms": 481840,
+    "pico_uptime_after_ms": 512740,
+    "valid_motion_packets": 6,
+    "fault_codes": [
+      0
+    ],
+    "usb_phases_seen": [
+      3
+    ],
+    "final_stop_latched": true,
+    "mqtt_stop_ack_after_reconnect": true,
+    "no_start_sent": true,
+    "physical_observations_pending": true
+  },
+  "live_pico_check_local": "serial-output/rtos-network-restart-verification-20261108/restart-check.json",
+  "live_pico_check_sha256": "c1794f3bec1aa11342f0b84dfd0c37bd39976f44e2c4a8ab9b17cefd95f85a73",
+  "original_session_recovered_usb": "serial-output/rtos-network-20261108-005922/usb-recovered.json",
+  "original_session_recovered_mqtt": "serial-output/rtos-network-20261108-005922/mqtt-recovered-summary.json",
+  "original_session_observations": {
+    "controller_fault_codes": [
+      0
+    ],
+    "user_stop_traces": 3,
+    "user_mqtt_stop_requests": 2,
+    "acknowledged_user_mqtt_stops": 2,
+    "additional_stationary_agent_acknowledgement": 1,
+    "failed_restart_begin": 1,
+    "failed_restart_complete": 0
+  },
+  "source_sha256": {
+    "tools/rtos_network_session.py": "9f3b65b0d2307790f99186f55bd38eff63030e30c6f12d48e30228fd68608133",
+    "tools/rtos_broker_worker.py": "cfebc2102b73355d98430fd0052b28cc97094403dcda367b622a15360894cdf4",
+    "tools/test_rtos_network_setup.py": "edb3b5357545a9771cd7e46886ee7ef41db7175bbcfb8af480650226abd0212c"
+  },
+  "limits": [
+    "The live recovery check did not start the car; its captured phase remained aborted and stop-latched",
+    "User confirmation of physical stopping and no restart after GP20 release is still required",
+    "Worst-case RTOS/stop deadlines, loaded track performance, runtime stack margins and combined mission remain unverified"
+  ]
+}

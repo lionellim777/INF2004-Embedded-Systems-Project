@@ -8,33 +8,129 @@ from pathlib import Path
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import warnings
 
 from rtos_network_setup import PREFIX, validate, write_settings, broker_config
 
 
+async def console_quit_during_restart(settings,folder):
+    """Drive the actual input/finally path; only USB is replaced, never the broker."""
+    import rtos_network_session as session
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
+    commands=[]
+    class USBFixture:
+        def __init__(self,capture):self.capture=capture
+        def poll(self):pass
+        def command(self,key):commands.append(key)
+        def close(self):pass
+    original=(session.ROOT,session.USB,sys.stdin)
+    read_fd,write_fd=os.pipe();reader=os.fdopen(read_fd)
+    task=None
+    try:
+        session.ROOT=Path(folder)/'console-quit'
+        session.USB=USBFixture;sys.stdin=reader
+        task=asyncio.create_task(session.run(dict(settings,broker_ip='127.0.0.1',port=port),
+            Path(folder)/'fixture.uf2',folder,flash_hint=False))
+        # Wait for the real worker readiness before driving b then q.
+        for _ in range(100):
+            if list(session.ROOT.glob('serial-output/*/broker.log')):
+                await asyncio.sleep(.3);break
+            await asyncio.sleep(.03)
+        os.write(write_fd,b'b\n');await asyncio.sleep(.15)
+        os.write(write_fd,b'q\n')
+        await asyncio.wait_for(task,5)
+        logs=list(session.ROOT.glob('serial-output/*'));assert len(logs)==1
+        for name in ['usb.log','usb.json','mqtt.jsonl','mqtt-summary.json']:
+            assert (logs[0]/name).exists(),name
+        events=[json.loads(l)['event'] for l in (logs[0]/'mqtt.jsonl').read_text().splitlines()]
+        assert 'broker_restart_begin' in events and 'broker_restart_cancelled' in events
+        assert commands==['x'],'Quit did not request exactly one USB stop'
+        with socket.socket() as probe:
+            assert probe.connect_ex(('127.0.0.1',port))!=0,'Quit left a broker listening'
+    finally:
+        if task is not None and not task.done():
+            task.cancel()
+            try:await task
+            except asyncio.CancelledError:pass
+        session.ROOT,session.USB,sys.stdin=original
+        reader.close();os.close(write_fd)
+
+
 async def console_reconnect(settings,folder):
     from rtos_network_session import Link,Telemetry
+    import paho.mqtt.client as mqtt
     with socket.socket() as sock:
         sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
     local=dict(settings,broker_ip='127.0.0.1',port=port)
     telemetry=Telemetry(Path(folder)/'console-mqtt.jsonl')
     link=Link(local,folder,telemetry)
+    robot=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,client_id='fixture-robot')
+    robot.username_pw_set(settings['robot_user'],settings['robot_password'])
+    robot.will_set(PREFIX+'link',b'\x01',qos=1,retain=True)
+    robot.on_connect=lambda client,*args:client.subscribe(PREFIX+'command/#',qos=1)
+    idle_writer=None;pump=None
+    async def traffic():
+        while True:
+            if robot.is_connected():robot.publish(PREFIX+'motion',bytes.fromhex('00000000000000000000000001'))
+            await asyncio.sleep(.03)
     try:
         await link.start()
         for _ in range(100):
             if telemetry.summary['connections']>=1:break
             await asyncio.sleep(.03)
         assert telemetry.summary['connections']==1
-        await link.restart()
+        robot.connect_async('127.0.0.1',port,keepalive=15);robot.loop_start()
+        pump=asyncio.create_task(traffic())
+        for _ in range(150):
+            if telemetry.summary['valid_motion_packets']:break
+            await asyncio.sleep(.03)
+        assert telemetry.summary['valid_motion_packets']
+        # An accepted TCP peer that never sends MQTT CONNECT was absent from
+        # the old test. It can keep Server.wait_closed() blocked indefinitely.
+        idle_reader,idle_writer=await asyncio.open_connection('127.0.0.1',port)
+        await asyncio.sleep(.05)
+        first_worker=link.broker
+        await asyncio.wait_for(link.restart(),8)
+        assert first_worker.returncode is not None
+        assert await asyncio.wait_for(idle_reader.read(1),2)==b''
         for _ in range(200):
-            if telemetry.summary['connections']>=2:break
+            if telemetry.summary['connections']>=2 and robot.is_connected():break
             await asyncio.sleep(.03)
         assert telemetry.summary['connections']>=2
+        assert robot.is_connected()
         assert telemetry.summary['broker_restarts_requested']==1
+        # A second outage must also recover real binary traffic automatically.
+        count=telemetry.summary['valid_motion_packets']
+        await asyncio.wait_for(link.restart(),8)
+        for _ in range(200):
+            if telemetry.summary['valid_motion_packets']>count:break
+            await asyncio.sleep(.03)
+        assert telemetry.summary['valid_motion_packets']>count
+        assert telemetry.summary['broker_restarts_requested']==2
+        # Quitting during the pause must cancel promptly, not await shutdown.
+        restart=asyncio.create_task(link.restart())
+        await asyncio.sleep(.1);restart.cancel()
+        try:await asyncio.wait_for(restart,2)
+        except asyncio.CancelledError:pass
+        await link.start_broker()
+        orphan=link.broker
+        orphan.stdin.close()
+        await asyncio.wait_for(orphan.wait(),3)
+        assert orphan.returncode==0,'Worker remained alive after parent stdin closed'
     finally:
-        await link.close();telemetry.save(Path(folder)/'console-summary.json')
+        if pump is not None:
+            pump.cancel()
+            try:await pump
+            except asyncio.CancelledError:pass
+        if idle_writer is not None:
+            idle_writer.close();await idle_writer.wait_closed()
+        robot.disconnect();await asyncio.to_thread(robot.loop_stop)
+        await asyncio.wait_for(link.close(),6)
+        assert link.broker is None
+        telemetry.save(Path(folder)/'console-summary.json')
 
 
 async def authenticated_roundtrip(settings, folder):
@@ -130,7 +226,9 @@ def main():
         asyncio.run(authenticated_roundtrip(settings,folder))
         print('PASS real broker: anonymous/wrong-password denied, binary telemetry and empty STOP delivered, telemetry spoof blocked')
         asyncio.run(console_reconnect(settings,folder))
-        print('PASS actual operator console: authenticated connection, owned broker restart and automatic observer reconnect')
+        print('PASS actual operator console: two bounded restarts with live binary traffic, LWT and idle TCP peer; robot/observer reconnect; cancellation, cleanup and parent-EOF exit')
+        asyncio.run(console_quit_during_restart(settings,folder))
+        print('PASS actual console b/q input: pending restart cancelled, USB STOP requested, four capture files saved, no broker left listening')
 
 
 if __name__=='__main__':main()

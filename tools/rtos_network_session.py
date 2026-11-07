@@ -16,7 +16,6 @@ import subprocess
 import sys
 import threading
 import time
-import warnings
 from zoneinfo import ZoneInfo
 
 from rtos_bench import Capture
@@ -109,13 +108,36 @@ class Link:
         self.telemetry.event('observer_disconnect',reason=str(reason))
 
     async def start_broker(self):
-        from amqtt.broker import Broker
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore',DeprecationWarning)
-            warnings.filterwarnings('ignore',message="The 'acl' option is deprecated.*",category=UserWarning)
-            self.broker=Broker(broker_config(self.settings,self.folder))
-        await self.broker.start()
-        self.broker_started=True
+        log=Path(self.telemetry.stream.name).parent/'broker.log'
+        with log.open('a') as errors:
+            self.broker=await asyncio.create_subprocess_exec(sys.executable,
+                str(Path(__file__).with_name('rtos_broker_worker.py')),stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,stderr=errors)
+        try:
+            self.broker.stdin.write((json.dumps(broker_config(self.settings,self.folder))+'\n').encode())
+            await self.broker.stdin.drain()
+            ready=await asyncio.wait_for(self.broker.stdout.readline(),5)
+            if ready!=b'BROKER_READY\n':
+                raise RuntimeError(f'Broker did not start; details: {log}')
+            self.broker_started=True
+            self.telemetry.event('broker_process_started',pid=self.broker.pid)
+        except BaseException:
+            await self.stop_broker()
+            raise
+
+    async def stop_broker(self):
+        process=self.broker
+        if process is not None and process.returncode is None:
+            try:process.terminate()
+            except ProcessLookupError:pass
+            try:await asyncio.wait_for(process.wait(),3)
+            except asyncio.TimeoutError:
+                try:process.kill()
+                except ProcessLookupError:pass
+                await asyncio.wait_for(process.wait(),2)
+        if process is not None and process.stdin is not None:process.stdin.close()
+        self.broker=None
+        self.broker_started=False
 
     async def start(self):
         await self.start_broker()
@@ -135,18 +157,20 @@ class Link:
         with self.telemetry.lock:self.telemetry.summary['broker_restarts_requested']+=1
         self.telemetry.event('broker_restart_begin')
         print('Pausing the broker for two seconds. GP20 and USB stop remain available.',flush=True)
-        await self.broker.shutdown()
-        self.broker_started=False
-        await asyncio.sleep(2)
-        await self.start_broker()
-        self.telemetry.event('broker_restart_complete')
-        print('Broker restarted. Waiting for automatic reconnection...',flush=True)
+        try:
+            await self.stop_broker()
+            await asyncio.sleep(2)
+            await self.start_broker()
+            self.telemetry.event('broker_restart_complete')
+            print('Broker restarted. Waiting for automatic reconnection...',flush=True)
+        except asyncio.CancelledError:
+            self.telemetry.event('broker_restart_cancelled')
+            raise
 
     async def close(self):
         self.client.disconnect()
         await asyncio.to_thread(self.client.loop_stop)
-        if self.broker_started:
-            await self.broker.shutdown();self.broker_started=False
+        await self.stop_broker()
 
 
 class USB:
@@ -197,7 +221,7 @@ class USB:
         if self.device is not None:self.device.close()
 
 
-async def run(settings,image,folder):
+async def run(settings,image,folder,flash_hint=True):
     stamp=datetime.now(ZoneInfo('Asia/Singapore')).strftime('%Y%m%d-%H%M%S')
     logs=ROOT/'serial-output'/('rtos-network-'+stamp);logs.mkdir(parents=True)
     capture=Capture(logs/'usb')
@@ -207,10 +231,11 @@ async def run(settings,image,folder):
     try:
         await link.start()
         print('\nKeep BOTH powered wheels clear of the table. No track is needed.')
-        print('Flash this file using BOOTSEL, then reconnect normally:',image)
+        if flash_hint:print('Flash this file using BOOTSEL, then reconnect normally:',image)
+        else:print('Reusing configured v0.3. No flashing is needed; waiting for the Pico.')
         print('f=select 30cm | x=USB stop | m=MQTT stop | b=restart broker | q=save/exit')
         print('There is no remote START. GP20 starts and stops physically. Logs:',logs,flush=True)
-        if sys.platform=='darwin':subprocess.Popen(['open','-R',str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        if flash_hint and sys.platform=='darwin':subprocess.Popen(['open','-R',str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         while True:
             usb.poll()
             if select.select([sys.stdin],[],[],0)[0]:
@@ -227,7 +252,9 @@ async def run(settings,image,folder):
                     else:print('Use f, x, m, b or q; start with GP20.',flush=True)
                 except (ValueError,OSError) as error:print(error,flush=True)
             if restart is not None and restart.done():
-                restart.result();restart=None
+                try:restart.result()
+                except Exception as error:print('Broker restart failed:',error,'; USB/GP20 stop remain available.',flush=True)
+                restart=None
             await asyncio.sleep(0.03)
     finally:
         try:usb.command('x')
@@ -236,7 +263,9 @@ async def run(settings,image,folder):
             try:link.stop()
             except ValueError:pass
         if restart is not None:
+            if not restart.done():restart.cancel()
             try:await restart
+            except asyncio.CancelledError:pass
             except Exception as error:print('Broker restart failed:',type(error).__name__,flush=True)
         for _ in range(10):
             usb.poll();await asyncio.sleep(0.03)
@@ -264,7 +293,7 @@ def main():
                hashlib.sha256(json.dumps(settings,sort_keys=True).encode()).hexdigest()!=metadata['settings_sha256']:
                 parser.error('Saved image/settings changed; rerun without --reuse to rebuild')
         else:settings,image=prepare()
-        asyncio.run(run(settings,image,PRIVATE))
+        asyncio.run(run(settings,image,PRIVATE,flash_hint=not args.reuse))
     except KeyboardInterrupt:pass
     except (OSError,ValueError,RuntimeError) as error:
         parser.exit(1,f'Setup stopped: {error}\n')

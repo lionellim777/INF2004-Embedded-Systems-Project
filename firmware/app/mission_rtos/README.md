@@ -13,8 +13,11 @@ The [v0.3 setup validation](../../../docs/testing/rtos-v0_3-setup-validation.jso
 records software-only checks; it does not claim a completed Pico radio test.
 The subsequent [stationary Pico Wi-Fi/MQTT acceptance](../../../docs/testing/rtos-v0_3-stationary-mqtt-acceptance.json)
 confirms association, DHCP, real binary motion telemetry and an empty STOP
-acknowledgement after selecting the router's 2.4 GHz SSID. Motor-under-network
-stop tests and live Pico broker-restart recovery remain pending.
+acknowledgement after selecting the router's 2.4 GHz SSID. The subsequent
+[live Pico restart check](../../../docs/testing/rtos-v0_3-broker-restart-recovery.json)
+confirms telemetry recovery without a Pico reset and with the stop latch retained,
+after fixing the host console's broker shutdown. User confirmation of physical
+stopping under network traffic and measured timing/stack margins remain pending.
 
 ## What is implemented
 
