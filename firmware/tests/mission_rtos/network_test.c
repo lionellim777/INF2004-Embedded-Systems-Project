@@ -94,12 +94,12 @@ int main(void)
  data(NULL,p+1,1,1);assert((policy&8191)==1000);
  publication_error=ERR_ARG;uint32_t previous_motion=motion_ms;step(3000);assert(motion_ms==previous_motion);
  publication_error=0;step(3010);assert(motion_ms==3010);
- link=0;step(3020);assert(network_state()==NETWORK_RETRYING);
+ link=0;step(3020);assert(network_state()==NETWORK_RETRYING && network_error()==4);
  link=CYW43_LINK_UP;step(4019);assert(network_state()==NETWORK_RETRYING);
- step(4020);step(4021);step(4022);assert(network_state()==NETWORK_ONLINE);
+ step(4020);step(4021);step(4022);assert(network_state()==NETWORK_ONLINE && network_error()==0);
  client_connected=false;step(4030);assert(network_state()==NETWORK_RETRYING);
  online(10000);subscription_error=ERR_ARG;state(NETWORK_CONNECTING,11000);flags|=CONNECTED;
- step(11000);assert(network_state()==NETWORK_RETRYING);
+ step(11000);assert(network_state()==NETWORK_RETRYING && network_error()==8);
  puts("PASS actual MQTT service: explicit byte lengths, Z preservation, STOP-only commands, no start topic, period changes, backpressure, reconnect, subscription failure, clock wrap");
  for(unsigned i=0;i<transmitted;++i) {
   printf("PACKET %s ",sent[i].topic);

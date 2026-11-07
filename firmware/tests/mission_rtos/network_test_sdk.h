@@ -14,6 +14,7 @@ typedef struct { int dummy; } cyw43_t;
 extern cyw43_t cyw43_state;
 enum { ERR_OK, ERR_ARG, MQTT_CONNECT_ACCEPTED=0, MQTT_DATA_FLAG_LAST=1,
        CYW43_LINK_UP=3, CYW43_ITF_STA=0, CYW43_AUTH_WPA2_AES_PSK=1 };
+enum { MQTT_CONNECT_DISCONNECTED=256, MQTT_CONNECT_TIMEOUT=257 };
 typedef void (*mqtt_request_cb_t)(void *,err_t);
 struct mqtt_connect_client_info_t {
  const char *client_id,*client_user,*client_pass;

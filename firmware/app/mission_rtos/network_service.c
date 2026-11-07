@@ -16,14 +16,16 @@
 #include <string.h>
 
 enum { INITIALIZED=1u, CONNECTED=2u, FAILED=4u, FORCE_STATUS=8u,
-       SUB_SHIFT=4u, SUB_MASK=48u, RESULT_PENDING=64u, RETRY_SHIFT=7u, RETRY_MASK=896u };
-/* policy: period bits0..12 (200..5000), state13..15. flags: above; bits10..15 zero.
+       SUB_SHIFT=4u, SUB_MASK=48u, RESULT_PENDING=64u, RETRY_SHIFT=7u, RETRY_MASK=896u,
+       ERROR_SHIFT=10u,ERROR_MASK=15360u };
+/* policy: period bits0..12 (200..5000), state13..15. flags: above, error10..13;
+ * bits14..15 zero.
  * Network task is the sole writer; observer reads an aligned halfword. */
 static volatile uint16_t policy=200u;
 /* Keep the complete radio path compiled even in the default unconfigured
  * candidate. No radio init/association is attempted until local configuration. */
 static const volatile uint8_t network_configured=RTOS_NETWORK_CONFIGURED;
-static uint16_t flags;
+static volatile uint16_t flags; /* one network writer; aligned diagnostic reads */
 static uint32_t state_ms, status_ms, motion_ms, online_ms, boot_id;
 static uint8_t barcode_latest[BARCODE_RECORD_BYTES], result;
 static binary_command_frame_t command_frame;
@@ -40,6 +42,9 @@ static const char stop_command[]=RTOS_TOPIC_PREFIX "command/stop";
 static const char result_topic[]=RTOS_TOPIC_PREFIX "command_result";
 
 uint8_t network_state(void) { return (uint8_t)(policy>>13u); }
+uint8_t network_error(void) { return (uint8_t)((flags&ERROR_MASK)>>ERROR_SHIFT); }
+static void error_code(uint8_t code)
+{ flags=(uint16_t)((flags&~ERROR_MASK) | ((uint16_t)code<<ERROR_SHIFT)); }
 static void state(uint8_t value,uint32_t now)
 { policy=(uint16_t)((policy&8191u) | ((uint16_t)value<<13u)); state_ms=now; }
 bool network_barcode(uint32_t ms,char letter,bool valid,bool simulated)
@@ -56,10 +61,11 @@ static void read_barcode(uint8_t bytes[BARCODE_RECORD_BYTES])
     memcpy(bytes,barcode_latest,BARCODE_RECORD_BYTES);
     restore_interrupts(irq);
 }
-static void fail(uint32_t now)
+static void fail(uint32_t now,uint8_t code)
 {
     if (client!=NULL) mqtt_disconnect(client);
     flags&=(uint16_t)~(CONNECTED|FAILED|SUB_MASK|RESULT_PENDING);
+    error_code(code); /* cancellation callbacks must not replace the root cause */
     command_frame.state=0;
     state(NETWORK_RETRYING,now);
 }
@@ -68,14 +74,18 @@ static void connection(mqtt_client_t *c,void *context,mqtt_connection_status_t r
     (void)c; (void)context;
     if (network_state()!=NETWORK_CONNECTING) return;
     if (result_code==MQTT_CONNECT_ACCEPTED) flags|=CONNECTED;
-    else flags|=FAILED;
+    else {
+        error_code(result_code==MQTT_CONNECT_TIMEOUT?9:
+            result_code==MQTT_CONNECT_DISCONNECTED?11:7);
+        flags|=FAILED;
+    }
 }
 static void subscribed(void *context,err_t error)
 {
     (void)context;
     if (network_state()!=NETWORK_SUBSCRIBING) return;
     unsigned count=(flags&SUB_MASK)>>SUB_SHIFT;
-    if (error!=ERR_OK || count>=3) flags|=FAILED;
+    if (error!=ERR_OK || count>=3) { error_code(8);flags|=FAILED; }
     else flags=(uint16_t)((flags&~SUB_MASK) | ((count+1u)<<SUB_SHIFT));
 }
 static void incoming(void *context,const char *topic,u32_t length)
@@ -114,12 +124,12 @@ static void join(uint32_t now)
 {
     if (cyw43_arch_wifi_connect_async(RTOS_WIFI_SSID,RTOS_WIFI_PASSWORD,CYW43_AUTH_WPA2_AES_PSK)==0)
         state(NETWORK_JOINING,now);
-    else fail(now);
+    else fail(now,2);
 }
 static void connect_broker(uint32_t now)
 {
     if (client==NULL) client=mqtt_client_new();
-    if (client==NULL || !ipaddr_aton(RTOS_BROKER_IPV4,&address)) { fail(now); return; }
+    if (client==NULL || !ipaddr_aton(RTOS_BROKER_IPV4,&address)) { fail(now,5); return; }
     /* SDK2.1.1 lwIP only accepts a NUL-terminated will. A one-byte binary
      * link code avoids embedded-NUL truncation without modifying the SDK:
      * 0 unknown, 1 offline, 2 online. Numeric code, not an ASCII digit. */
@@ -130,32 +140,33 @@ static void connect_broker(uint32_t now)
     mqtt_set_inpub_callback(client,incoming,data,NULL);
     flags&=(uint16_t)~(CONNECTED|FAILED|SUB_MASK);
     state(NETWORK_CONNECTING,now);
-    if (mqtt_client_connect(client,&address,RTOS_BROKER_PORT,connection,NULL,&info)!=ERR_OK) fail(now);
+    if (mqtt_client_connect(client,&address,RTOS_BROKER_PORT,connection,NULL,&info)!=ERR_OK) fail(now,6);
 }
 static void step(uint32_t now)
 {
     uint8_t current=network_state();
     int link=cyw43_tcpip_link_status(&cyw43_state,CYW43_ITF_STA);
     if ((flags&FAILED) || (current!=NETWORK_JOINING && current!=NETWORK_RETRYING && link!=CYW43_LINK_UP)) {
-        fail(now); return;
+        fail(now,(flags&FAILED)?network_error():4); return;
     }
     if (current==NETWORK_JOINING) {
         if (link==CYW43_LINK_UP) connect_broker(now);
-        else if ((uint32_t)(now-state_ms)>=15000u) fail(now);
+        else if ((uint32_t)(now-state_ms)>=15000u) fail(now,3);
     } else if (current==NETWORK_CONNECTING) {
         if (flags&CONNECTED) {
             flags&=(uint16_t)~SUB_MASK; state(NETWORK_SUBSCRIBING,now);
             if (mqtt_subscribe(client,status_command,1,subscribed,NULL)!=ERR_OK ||
                 mqtt_subscribe(client,period_command,1,subscribed,NULL)!=ERR_OK ||
-                mqtt_subscribe(client,stop_command,1,subscribed,NULL)!=ERR_OK) fail(now);
-        } else if ((uint32_t)(now-state_ms)>=10000u) fail(now);
+                mqtt_subscribe(client,stop_command,1,subscribed,NULL)!=ERR_OK) fail(now,8);
+        } else if ((uint32_t)(now-state_ms)>=10000u) fail(now,9);
     } else if (current==NETWORK_SUBSCRIBING) {
         if (((flags&SUB_MASK)>>SUB_SHIFT)==3u) {
             state(NETWORK_ONLINE,now); online_ms=now; status_ms=now; motion_ms=now;
             flags|=FORCE_STATUS;
-        } else if ((uint32_t)(now-state_ms)>=10000u) fail(now);
+            error_code(0);
+        } else if ((uint32_t)(now-state_ms)>=10000u) fail(now,10);
     } else if (current==NETWORK_ONLINE) {
-        if (!mqtt_client_is_connected(client)) { fail(now); return; }
+        if (!mqtt_client_is_connected(client)) { fail(now,11); return; }
         if ((uint32_t)(now-online_ms)>=30000u) flags&=(uint16_t)~RETRY_MASK;
         if ((flags&FORCE_STATUS) || (uint32_t)(now-status_ms)>=1000u) {
             uint8_t barcode[5],status_bytes[10],motion[MOTION_RECORD_BYTES]; read_barcode(barcode);
@@ -197,7 +208,7 @@ void network_task(int start_code,void *context)
                 if (network_state()!=NETWORK_RETRYING || (uint32_t)(now-state_ms)>=1000u) {
                     if (cyw43_arch_init()==0) {
                         flags|=INITIALIZED; cyw43_arch_enable_sta_mode(); join(now);
-                    } else fail(now);
+                    } else fail(now,1);
                 }
             } else { cyw43_arch_poll(); step(now); }
         }

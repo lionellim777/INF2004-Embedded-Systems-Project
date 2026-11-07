@@ -1,0 +1,98 @@
+# First Pico Wi-Fi and binary MQTT hardware check
+
+The v0.2 USB run is accepted for observed RTOS boot, one bounded completion and
+two user-stop events. See [the saved bench evidence](rtos-v0_2-usb-acceptance.json).
+The next check connects the Pico to an authenticated MQTT broker on this Mac.
+The car stays on its support; no track, barcode or hump is needed.
+
+## Start the single-console setup
+
+1. Keep both powered wheels free of the table, normal motor power available,
+   and the USB data cable connected. Leave the old USB helper closed.
+2. Connect this Mac to the Wi-Fi network to be used for the test. The network
+   must support 2.4 GHz and permit the Pico and Mac to communicate. No internet
+   service/cloud broker is required.
+3. Run in Terminal:
+
+   ```sh
+   sh "/Users/cyix/Github/INF2004-Embedded-Systems-Project/tools/run_rtos_network.sh"
+   ```
+
+4. Enter the Wi-Fi name and its password at the local prompts. The password is
+   hidden. Accept the displayed Mac broker address if it matches the current
+   Wi-Fi interface. It was `192.168.1.9` when prepared; the tool detects it again.
+   Do not paste passwords into chat.
+
+The tool generates separate robot/observer broker credentials, writes private
+settings under ignored `build/rtos-network-local/`, and builds the actual
+configured firmware. It then starts the broker, subscriber and USB logger.
+No motor START is sent. Anonymous clients and incorrect passwords are rejected;
+the observer account can send commands but cannot forge robot telemetry.
+The broker binds only the chosen Mac address and uses the configured topic ACLs.
+
+## Flash and confirm stationary data
+
+5. Finder reveals the generated file:
+   `build/rtos-network/robocar_rtos_network_v0_3.uf2`.
+   Flash **that generated file** using the normal BOOTSEL method. Keep the test
+   console running. It reconnects after the Pico returns. This image contains
+   local credentials: keep it in the ignored build folder, not in git/releases.
+   This bring-up image waits for the USB console before starting the kernel so
+   early startup messages are captured. Keep USB connected for this test.
+6. Wait for both:
+
+   - `Pico v0.3: online; error: none`
+   - `MQTT: valid motion data received from the Pico.`
+
+   The wheels must remain undriven. The source masks must identify motion as
+   available and the other sensor producers as unavailable. Barcode, line,
+   terrain and obstacle modules are not physically integrated into this target.
+   If macOS asks for Python local-network access, allow it for this local test.
+
+If USB does not return, release BOOTSEL, disconnect USB and battery for about
+five seconds, then reconnect normally without holding BOOTSEL. If the console
+reports an error or never receives MQTT motion, stop at this stationary stage
+and send the saved logs; motor tests are not needed to diagnose association or
+broker login failures. `network_error` distinguishes radio initialization,
+Wi-Fi/DHCP timeout, connection failure, login refusal and subscription failure.
+
+## Stop and recovery checks
+
+7. Type `f`, Enter to select the bounded motor test. Press/release GP20 to
+   start. Once the wheels turn, press/hold GP20 to abort, then release it.
+   Drive must remain off. This repeats the physical stop with networking active.
+8. While stopped, type `m` **without Enter**. Press/release GP20 to start a new
+   run; as soon as the wheels turn, press Enter. The console should report a
+   Pico MQTT STOP acknowledgement, followed by the USB aborted/latched state.
+   Confirm drive is removed and remains off. Acknowledgement alone does not
+   prove physical stopping.
+9. While stopped, type `b`, Enter. The owned broker pauses for two seconds and
+   restarts. Wait for automatic reconnection and
+   `MQTT: motion telemetry resumed after the interruption.`
+   No new physical start should occur. The boot ID/uptime should show the Pico
+   did not reset. Optionally repeat this after starting a bounded run to check
+   that local control continues while the broker is unavailable; GP20 remains
+   the physical stop and `x` is the independent USB stop.
+10. Type `q`, Enter. The tool requests USB/MQTT stops and saves files under the
+    printed `serial-output/rtos-network-<time>/` folder:
+    `usb.log`, `usb.json`, `mqtt.jsonl` and `mqtt-summary.json`.
+    Confirm drive is off before lowering the car. Report whether drive stayed
+    off after GP20/MQTT stop and during reconnection. The files can be read
+    directly from this shared workspace; no manual upload is required.
+
+The console supports selection and STOP, never remote START. Each run needs
+GP20. Network failure does not authorize or restart motion. The standard
+v5.63 track firmware remains unchanged and available for restoring normal use.
+
+## Repeat sessions and evidence boundaries
+
+Normal reruns offer to reuse settings and rebuild. If both settings and the
+Mac address are unchanged, `run_rtos_network.sh --reuse` skips the setup/build;
+it verifies the saved firmware and settings hashes before starting services.
+If the Mac address changes, rebuild so the Pico has the correct broker address.
+
+Before this physical test, software verification covers target compilation with
+synthetic credentials, real loopback password/ACL tests, binary packet integrity,
+broker restart, USB command gates and motor/stop host regressions. It does not
+establish Pico radio operation, loaded motion accuracy, full mission completion,
+runtime stack margins or a worst-case physical stopping bound.

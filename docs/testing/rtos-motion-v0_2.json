@@ -22,8 +22,8 @@
     4096
   ],
   "main_stack_reservation_bytes": 4096,
-  "physical_tests_performed": false,
-  "flashed": false,
+  "physical_tests_performed": true,
+  "flashed": true,
   "hardware_network_tested": false,
   "runtime_stack_margins_measured": false,
   "network_path_compiled": true,
@@ -116,5 +116,8 @@
     "tools/test_rtos_bench.py": "39c9ab50e6c8ab96bf6d6032effb647de16ff5cc110b386c991aee0180953f28",
     "tools/test_rtos_motion.py": "5e1c2c3ca7d4151d998fad3b5d832f8f70de5fbd8e26f1e8d8b341e3ca909242",
     "tools/test_rtos_network.py": "5a4155d489c38c8eb32eaec6097d42f0db5845d12edf3cc57ae0489bd8626290"
-  }
+  },
+  "source_commit": "d58f686",
+  "flashed_by": "user",
+  "hardware_validation": "docs/testing/rtos-v0_2-usb-acceptance.json"
 }

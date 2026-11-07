@@ -1,9 +1,16 @@
-# µT-Kernel motion foundation v0.2
+# µT-Kernel motion foundation v0.3
 
 This separate Pico W target starts the real µT-Kernel scheduler and uses the
 existing quadrature encoder driver and calibrated motion controller. It is a
 USB bench-test build, not the combined line/barcode/obstacle/terrain mission.
 The v5.63 target and accepted UF2 remain unchanged.
+
+The v0.2 USB hardware check now has [recorded acceptance evidence](../../../docs/testing/rtos-v0_2-usb-acceptance.json):
+bounded completion plus GP20/USB aborts, with no reported controller faults.
+v0.3 adds the local Wi-Fi provisioning/broker console and network diagnostics.
+Use the [next physical network checklist](../../../docs/testing/rtos-network-first-physical-check.md).
+The [v0.3 setup validation](../../../docs/testing/rtos-v0_3-setup-validation.json)
+records software-only checks; it does not claim a completed Pico radio test.
 
 ## What is implemented
 
@@ -85,7 +92,9 @@ python3 tools/test_rtos_motion.py
 The build helper accepts `PICO_SDK_PATH`, `PICO_TOOLCHAIN_PATH`, `MTK_BSP_PATH`,
 `ROBOT_CMAKE`, `ROBOT_NINJA` and `ROBOT_PICOTOOL_DIR` overrides. Its default
 picotool directory is the one already used by the calibration build.
-Build output is `build/rtos-motion/robocar_rtos_motion.uf2`. Nothing is flashed
+Default build output is `build/rtos-motion/robocar_rtos_motion_v0_3.uf2`; network
+setup builds separately under `build/rtos-network/` using a private settings
+header supplied by `RTOS_NETWORK_SETTINGS_FILE`. Nothing is flashed
 by these commands. Build/host evidence is in
 [the v0.2 report](../../../docs/testing/rtos-motion-v0_2.json).
 The [v0.1 report](../../../docs/testing/rtos-motion-foundation.json) is a
@@ -119,8 +128,10 @@ hardware test.
 
 ## First physical acceptance
 
-This candidate has built and passed host simulation; **it has not run on the
-robot**. Keep the accepted v5.63 UF2 available for ordinary track operation.
+The v0.2 USB candidate has now run on the robot; the first network-enabled
+v0.3 physical test remains pending. Keep the v5.63 UF2 for normal track use.
+The steps below describe the original USB check; do not repeat them solely
+because the software version changed. Follow the network checklist next.
 
 Use the [specific first-test instructions](../../../docs/testing/rtos-motion-first-physical-check.md)
 and `sh tools/run_rtos_bench.sh` to collect decoded logs automatically.
@@ -233,6 +244,15 @@ enter the local 2.4 GHz Wi-Fi/broker settings, set `RTOS_NETWORK_CONFIGURED` to1
 and rebuild for the later radio test. Keep passwords out of chat, git, logs and
 command-line arguments. The first USB test needs none of these settings. The
 default has empty credentials and does not attempt association.
+
+The simpler operator route is now `sh tools/run_rtos_network.sh`. It prompts
+locally for Wi-Fi settings, generates password-protected robot/observer accounts
+with topic permissions, builds the actual configured v0.3 image and runs one
+console for USB and MQTT evidence. `m` sends MQTT STOP and `b` restarts only its
+own broker; it never sends START. Both source code and existing shared formats
+remain compatible with the v1 binary receiver. Credentials and configured UF2s
+stay under ignored `build/`; no passwords are logged. The software tests use
+temporary synthetic settings and loopback brokers, not the user's Wi-Fi key.
 
 `tools/rtos_mqtt_observer.py --broker <address>` decodes packets and resubscribes
 after reconnect. It does not publish control commands. Use `--user` with

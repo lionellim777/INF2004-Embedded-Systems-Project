@@ -31,7 +31,7 @@ class Capture:
         self.raw.write(line + "\n")
         info = re.search(r"\[RTOS_INFO\] version=(\S+)", line)
         if info:
-            self.ready = info[1] == "0.2"
+            self.ready = info[1] in ("0.2", "0.3")
             self.summary["firmware_version"] = info[1]
         match = re.search(r"\[MOTION_V1\] ([0-9a-fA-F]+) gap_us=(\d+)", line)
         if match:
@@ -68,7 +68,7 @@ class Capture:
         if key not in ("f", "l", "r", "u", "x", "?"):
             raise ValueError("Use f, l, r, u, x or q")
         if not self.ready:
-            raise ValueError("Waiting for RTOS v0.2 identity; no commands sent")
+            raise ValueError("Waiting for supported RTOS identity; no commands sent")
         if key in "flru" and self.latest and not self.latest["stop_latched"]:
             raise ValueError("Stop the current test before choosing another")
         self.summary["commands_requested"].append(key)
@@ -110,7 +110,7 @@ def main():
                         candidate = serial.Serial(port, 115200, timeout=0.05, write_timeout=0.5)
                         candidate.dtr = True
                         device = candidate; pending = bytearray(); waiting = False
-                        print("Connected. Waiting for RTOS v0.2 identity...", flush=True)
+                        print("Connected. Waiting for RTOS identity...", flush=True)
                     except (serial.SerialException, OSError):
                         if candidate is not None: candidate.close()
                         device = None
@@ -126,7 +126,7 @@ def main():
                         was_ready = capture.ready
                         message = capture.line(line.rstrip(b"\r").decode("utf-8", errors="replace"))
                         if capture.ready and not was_ready:
-                            print("RTOS v0.2 confirmed. Wheels should still be stopped. Type f, then Enter.", flush=True)
+                            print(f"RTOS v{capture.summary['firmware_version']} confirmed. Wheels should still be stopped. Type f, then Enter.", flush=True)
                         if message: print(message, flush=True)
                 except (serial.SerialException, OSError, ValueError) as error:
                     print(f"USB disconnected: {error}. Use GP20 to stop if needed.", flush=True)

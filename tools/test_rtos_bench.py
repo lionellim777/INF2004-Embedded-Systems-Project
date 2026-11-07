@@ -37,6 +37,10 @@ def main():
         assert result['stop_traces'][0]['register_write_delay_us']==4
         assert result['commands_requested']==['f','x']
         assert result['max_motion_gap_us']==15000
+        c2=Capture(Path(folder)/'v03')
+        c2.line('[RTOS_INFO] version=0.3 network_state=1 network_error=0 uptime_ms=2')
+        assert c2.ready and c2.command('f')==b'f'
+        c2.close()
         try:Capture(path)
         except FileExistsError:pass
         else:raise AssertionError('Existing evidence log overwritten')

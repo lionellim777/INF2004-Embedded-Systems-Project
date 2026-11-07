@@ -2,6 +2,7 @@
 #include "encoders.h"
 #include "motion_runtime.h"
 #include "network_service.h"
+#include "version.h"
 #include "port/mtk_bridge.h"
 #include <inttypes.h>
 #include <stdio.h>
@@ -10,6 +11,9 @@
 #include "pico/stdlib.h"
 #include "pico/stdio_usb.h"
 #include "network_settings.h"
+#ifndef RTOS_WAIT_FOR_USB
+#define RTOS_WAIT_FOR_USB (!RTOS_NETWORK_CONFIGURED)
+#endif
 
 /* Startup/exception adapter follows Justin's pinned single-core bridge.
  * This target never starts core1 and does not link a second network runtime. */
@@ -33,7 +37,7 @@ static void motion_task(int start_code, void *context)
 static void observer_task(int start_code, void *context)
 {
     (void)start_code; (void)context;
-    puts("RTOS motion foundation v0.2: encoders/motion REAL; barcode/terrain/obstacle UNAVAILABLE; network needs local configuration");
+    puts("RTOS motion foundation v" RTOS_FIRMWARE_VERSION ": encoders/motion REAL; barcode/terrain/obstacle UNAVAILABLE");
     puts("Select f=30cm,l=L90,r=R90,u=R180. GP20 press/release starts; next press stops. x=stop. No remote start.");
     uint32_t last_print = 0;
     uint32_t last_info = 0;
@@ -55,7 +59,7 @@ static void observer_task(int start_code, void *context)
             last_stop=trace.sequence;
         }
         if (command=='?' || (uint32_t)(now-last_info)>=1000u) {
-            printf("[RTOS_INFO] version=0.2 network_state=%u uptime_ms=%" PRIu32 "\n",network_state(),now);
+            printf("[RTOS_INFO] version=" RTOS_FIRMWARE_VERSION " network_state=%u network_error=%u uptime_ms=%" PRIu32 "\n",network_state(),network_error(),now);
             last_info=now;
         }
         if ((uint32_t)(now - last_print) >= 200u) {
@@ -90,7 +94,7 @@ int main(void)
     /* Default USB bench mode waits for its logger before starting the kernel,
      * preserving the boot breadcrumb if RTOS startup itself fails. A locally
      * configured radio build may boot without USB. Outputs remain zero. */
-    if (!RTOS_NETWORK_CONFIGURED)
+    if (RTOS_WAIT_FOR_USB)
         while (!stdio_usb_connected()) sleep_ms(10);
     if (!initialized || clock_get_hz(clk_sys) != 125000000u) {
         puts("[RTOS_BOOT] error=timer_or_clock");
@@ -104,7 +108,7 @@ int main(void)
     (void)exception_set_exclusive_handler(SYSTICK_EXCEPTION, knl_systim_inthdr);
     (void)exception_set_priority(PENDSV_EXCEPTION, 0xc0u);
     (void)exception_set_priority(SYSTICK_EXCEPTION, 0x00u);
-    puts("[RTOS_BOOT] version=0.2 stage=kernel_start");
+    puts("[RTOS_BOOT] version=" RTOS_FIRMWARE_VERSION " stage=kernel_start");
     stdio_flush();
     (void)mtk_kernel_main();
     board_stop(STOP_INIT);
