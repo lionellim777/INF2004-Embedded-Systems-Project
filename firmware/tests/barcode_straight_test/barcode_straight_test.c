@@ -862,7 +862,7 @@ static void finish_run(const motion_control_t *p_motion, const char *p_reason)
     run.width_count = g_capture.saved_runs;
     for (uint32_t i = 0u; i < run.width_count; ++i) {
         run.widths_ms[i] = (uint16_t)(barcode_runs_get(&g_capture.last_runs, i) /
-                                      BARCODE_RUN_QUANTUM);
+                                      1000u);
     }
     run.valid = true;
     g_state.history[g_state.run_total % HISTORY_RUNS] = run;

@@ -1,0 +1,33 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_59_wireless.uf2",
+  "version": "v5.59",
+  "base_commit": "5fb1983ea0eee52a58a194246501b21e800c9c92",
+  "bytes": 1117184,
+  "blocks": 2182,
+  "sha256": "bf028c1fdfa19341a06a2dc606516a2999ce8f947fda3e58fb44a3518e1602d7",
+  "linked_text_bytes": 558376,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 177244,
+  "target": "Pico W / RP2040; GP26 barcode, GP28 centre, GP27 right; WiFi core1",
+  "build": "Release, -Wall -Wextra -Werror; centred course flow enabled; not flashed by agent",
+  "physical_baseline": "v5.58: five files each latest current run AA; no Z; rolling bend attempts zero. User confirms only run3 traversed right bend/half-Z. Other four end local recovery exhausted; run3 obstacle stop.",
+  "controller": "Timed analogue GP27 preview; pre-loss forward arc in confirmed direction; 80ms/80-count unknown-direction grace; 650ms/540-count/400-differential arc limits; no barcode-only inhibition in course flow; existing bounded recovery; STOP immediate, other mapped actions defer through arc.",
+  "checks": [
+    "All UF2 block magic/family/payload/index/count/contiguous address bounds; complete page bytes and version/control markers",
+    "New flow bend fixtures: right/left memory, unknown direction, side conflict, strong-pair rejoin, timing/motion bounds, deferred turn and immediate STOP",
+    "52 centred production main scenarios, including rolling correction with Z decoding; 18 legacy main cases",
+    "Old centre/bend regressions and obstacle planner/alignment/state tests",
+    "832 waveform matrix +52 prefix regressions +3000 noisy synthetic frames; failed-after-A snapshot selection",
+    "All five frozen A captures and earlier physical half-Z checksum and exact batch replay",
+    "Existing 15 barcode/motion suites; packed-storage and ARM layout",
+    "Wireless transport/core1/retained results; mocked browser controls/mobile/complete and corrupt export checks"
+  ],
+  "limits": [
+    "No physical v5.59 run or curve-barcode success established.",
+    "Current sensor pair is asymmetric centre/right; no bilateral optical measurement when both white.",
+    "Analogue thresholds use existing calibration and need physical validation.",
+    "Encoder and time bounds do not prove physical clearance or exact stop distance.",
+    "Frozen export selects one latest accepted/substantial >=1s capture, not all three waveforms."
+  ],
+  "procedure": "docs/testing/course-v5_59-flow-bend.md"
+}

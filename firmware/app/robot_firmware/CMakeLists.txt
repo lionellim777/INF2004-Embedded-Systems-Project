@@ -16,7 +16,7 @@ if(ROBOCAR_STATIONARY_BARCODE)
 else()
     add_executable(robot_firmware
         robot_firmware.c terrain.c encoders.c motion_control.c run_diagnostics.c course_control.c obstacle_bypass.c
-        barcode_decoder.c barcode_reader.c barcode_acquisition.c navigation_commands.c)
+        barcode_decoder.c barcode_reader.c barcode_acquisition.c barcode_waveform.c navigation_commands.c)
 endif()
 
 target_link_libraries(robot_firmware
@@ -53,5 +53,5 @@ endif()
 
 pico_enable_stdio_usb(robot_firmware 1)
 pico_enable_stdio_uart(robot_firmware 0)
-target_compile_definitions(robot_firmware PRIVATE PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
+target_compile_definitions(robot_firmware PRIVATE PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000 PICO_STACK_SIZE=0x1000)
 pico_add_extra_outputs(robot_firmware)

@@ -1,0 +1,35 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_58_wireless.uf2",
+  "version": "v5.58",
+  "base_commit": "5fb1983ea0eee52a58a194246501b21e800c9c92",
+  "bytes": 1111040,
+  "blocks": 2170,
+  "sha256": "c9b25b68e3e5c5e9829785a1740500c48c032a84c17cdd80807a564f4a67be85",
+  "linked_text_bytes": 555480,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 177148,
+  "target": "Pico W / RP2040; GP26 barcode, GP28 centred over tape, GP27 right; WiFi core1",
+  "build": "Release, -Wall -Wextra -Werror; centred course; not flashed by agent",
+  "checks": [
+    "Every UF2 block: magic, RP2040 family, count/index, 256-byte payload, contiguous flash addresses within 2 MiB",
+    "Compiled embedded HTML byte-identical to source; version, export route and diagnostics present in UF2",
+    "832 waveform matrix and 3000 noisy synthetic frames",
+    "52 prefix regressions; all six profiles violate v5.57 exact-31 gate but v5.58 finds intact frames",
+    "Conflicting-window, partial, timing/storage, frozen-sample hash/details tests",
+    "51 centred production-main and 18 legacy-main cases",
+    "Existing 15 barcode/motion suites and packed-storage/ARM layout checks",
+    "Wireless retained-result ordering, chunk/bounds/unpublish, maximal retained lines and core1 concurrency",
+    "Mocked Chrome controls/mobile/download; checked complete two-chunk data, corrupted checksum and changing capture ID"
+  ],
+  "confirmed_logging_bug": "Retrospective drive OPTICAL START erased waveform result in v5.57; fixed and regression tested.",
+  "rejection_hypothesis": "Prefix activity makes exact-whole-recording gate reject a complete frame. Reproduced synthetically; actual v5.57 half-Z extrema were not retained.",
+  "physical_status": "Latest provided v5.57 half-Z course run rejected. v5.58 requires a new controlled pass; physical decoding and work time unverified.",
+  "input_log": "docs/testing/logs/20261105-v5_57-half-Z-rejected.txt",
+  "procedure": "docs/testing/barcode-v5_58-half-Z-diagnostics.md",
+  "limits": [
+    "Strict complete Code39 frames remain required; no missing-stripe guesses or wider decoder tolerances.",
+    "Filtered 2 ms samples with elapsed-ms quantisation, not all unfiltered 500 us ADC readings.",
+    "Frozen data lasts until the next motion start or reset.",
+    "CPU/timing, optical resolution and moving/reversing trajectories need hardware evidence."
+  ]
+}

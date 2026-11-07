@@ -32,21 +32,14 @@
 #include "run_diagnostics.h"
 #include "line_check.h"
 #include "barcode_acquisition.h"
-#include "ir_fault.h"
 #include "barcode_optical.h"
 #include "barcode_signal.h"
-#include "barcode_swing.h"
+#include "barcode_waveform.h"
 #include "barcode_drive.h"
 #include "course_control.h"
 #include "obstacle_bypass.h"
 #include "terrain.h"
 #include "calibration_wifi.h"
-/* Centre-line course scans: 1 measures bar widths by encoder axle travel, so
- * a slowdown or brief stop mid-barcode does not distort them; 0 uses time.
- * Travel widths rely on the course barcode hold keeping the wheels forward. */
-#ifndef ROBOCAR_COURSE_DISTANCE_WIDTHS
-#define ROBOCAR_COURSE_DISTANCE_WIDTHS 1
-#endif
 
 enum {
     LEFT_MOTOR_A_PIN = 8,
@@ -294,8 +287,27 @@ static volatile uint32_t adc_max_us;
 static barcode_sampler_t barcode_sampler;
 static barcode_signal_t barcode_signal;
 static volatile uint16_t barcode_filtered;
-static barcode_swing_t barcode_swing;  /* Owned by the IRQ once the sampler starts. */
-static barcode_white_t barcode_white;
+/* Single IRQ producer / foreground consumer. Pop with IRQ excluded. The
+ * existing 2 kHz ADC/filter remain; retain one full grey reading every 2 ms.
+ * 511 queued samples cover >1 s; loss is a latched integrity fault. */
+typedef struct { uint32_t us,left,right; uint16_t raw; } waveform_sample_t;
+static waveform_sample_t waveform_queue[512];
+static volatile unsigned waveform_head,waveform_tail;
+static volatile bool waveform_overflow;
+static unsigned waveform_divider;
+static bool waveform_enabled;
+static barcode_waveform_t waveform;
+static uint32_t waveform_max_work_us;
+static char waveform_details[4096];
+static void waveform_sample(uint16_t raw,uint32_t now)
+{
+    if(!waveform_enabled || !barcode_sampler.enabled || ++waveform_divider!=4u)return;
+    waveform_divider=0;
+    unsigned next=(waveform_head+1u)%512u;
+    if(next==waveform_tail)waveform_overflow=true;
+    else {encoder_sample_t e=encoders_snapshot();
+        waveform_queue[waveform_head]=(waveform_sample_t){now,e.left_raw,e.right_raw,raw};waveform_head=next;}
+}
 static barcode_optical_t optical;
 static bool optical_pending;
 static bool optical_drive_pending, optical_drive_frozen, optical_drive_aborted;
@@ -322,13 +334,11 @@ static bool ir_sample_alarm(repeating_timer_t *timer)
     ir_latest[2] = line_sensor_read(RIGHT_IR_PIN);
     ir_last_us = start;
     barcode_filtered=barcode_signal_update(&barcode_signal,ir_latest[0]);
-    uint16_t barcode_level=barcode_filtered;
-    if(barcode_sampler.enabled && barcode_swing.enabled)
-        barcode_level=barcode_swing_step(&barcode_swing,barcode_level);
+    waveform_sample(barcode_filtered,start);
     if(barcode_sampler.enabled && barcode_sampler.motion.enabled){
         encoder_sample_t e=encoders_snapshot();
-        barcode_sampler_sample_motion(&barcode_sampler,barcode_level,start,e.left_raw,e.right_raw);
-    }else barcode_sampler_sample(&barcode_sampler, barcode_level, start);
+        barcode_sampler_sample_motion(&barcode_sampler,barcode_filtered,start,e.left_raw,e.right_raw);
+    }else barcode_sampler_sample(&barcode_sampler, barcode_filtered, start);
     if(optical.armed && barcode_sampler.enabled && barcode_sampler.stats.edges)
         barcode_optical_trigger(&optical,start);
     barcode_optical_sample(&optical, ir_latest[0], start);
@@ -369,10 +379,45 @@ static void optical_finish(bool aborted, bool driving)
 static course_control_t course;
 static center_baseline_t center_baseline;
 static bool course_run;
-static bool straight_selected, straight_run; /* course reading, straight drive, no line */
 static bool avoid_run;
 static obstacle_bypass_t avoidance;
 static int32_t blackness(uint16_t raw,int32_t white,int32_t black);
+static void waveform_drain(void)
+{
+    static waveform_sample_t batch[32]; /* core0-only scratch, not IRQ stack */
+    for(;;){
+        unsigned count=0;
+        uint32_t irq=save_and_disable_interrupts();
+        while(waveform_tail!=waveform_head && count<32u){
+            batch[count++]=waveform_queue[waveform_tail];waveform_tail=(waveform_tail+1u)%512u;
+        }
+        bool overflow=waveform_overflow;
+        restore_interrupts(irq);
+        if(overflow)barcode_capture.integrity_fault=true;
+        if(!count)break;
+        for(unsigned i=0;i<count;i++){
+            if(barcode_capture.integrity_fault)continue;
+            char letter=0;
+            uint32_t work_start=time_us_32();
+            bool emitted=barcode_waveform_update_motion(&waveform,batch[i].raw,batch[i].us,batch[i].left,batch[i].right,&letter);
+            uint32_t work_us=time_us_32()-work_start;
+            if(work_us>waveform_max_work_us)waveform_max_work_us=work_us;
+            if(emitted){
+                if(barcode_capture.event_count==BARCODE_STREAM_EVENTS){
+                    barcode_capture.event_overflow=true;barcode_capture.integrity_fault=true;continue;
+                }
+                unsigned event=barcode_capture.event_count++;
+                barcode_capture.events[event].us=batch[i].us-barcode_origin_us;
+                barcode_capture.events[event].letter=letter;barcode_capture.decoded=letter;
+                barcode_capture.saved_runs=29;
+                for(unsigned j=0;j<29;j++)barcode_runs_set(&barcode_capture.last_runs,j,waveform.last_runs[j]);
+            }
+            if(waveform.timing_faults)barcode_capture.integrity_fault=true;
+        }
+    }
+    barcode_capture.frames=waveform.frames;barcode_capture.rejected=waveform.rejected;
+    barcode_capture.reader.active=waveform.recording;
+}
 static void barcode_drain(bool end)
 {
     uint32_t irq = save_and_disable_interrupts();
@@ -381,14 +426,20 @@ static void barcode_drain(bool end)
     bool on_crossing=blackness(ir_latest[1],CENTRE_IR_WHITE,CENTRE_IR_BLACK)>=IR_BLACK_LEVEL &&
                      blackness(ir_latest[2],RIGHT_IR_WHITE,RIGHT_IR_BLACK)>=IR_BLACK_LEVEL;
     restore_interrupts(irq);
-    if(course_run && !end && (barcode_batch.count || barcode_batch.stats.black))
+    if(course_run && !end && (waveform_enabled?waveform.recording:(barcode_batch.count || barcode_batch.stats.black)))
         course_note_barcode_activity(&course,time_us_64());
     for(unsigned i=0;i<barcode_batch.count;i++){
         if(barcode_trace_count==128u){barcode_trace_overflow=true;break;}
         barcode_trace[barcode_trace_count++]=(barcode_edge_t){
             barcode_batch.edges[i].us-barcode_origin_us,barcode_batch.edges[i].black};
     }
-    if(course_run && !barcode_capture.independent_optical && !barcode_capture.distance_mode && !course_reads_barcodes(&course)) {
+    if(waveform_enabled){
+        barcode_capture.stats=barcode_batch.stats;
+        /* Fixed-threshold edge overflow is diagnostic only for this reader.
+         * Missing ADC readings or grey samples still invalidate all results. */
+        if(barcode_batch.stats.gap_fault)barcode_capture.integrity_fault=true;
+        waveform_drain();
+    }else if(course_run && !barcode_capture.independent_optical && !barcode_capture.distance_mode && !course_reads_barcodes(&course)) {
         /* Keep sampler faults visible, but discard optical fragments while
          * braking/pivoting/seeking. Resume only after a fresh white quiet zone. */
         barcode_capture.stats=barcode_batch.stats;
@@ -424,9 +475,8 @@ static void barcode_drain(bool end)
                  * logging. The course controller applies subsequent outputs. */
                 if(course.phase==COURSE_BRAKE||course.phase==COURSE_FAILED)motors_stop();
             }
-            printf("[BARCODE EVENT] seq=%u letter=%c value=%u at_ms=%lu action=%s\n",
-                   stream_logged+1,letter,(unsigned)navigation_barcode_value(letter,false),
-                   (unsigned long)(barcode_capture.events[stream_logged].us/1000u),disposition);
+            printf("[BARCODE EVENT] seq=%u letter=%c at_ms=%lu action=%s\n",
+                   stream_logged+1,letter,(unsigned long)(barcode_capture.events[stream_logged].us/1000u),disposition);
             if(course_run && !end && (letter=='Y'||letter=='Z')){
                 char action=letter=='Y'?course.config.y_action:course.config.z_action;
                 printf("[ROUTE BARCODE] source=%c selected=%s prior_waiting=%c remaining=%u deferred=%u.\n",
@@ -435,12 +485,10 @@ static void barcode_drain(bool end)
             stream_logged++;
         }
         if(stream_rejected_logged!=barcode_capture.rejected || stream_timeouts_logged!=barcode_capture.timeouts){
-            printf("[BARCODE RETRY] rejected=%lu timeouts=%lu value=%u ir_fault=0x%02x; %s.\n",
+            printf("[BARCODE RETRY] rejected=%lu timeouts=%lu; %s.\n",
                    (unsigned long)barcode_capture.rejected,(unsigned long)barcode_capture.timeouts,
-                   (unsigned)navigation_barcode_value('\0',stream_rejected_logged!=barcode_capture.rejected),
-                   (unsigned)ir_fault_bits(&barcode_capture),
                    barcode_capture.independent_optical?"searching for next complete framed letter":"wait250ms white before rearming");
-            printf("[BARCODE PARTIAL] completed_runs=%u expected=29 widths_%s=",barcode_capture.saved_runs,barcode_capture.distance_mode?"sumcounts_x1000":"us");
+            printf("[BARCODE PARTIAL] completed_runs=%u expected=29 widths_%s=",barcode_capture.saved_runs,waveform_enabled?"gp26_count1000":barcode_capture.distance_mode?"sumcounts_x1000":"us");
             for(unsigned i=0;i<barcode_capture.saved_runs;i++)
                 printf("%s%lu",i?",":"",(unsigned long)barcode_runs_get(&barcode_capture.last_runs,i));
             printf(" active=%u raw_range=%u..%u max_gap_us=%lu. No accepted letter from this capture.\n",
@@ -454,6 +502,34 @@ static void barcode_drain(bool end)
 static void barcode_result(void)
 {
     const barcode_sample_stats_t *s = &barcode_capture.stats;
+    if(waveform_enabled){
+        barcode_waveform_save_partial(&waveform);
+        if(barcode_waveform_details(&waveform.saved,waveform_details,sizeof(waveform_details)))
+            calibration_wifi_set_waveform(waveform.saved.sample,waveform.saved.count,
+                waveform_details,waveform.saved.start_us,waveform.saved.checksum);
+    }
+    if(waveform_enabled){
+        printf("[WAVEFORM MOTION] domain=PROJECTED_GP26_COUNTS geometry_mm=80_forward/85_left wheel_mm=60 cpr=2543 track_mm=115 recrosses=%lu lateral_recrosses=%lu holds=%lu motion_faults=%lu attempts=%u attempt_overflow=%u; axle=powered_wheel_midpoint.\n",
+            (unsigned long)waveform.recrosses,(unsigned long)waveform.lateral_recrosses,(unsigned long)waveform.stationary_samples,
+            (unsigned long)waveform.motion_faults,waveform.attempt_count,waveform.attempt_overflow);
+        for(unsigned i=0;i<waveform.attempt_count;i++){
+            const barcode_wave_attempt_t *a=&waveform.attempts[i];const barcode_wave_profile_t *d=&a->best;
+            printf("[SCAN ATTEMPT] index=%u start_us=%lu duration_us=%lu samples=%u result=%s letter=%c coherent_mask=0x%x geometry_mask=0x%x raw=%u..%u lateral_mm=%u yaw_deg=%u extrema=%u windows=%u reversed=%u patterns=%03x/%03x/%03x width_reason=%u/%u/%u guards=%u separators=%u\n",
+                i,(unsigned long)a->start_us,(unsigned long)a->duration_us,a->samples,barcode_waveform_reason(a->reason),a->letter?a->letter:'-',a->coherent_mask,a->geometry_mask,a->raw_min,a->raw_max,a->lateral_mm,a->yaw_deg,
+                d->extrema,d->windows,d->code39.reversed,d->code39.patterns[0],d->code39.patterns[1],d->code39.patterns[2],
+                d->code39.width_reason[0],d->code39.width_reason[1],d->code39.width_reason[2],d->code39.guards,d->code39.separators);
+            printf("[SCAN WIDTHS] index=%u units=mean_count1000 values=",i);
+            for(unsigned j=0;j<29;j++)printf("%s%lu",j?",":"",(unsigned long)d->runs[j]);
+            printf("\n");
+        }
+    }
+    if(waveform_enabled)printf("[WAVEFORM RESULT] reader=LOCAL_EXTREMA period_us=%u capture_limit=%u candidates=%lu rejected=%lu ambiguous=%lu buffer_full=%lu timing_faults=%lu queue_overflow=%u prominence=%u extrema=%u profiles_12_24_48_96_192_384=%u/%u/%u/%u/%u/%u complete_mask=0x%x coherent_mask=0x%x geometry_mask=0x%x max_work_us=%lu quiet_us=250000; physical acceptance pending.\n",
+        BARCODE_WAVE_PERIOD_US,BARCODE_WAVE_SAMPLES,(unsigned long)waveform.frames,
+        (unsigned long)waveform.rejected,(unsigned long)waveform.ambiguous,(unsigned long)waveform.overflows,
+        (unsigned long)waveform.timing_faults,waveform_overflow,waveform.last_prominence,waveform.last_extrema,
+        waveform.profile_extrema[0],waveform.profile_extrema[1],waveform.profile_extrema[2],
+        waveform.profile_extrema[3],waveform.profile_extrema[4],waveform.profile_extrema[5],
+        waveform.complete_profiles,waveform.coherent_mask,waveform.geometry_mask,(unsigned long)waveform_max_work_us);
     if(barcode_capture.continuous){
         printf("[BARCODE RESULT] mode=CONTINUOUS reads=%u sequence=",barcode_capture.event_count);
         for(unsigned i=0;i<barcode_capture.event_count;i++)printf("%c",barcode_capture.events[i].letter);
@@ -461,10 +537,12 @@ static void barcode_result(void)
                (unsigned long)barcode_capture.rejected,(unsigned long)barcode_capture.timeouts,
                (unsigned long)s->edges,(unsigned long)s->max_gap_us,barcode_capture.integrity_fault,
                barcode_capture.event_overflow,barcode_trace_overflow,course_run?"Y_Z_CONFIGURED":"RECORD_ONLY");
-        printf(" width_source=%s motion_breaks=%lu motion_aborts=%lu pause_timeouts=%lu zero_distance_aborts=%lu",barcode_capture.distance_mode?"ENCODER_AXLE_DISTANCE":"TIME",(unsigned long)s->motion_breaks,
+        printf(" width_source=%s motion_breaks=%lu motion_aborts=%lu pause_timeouts=%lu zero_distance_aborts=%lu",waveform_enabled?"PROJECTED_GP26_DISTANCE":barcode_capture.distance_mode?"ENCODER_AXLE_DISTANCE":"TIME",(unsigned long)s->motion_breaks,
                (unsigned long)barcode_capture.motion_aborts,(unsigned long)barcode_capture.pause_timeouts,(unsigned long)barcode_capture.zero_distance_aborts);
         printf(" adc_max_us=%lu",(unsigned long)adc_max_us);
-        printf(" sample_period_us=500 filter_samples=12 black_on=226 white_off=220 paused_fragments=%u last_ended_runs=%u last_ended_widths_%s=",stream_paused_fragments,barcode_capture.saved_runs,barcode_capture.distance_mode?"sumcounts_x1000":"us");
+        if(waveform_enabled)printf(" reader=LOCAL_EXTREMA waveform_period_us=2000 legacy_black_on=226 legacy_white_off=220");
+        else printf(" black_on=226 white_off=220");
+        printf(" sample_period_us=500 filter_samples=12 paused_fragments=%u last_ended_runs=%u last_ended_widths_%s=",stream_paused_fragments,barcode_capture.saved_runs,waveform_enabled?"gp26_count1000":barcode_capture.distance_mode?"sumcounts_x1000":"us");
         for(unsigned i=0;i<barcode_capture.saved_runs;i++)
             printf("%s%lu",i?",":"",(unsigned long)barcode_runs_get(&barcode_capture.last_runs,i));
         printf(" active_runs=%u.\n",barcode_capture.reader.active?barcode_capture.reader.run_count:0);
@@ -532,9 +610,9 @@ static bool button_fell(button_t *button, uint pin, uint64_t now_us)
 static void print_controls(void)
 {
 #ifdef ROBOCAR_WIRELESS_CALIBRATION
-    printf("\nAAI10 MOTION INTEGRATION v5.56 WIRELESS | obstacle bypass test | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.63 WIRELESS | motion-aware barcode + per-attempt diagnostics | %s %s\n", __DATE__, __TIME__);
 #else
-    printf("\nAAI10 MOTION INTEGRATION v5.56 USB | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.63 USB | %s %s\n", __DATE__, __TIME__);
 #endif
     printf("Starts STOPPED. Existing IR, sonar, servo and terrain settings retained.\n");
     printf("Batch 5: CPR2543 wheel60mm track115mm; turn early290 L90+65 R180-60.\n");
@@ -556,12 +634,12 @@ static void print_controls(void)
     if(!ROBOCAR_CENTER_LINE)printf("Both line black: straight900cps bridge, max300ms/360counts;50ms clear required. No cliff detection or navigation turns.\n");
     if(!ROBOCAR_CENTER_LINE)printf("Barcode speed: target1200counts/s per wheel, 100ms PI including steering; inner target900/outer1200cps; ramp1500cps/s.\n");
     if(ROBOCAR_CENTER_LINE)printf("GP28-centred mission: select on website, GP20 starts after 3s countdown. GP28 must see black. f/l/r/u retain calibrated motor diagnostics.\n");
-    if(ROBOCAR_CENTER_LINE)printf("CENTER SENSOR BUILD: GP28 on tape, GP27 right, GP26 barcode; 600cps; encoder-balanced start, response-checked optical steering, strong-black recovery, short local barcode-area search; legacy tracking diagnostics disabled.\n");
+    if(ROBOCAR_CENTER_LINE)printf("CENTER SENSOR BUILD: GP28 on tape, GP27 right, GP26 barcode; 600cps; encoder-balanced start, response-checked optical steering, strong-black recovery, bounded rolling bend correction; legacy tracking diagnostics disabled.\n");
     printf("Y/Z mission: web actions trigger on decoded barcode; delayed actions count future crossings. New read replaces waiting action; committed turn defers newest; STOP wins.\n");
     printf("Course advance default120mm from measured sensor lead; nominal encoder scale, centering/curves/junctions pending physical validation.\n");
-    printf("Course barcode widths use encoder axle distance: forward steering/brief holds preserved; reverse excursions discard partial frames. Tight-curve sensor path remains unvalidated.\n");
-    printf("GP26 barcode: swing from white measured while stopped (rise/drop %u, bar>=white+%u, gap<=white+%u); fixed BLACK filtered>=%u / WHITE<=%u if GP26 is not steady. 12-sample mean at2kHz. Raw optical test unchanged.\n",
-           BARCODE_SWING_AMOUNT,BARCODE_SWING_BLACK_MARGIN,BARCODE_SWING_WHITE_MARGIN,BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
+    printf("Course barcode widths use optical elapsed time; speed changes or reversing across stripes can distort a frame. Curved sensor paths need physical validation.\n");
+    printf("Course guidance: early gentle drift correction; hard right arc requires live GP27 ink, not a recovery prior. Barcode sampling stays independent.\n");
+    printf("GP26 course barcode: record grey waveform + synchronized encoders at500Hz after6ms filtering; GP26 +80mm forward/+85mm left; spatial widths; local peaks/dips, complete Code39 guards, 250ms white before/after. Legacy scans fixed %u/%u.\n",BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
     printf("GP21=level calibration while stopped. Initial level calibration is automatic.\n");
     printf("IR order: barcode GP26 / line-left GP28 / line-right GP27. Barcode record-only in line check.\n");
     printf("o: obstacle bypass test, barcode actions OFF. Right-side floor test; GP20 start/abort.\n");
@@ -617,13 +695,13 @@ int main(void)
     selected = MOTION_STRAIGHT_30CM;
 #endif
     course_config_t selected_course={'s','s',120};
-    motion_control_t motion;
+    static motion_control_t motion;
     motion_init(&motion);
-    run_diagnostics_t diagnostics = {0};
-    barcode_reader_t barcode_reader;
+    static run_diagnostics_t diagnostics = {0};
+    static barcode_reader_t barcode_reader;
     barcode_reader_init(&barcode_reader);
     const char *motion_state = "STOPPED";
-    barcode_progress_t barcode_progress = {0};
+    static barcode_progress_t barcode_progress = {0};
 
     uint64_t previous_loop_us = 0u;
     uint32_t max_loop_us = 0u;
@@ -685,22 +763,15 @@ int main(void)
              } else if(ch=='o') {
                 if(!ROBOCAR_CENTER_LINE)printf("[SELECT] Obstacle mode requires the GP28 centre layout.\n");
                 else if(running||settling_until_us)printf("[SELECT] Rejected while running/settling.\n");
-                else {selected=MOTION_AVOID;straight_selected=false;printf("[SELECT] OBSTACLE_BYPASS; right-side bypass; barcodes disabled; floor only; GP20 starts.\n");}
+                else {selected=MOTION_AVOID;printf("[SELECT] OBSTACLE_BYPASS; right-side bypass; barcodes disabled; floor only; GP20 starts.\n");}
              } else if(ch=='q') {
                 if(running || settling_until_us!=0u)printf("[SELECT] Rejected while running/settling.\n");
                 else {
                     course_config_t config=calibration_wifi_course_config();
                     if(course_config_valid(config)){
-                        selected_course=config;selected=MOTION_COURSE;straight_selected=false;
+                        selected_course=config;selected=MOTION_COURSE;
                         printf("[SELECT Y/Z] Y=%s Z=%s junction_advance_mm=%u timer=none travel_limit=160000counts; GP20 starts; actions trigger on barcode.\n",course_action_name(config.y_action),course_action_name(config.z_action),config.advance_mm);
                     }else printf("[SELECT] Use course settings on the web page.\n");
-                }
-            } else if(ch=='s') {
-                if(!ROBOCAR_CENTER_LINE)printf("[SELECT] Straight barcode run requires the GP28 centre layout.\n");
-                else if(running||settling_until_us)printf("[SELECT] Rejected while running/settling.\n");
-                else {
-                    selected_course=(course_config_t){'s','s',120};selected=MOTION_COURSE;straight_selected=true;
-                    printf("[SELECT] STRAIGHT_BARCODE %umm; drives straight, line ignored, barcodes recorded only; GP26 starts on white; GP20 starts.\n",COURSE_STRAIGHT_MM);
                 }
             } else if (ch == '?') {
                 print_controls();
@@ -710,7 +781,6 @@ int main(void)
                 if (running || settling_until_us != 0u) {
                     printf("[SELECT] Rejected while running/settling. Stop first.\n");
                 } else {
-                    straight_selected = false;
                     selected = ch == 'f' ? MOTION_STRAIGHT_30CM :
                         (ch == 'l' ? MOTION_LEFT_90 : (ch == 'r' ? MOTION_RIGHT_90 :
                         (ch == 'u' ? MOTION_RIGHT_180 : (ch == 'b' ? MOTION_BARCODE : (ch == 'c' ? MOTION_CONTINUOUS : MOTION_NONE)))));
@@ -737,6 +807,7 @@ int main(void)
             } else if (!drive_guard_ready || !ir_timer_ready) {
                 printf("[STOP] Motor guard / IR sampling alarm unavailable; restart firmware before driving.\n");
             } else {
+                calibration_wifi_set_waveform(NULL,0,NULL,0,0);
                 uint32_t irq = save_and_disable_interrupts();
                 motor_guard_reset(&drive_guard);
                 restore_interrupts(irq);
@@ -745,7 +816,6 @@ int main(void)
                 motion_init(&motion);
                 pending = selected;
                 course_run = selected==MOTION_COURSE;
-                straight_run = course_run && straight_selected;
                 avoid_run = selected==MOTION_AVOID;
                 servo_set_test_angle(90);
                 max_loop_us = 0u;
@@ -753,7 +823,6 @@ int main(void)
                 calibration_wifi_reset_timing();
                 arming_until_us = now_us + 3000000u;
                 center_baseline=(center_baseline_t){0};
-                barcode_white=(barcode_white_t){0};
                 last_countdown = 0u;
                 printf("[START] %s. GP20 aborts.\n", motion_name(selected));
             }
@@ -832,7 +901,6 @@ int main(void)
             motion_state = "MOTION_COUNTDOWN";
             if(ROBOCAR_CENTER_LINE && (pending==MOTION_COURSE||pending==MOTION_AVOID))
                 center_baseline_add(&center_baseline,centre_blackness,now_us);
-            if(scan_kind(pending))barcode_white_add(&barcode_white,left_raw,now_us);
             if (now_us >= arming_until_us) {
                 arming_until_us = 0u;
                 bool began;
@@ -858,28 +926,25 @@ int main(void)
                     began = true;
                     if (scan_kind(pending)) {
                         int32_t baseline=500,baseline_spread=0;
-                        bool baseline_ok=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE || straight_run ||
+                        bool baseline_ok=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE ||
                             center_baseline_value(&center_baseline,now_us,&baseline,&baseline_spread);
-                        uint16_t gp26_white=0,gp26_spread=0;
-                        bool swing_ok=barcode_white_value(&barcode_white,now_us,&gp26_white,&gp26_spread);
                         /* Sonar may have blocked since the earlier snapshot. */
                         uint32_t irq = save_and_disable_interrupts();
                         bool white = ir_latest[0] <= BARCODE_BLACK_OFF;
                         bool fresh = (uint32_t)(time_us_32() - ir_last_us) <= BARCODE_SAMPLE_GAP_US;
                         bool stream = pending==MOTION_CONTINUOUS || pending==MOTION_COURSE;
-                        bool aligned=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE || straight_run ||
+                        bool aligned=!ROBOCAR_CENTER_LINE || pending!=MOTION_COURSE ||
                             (baseline_ok && blackness(ir_latest[1],CENTRE_IR_WHITE,CENTRE_IR_BLACK)>=IR_BLACK_LEVEL);
                         if (fresh && aligned && (white || stream)) {
                             barcode_origin_us=time_us_32();
-                            barcode_signal=(barcode_signal_t){0};
-                            /* Fixed levels remain only if GP26 was not steady while stopped. */
-                            if(swing_ok){
-                                barcode_swing_begin(&barcode_swing,gp26_white);
-                                barcode_sampler_begin_levels(&barcode_sampler,BARCODE_SWING_SAMPLER_ON,BARCODE_SWING_SAMPLER_OFF);
-                            }else{
-                                barcode_swing.enabled=false;
-                                barcode_sampler_begin_levels(&barcode_sampler,BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
-                            }
+                            /* Keep the continuously running filter history:
+                             * zeroing it here creates an artificial ramp on
+                             * a real white floor above the old 220 level. */
+                            waveform_enabled=ROBOCAR_CENTER_LINE && pending==MOTION_COURSE;
+                            waveform_head=waveform_tail=waveform_divider=0;waveform_overflow=false;
+                            waveform_max_work_us=0;
+                            barcode_waveform_begin(&waveform);
+                            barcode_sampler_begin_levels(&barcode_sampler,BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF);
                             if(ROBOCAR_CENTER_LINE && pending==MOTION_COURSE){
                                 encoder_sample_t scan_start=encoders_snapshot();
                                 barcode_sampler_enable_motion(&barcode_sampler,scan_start.left_raw,scan_start.right_raw);
@@ -891,17 +956,9 @@ int main(void)
                         }
                         restore_interrupts(irq);
                         began = fresh && aligned && (white || stream);
-                        if(began){
-                            if(swing_ok)printf("[BARCODE LEVELS] swing white=%u spread=%u: bar=rise %u and >=%u, gap=drop %u or <=%u.\n",
-                                gp26_white,gp26_spread,BARCODE_SWING_AMOUNT,gp26_white+BARCODE_SWING_BLACK_MARGIN,
-                                BARCODE_SWING_AMOUNT,gp26_white+BARCODE_SWING_WHITE_MARGIN);
-                            else printf("[BARCODE LEVELS] fixed %u/%u: GP26 not steady while stopped (white=%u spread=%u).\n",
-                                BARCODE_DRIVE_BLACK_ON,BARCODE_DRIVE_BLACK_OFF,gp26_white,gp26_spread);
-                        }
                         if(stream){
                             barcode_capture_begin_stream(&barcode_capture,barcode_origin_us);
-                            barcode_capture.distance_mode=ROBOCAR_COURSE_DISTANCE_WIDTHS &&
-                                ROBOCAR_CENTER_LINE && pending==MOTION_COURSE;
+                            barcode_capture.distance_mode=false;
                             barcode_capture.independent_optical=ROBOCAR_CENTER_LINE && pending==MOTION_COURSE;
                             /* Line following does not require barcode white.
                              * Ignore any partial symbol under the sensor at
@@ -916,12 +973,8 @@ int main(void)
                         barcode_progress = (barcode_progress_t){0};
                         if(course_run){
                             course_begin(&course,selected_course,enc,now_us);
+                            course_enable_flow_follow(&course,ROBOCAR_CENTER_LINE);
                             course_set_center_reference(&course,baseline);
-                            if(straight_run){
-                                course_set_straight_mm(&course,COURSE_STRAIGHT_MM);
-                                if(began)printf("[STRAIGHT] %umm (%ld counts) straight, line ignored, barcode widths by encoder distance.\n",
-                                    COURSE_STRAIGHT_MM,(long)course.straight_counts);
-                            }
                             if(began && ROBOCAR_CENTER_LINE)
                                 printf("[CENTER BASELINE] median=%ld iqr=%ld samples=%u frozen_for_run=1.\n",
                                     (long)baseline,(long)baseline_spread,center_baseline.count);
@@ -1029,7 +1082,7 @@ int main(void)
                 const int32_t fresh_levels[3]={left_blackness,centre_blackness,right_blackness};
                 roles=ir_roles(fresh_levels);
                 if(ROBOCAR_CENTER_LINE)course_center_level(&course,centre_blackness);
-                course_barcode_capturing(&course,barcode_sampler.enabled && barcode_capture.reader.active);
+                if(ROBOCAR_CENTER_LINE)course_right_level(&course,right_blackness);
                 now_us=time_us_64();enc=encoders_snapshot();
             }
             int32_t left = motion_left_position(&motion, enc);
@@ -1177,16 +1230,14 @@ int main(void)
             if(avoid_run)printf("[AVOID RESULT] detected=%u completed=%u phase=%s offset_mm=%u along_mm=%u scans=%u no_echo=%u sonar_retries=%u sonar_resumes=%u encoder_skips=%u/%u tape_checks=%u rejected=%u axle_mm=%u align_dir=%d reverse_sweep=%u align_rejected=%u fault=%s outcome=%s; geometry provisional, physical clearance requires observation.\n",
                 avoidance.detected,avoidance.completed,obstacle_bypass_phase(avoidance.phase),avoidance.offset_mm,avoidance.along_mm,avoidance.scans,avoidance.no_echo,avoidance.sonar_retries,avoidance.sonar_resumes,avoidance.encoder_skips[0],avoidance.encoder_skips[1],avoidance.rejoin_attempts,avoidance.rejoin_rejected,avoidance.axle_mm,avoidance.align_direction,avoidance.align_reversed,avoidance.align_rejected,avoidance.fault?avoidance.fault:"NONE",motion_state);
             if(avoid_run)printf("[SONAR RESULT] last_status=%s last_pulse_us=%lu max_pulse_us=%lu measurement_window_us=45000.\n",sonar_status,(unsigned long)sonar_pulse_us,(unsigned long)sonar_max_pulse_us);
-            if(course_run)printf("[COURSE RESULT] encounters=%u turns=%u Y=%s Z=%s advance_mm=%u updates=%u replacements=%u deferred_replacements=%u pending=%c remaining=%u deferred=%c recoveries=%u trims=%u trim_reversals=%u trim_no_response=%u fixed_ref=%ld settle_coast=%ld/%ld sensor_layout=%s outcome=%s.\n",
+            if(course_run)printf("[COURSE RESULT] encounters=%u turns=%u Y=%s Z=%s advance_mm=%u updates=%u replacements=%u deferred_replacements=%u pending=%c remaining=%u deferred=%c recoveries=%u trims=%u trim_reversals=%u trim_no_response=%u fixed_ref=%ld confirmation_retries=%u wide_searches=%u settle_coast=%ld/%ld sensor_layout=%s flow=%u arc_attempts=%u arc_rejoins=%u arc_fallbacks=%u previews=%u edge_coasts=%u arc_source=%s arc_exit=%s arc_gate=%s drift_max_cps=%u outcome=%s.\n",
                 course.junctions,course.turns,course_action_name(course.config.y_action),course_action_name(course.config.z_action),course.config.advance_mm,
                 course.route_updates,course.replacements,course.deferred_replacements,course.pending_source?course.pending_source:'-',course.remaining_junctions,
-                course.deferred?course.deferred_source:'-',course.recoveries,course.trim_attempts,course.trim_reversals,course.trim_no_responses,(long)course.center_reference,(long)course.center_search.coast_l,(long)course.center_search.coast_r,ROBOCAR_CENTER_LINE?"GP28_CENTER":"STRADDLE",motion_state);
+                course.deferred?course.deferred_source:'-',course.recoveries,course.trim_attempts,course.trim_reversals,course.trim_no_responses,(long)course.center_reference,course.confirmation_retries,course.wide_searches,(long)course.center_search.coast_l,(long)course.center_search.coast_r,ROBOCAR_CENTER_LINE?"GP28_CENTER":"STRADDLE",course.flow_follow,course.bend_attempts,course.bend_completed,course.bend_fallbacks,course.right_previews,course.loss_coasts,course.bend_source?course.bend_source:"NONE",course.bend_exit?course.bend_exit:"NONE",course.flow_follow?"TIMED_RIGHT":"HISTORY_LEGACY",course.flow_follow?150u:220u,motion_state);
             if(course_run||avoid_run){
                 const course_control_t *bc=avoid_run?&avoidance.line:&course;
                 printf("[BEND RESULT] attempts=%u rolling_rejoins=%u fallback_searches=%u active=%u; counts belong to current course segment.\n",bc->bend_attempts,bc->bend_completed,bc->bend_fallbacks,bc->bend_active);
             }
-            if(course_run)printf("[BARCODE HOLD] holds=%u line_lost_during_hold=%u limit_reached=%u limit_counts=%ld; straight drive while a symbol is part read.\n",
-                course.holds,course.hold_blind_holds,course.hold_limits,(long)course.hold_limit_counts);
             diagnostics.active = false;
             printf("[TIMING] max_loop_us=%lu wifi_max_poll_us=%lu",
                    (unsigned long)max_loop_us, (unsigned long)calibration_wifi_max_poll_us());
@@ -1229,6 +1280,7 @@ int main(void)
                 const course_control_t *bc=avoid_run?&avoidance.line:&course;
                 printf(" BendActive=%u BendDir=%d BendTries=%u BendOK=%u BendFallback=%u",bc->bend_active,bc->bend_direction,bc->bend_attempts,bc->bend_completed,bc->bend_fallbacks);
             }
+            if(course_run)printf(" RightLevel=%ld RightPreview=%u ArcSource=%s ArcExit=%s",(long)course.right_level,course.right_preview,course.bend_source?course.bend_source:"NONE",course.bend_exit?course.bend_exit:"NONE");
             if(course_run)printf(" Junctions=%u Turns=%u CoursePhase=%u Pending=%c Remaining=%u Deferred=%c",course.junctions,course.turns,(unsigned)course.phase,course.pending_source?course.pending_source:'-',course.remaining_junctions,course.deferred?course.deferred_source:'-');
             if(scan_kind(motion.kind)){
                 printf(" BarcodeRawBlack=%u BarcodeCPS=%.0f/%.0f BaseTargetCPS=%u TargetCPS=%.0f/%.0f Edges=%lu Frames=%lu Rejected=%lu",

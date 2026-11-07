@@ -203,7 +203,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head><body>
 <div class="wrap">
-<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.56</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
+<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.63</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
 <main class="grid">
 
 <section id="controls" class="board" aria-label="Test controls">
@@ -212,8 +212,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 <select id="test-mode" class="setting" disabled>
 <option value="o">Follow track + avoid obstacle</option>
 <option value="v">Barcode sensor check · motors off</option>
-<option value="course">Follow track + read barcodes</option>
-<option value="s">Straight 40 cm + read barcode</option>
+<option value="course" selected>Follow track + read barcodes</option>
 <option value="f">30 cm forward</option><option value="l">Left 90°</option><option value="r">Right 90°</option><option value="u">Right 180°</option>
 </select></div>
 <button id="prepare" class="primary" disabled>Record sensor · 5 seconds</button><button id="stop" class="stop">Stop</button>
@@ -229,7 +228,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 </details></div>
 </section>
 
-<section id="optical-panel" class="board"><header><h2>Sensor result</h2></header><p id="optical-summary" role="status">No recording yet.</p><canvas id="optical-plot" width="900" height="220" aria-label="Barcode sensor readings across five seconds" hidden></canvas><small id="plot-help" hidden>Higher readings mean darker. Dashed lines: 226 / 220. Driving uses a 6 ms average; this graph shows raw readings and does not confirm a decoded barcode.</small></section>
+<section id="optical-panel" class="board"><header><h2>Sensor result</h2></header><p id="optical-summary" role="status">No recording yet.</p><canvas id="optical-plot" width="900" height="220" aria-label="Barcode sensor readings across five seconds" hidden></canvas><small id="plot-help" hidden>Higher readings mean darker. Course mode reads peaks and dips after a 6 ms average. This graph shows raw readings and does not confirm a decoded barcode.</small></section>
 
 <div class="col">
 <section id="now" class="board" aria-labelledby="now-h">
@@ -321,7 +320,7 @@ const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 let lastData=0;
 function append(text,snapshot){if(snapshot)inspectSnapshot(text);else inspectOptical(text);transcript+=text;if(transcript.length>1048576)transcript='[BROWSER LOG TRIMMED: earlier text removed]\n'+transcript.slice(-1000000);el('log').textContent=transcript.slice(-50000);el('log').scrollTop=el('log').scrollHeight;}
 let opticalLines='',opticalBins=[];
-function updateMode(){const mode=el('test-mode').value;el('course-options').hidden=mode!=='course';el('optical-panel').hidden=mode!=='v';el('prepare').textContent=mode==='v'?'Record sensor · 5 seconds':'Prepare run';el('test-help').textContent=mode==='v'?'Keep the car still. Start on white, then slide the whole barcode underneath once during the five-second recording, finishing on white.':mode==='course'?'Centre GP28 over the tape; keep GP27 beside it. Default: follow the track, go straight through crossings and record barcodes.':mode==='s'?'Drives straight 40 cm without following the line and reads the barcode on the way. Point the car along the barcode with GP26 on white, about 5 cm before the first bar.':mode==='o'?'Centre GP28 over the tape. Scans and plans a right-side bypass, checks clearance, then rejoins right-first. Faster on stable straights; slower through bends. Barcodes are disabled. Test on the floor with clear space to the right.':'Place the car on a clear, flat surface for the selected movement.';el('start-help').textContent=mode==='v'?'No GP20 start needed. GP20 cancels this sensor test.':'After confirmation, press GP20 on the car. Hold it still through the 3-second countdown. GP20 also stops it.';}
+function updateMode(){const mode=el('test-mode').value;el('course-options').hidden=mode!=='course';el('optical-panel').hidden=mode!=='v';el('prepare').textContent=mode==='v'?'Record sensor · 5 seconds':'Prepare run';el('test-help').textContent=mode==='v'?'Keep the car still. Start on white, then slide the whole barcode underneath once during the five-second recording, finishing on white.':mode==='course'?'Centre GP28 over the tape; keep GP27 beside it. Default: follow the track, go straight through crossings and record barcodes.':mode==='o'?'Centre GP28 over the tape. Scans and plans a right-side bypass, checks clearance, then rejoins right-first. Faster on stable straights; slower through bends. Barcodes are disabled. Test on the floor with clear space to the right.':'Place the car on a clear, flat surface for the selected movement.';el('start-help').textContent=mode==='v'?'No GP20 start needed. GP20 cancels this sensor test.':'After confirmation, press GP20 on the car. Hold it still through the 3-second countdown. GP20 also stops it.';}
 el('test-mode').onchange=()=>{updateMode();drawOptical();};
 window.addEventListener('resize',drawOptical);
 function drawOptical(){
@@ -331,7 +330,7 @@ function drawOptical(){
  const y=v=>h-25-v/top*(h-40),x=i=>48+i/500*(w-60);
  ctx.font='13px system-ui';ctx.fillStyle='#bcbab2';ctx.fillText('Raw '+Math.ceil(top),5,15);ctx.fillText('0 s',48,h-5);ctx.fillText('5 s',w-30,h-5);
  ctx.strokeStyle='#f4a62a';ctx.setLineDash([5,4]);
- for(const value of [220,226]){ctx.beginPath();ctx.moveTo(48,y(value));ctx.lineTo(w-10,y(value));ctx.stroke();ctx.fillText(String(value),value===220?5:w-35,y(value)-3);}
+
  ctx.setLineDash([]);ctx.strokeStyle='#f3f1ea';
  opticalBins.forEach((v,i)=>{if(!v)return;ctx.beginPath();ctx.moveTo(x(i),y(v[0]));ctx.lineTo(x(i),y(v[1])-1);ctx.stroke();});
 }
@@ -656,7 +655,33 @@ el('prepare').onclick=()=>{
 };
 el('stop').onclick=()=>command('x');
 async function recover(){resultPending=true;try{const r=await request('/result');if(!r.ok)throw Error();const recovered=await r.text();if(recovered!==downloadedResult)append('\n[RETAINED SNAPSHOT]\n'+recovered,true);downloadedResult=recovered;resultPending=false;el('result').textContent=downloadedResult;}catch(e){el('result').textContent=downloadedResult||'Could not reach the car. Retrying while stopped.';}}
-el('download').onclick=async()=>{await recover();const metadata='AAI10 v5.56 wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';const blob=new Blob([metadata,'RECOVERED RESULT (may duplicate log):\n',downloadedResult||'Current result unavailable; see captured live log.\n','\nLIVE LOG:\n',transcript],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-motion-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+async function waveformDownload(){
+ let offset=0,total=0,id='',checksum='',hash=2166136261,parts=[];const expectedBoot=boot;
+ for(let page=0;page<64;page++){
+  const r=await request('/waveform?offset='+offset);
+  if(page===0&&r.status===404)return '[WAVEFORM EXPORT] No frozen waveform available in this run.\n';
+  if(!r.ok)throw Error('Scanner data HTTP '+r.status);
+  const responseBoot=r.headers.get('X-Boot');if(responseBoot&&responseBoot!==expectedBoot)throw Error('Car restarted during scanner download');
+  const text=await r.text(),m=text.match(/\[WAVEFORM CHUNK\] id=(\d+) offset=(\d+) count=(\d+) total=(\d+) fnv=([0-9a-f]{8}) packed=([0-9a-f]+)\n/);
+  if(!m)throw Error('Malformed scanner data');
+  const count=Number(m[3]);if(Number(m[2])!==offset||count<1||count>256||m[6].length!==count*4)throw Error('Incomplete scanner chunk');
+  if(!page){id=m[1];total=Number(m[4]);checksum=m[5];if(total<1||total>16384)throw Error('Invalid scanner length');}
+  if(m[1]!==id||Number(m[4])!==total||m[5]!==checksum||offset+count>total)throw Error('Scanner capture changed during download');
+  for(let i=0;i<m[6].length;i+=4){const word=parseInt(m[6].slice(i,i+4),16);hash=Math.imul(hash^(word&255),16777619)>>>0;hash=Math.imul(hash^(word>>>8),16777619)>>>0;}
+  parts.push(text);offset+=count;
+  if(offset===total){if(hash.toString(16).padStart(8,'0')!==checksum)throw Error('Scanner checksum mismatch');return parts.join('')+'[WAVEFORM COMPLETE] samples='+total+' checksum=OK\n';}
+ }
+ throw Error('Scanner download exceeded capture bound');
+}
+el('download').onclick=async()=>{
+ if(!robotIdle){el('message').textContent='Stop the car before downloading its saved scan.';return;}
+ requestBusy=true;refreshButtons();let wave='';
+ try{await recover();el('message').textContent='Collecting saved scan data…';wave=await waveformDownload();el('message').textContent='Log and saved scan data downloaded.';}
+ catch(e){wave='[WAVEFORM EXPORT INCOMPLETE] '+e.message+'\n';el('message').textContent='Log saved, but scan data is incomplete. Download again before another run.';}
+ finally{requestBusy=false;refreshButtons();}
+ const metadata='AAI10 v5.63 wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';
+ const blob=new Blob([metadata,'RECOVERED RESULT (may duplicate log):\n',downloadedResult||'Current result unavailable; see captured live log.\n','\nFROZEN SCANNER DATA:\n',wave,'\nLIVE LOG:\n',transcript],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-motion-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
 updateMode();
 setPhase('IDLE','Choose a test and prepare it. The car starts only when GP20 is pressed.');
 flap(el('bc-letter'),'–');

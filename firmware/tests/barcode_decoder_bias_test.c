@@ -13,34 +13,12 @@ static void make(uint16_t symbol,int bias,uint32_t *w){
         w[i]=(uint32_t)(width+(i%2?bias:-bias));
     }
 }
-/* Packed storage keeps 1 ms steps. Small synthetic widths (<=750) are taken
- * as whole milliseconds, so storage is exact and must decode identically.
- * Larger (microsecond) widths must decode the same as their 1 ms rounding. */
 static bool both(const uint32_t *w,char *c){
     barcode_runs_t p={{0}};
-    uint32_t scale=1000u,q[29];
-    for(unsigned i=0;i<29;i++){
-        if(w[i]>BARCODE_RUN_MAX_US/BARCODE_RUN_QUANTUM){scale=1u;}
-    }
-    for(unsigned i=0;i<29;i++){
-        uint32_t v=w[i]*scale;
-        assert(barcode_runs_set(&p,i,v));
-        q[i]=((v+BARCODE_RUN_QUANTUM/2u)/BARCODE_RUN_QUANTUM)*BARCODE_RUN_QUANTUM;
-    }
-    char other=0,rounded=0;bool a=barcode_decode_code39_letter(w,c);
-    bool aq=barcode_decode_code39_letter(q,&rounded);
-    bool b=barcode_decode_code39_packed(&p,&other);
-    assert(aq==b && (!b || rounded==other));
-    if(scale!=1u){
-        assert(a==b && (!a || *c==other));
-    }
-    return a;
-}
-/* Real logged captures must give the same letter after 1 ms storage. */
-static char packed_letter(const uint32_t *w){
-    barcode_runs_t p={{0}};char letter=0;
     for(unsigned i=0;i<29;i++)assert(barcode_runs_set(&p,i,w[i]));
-    return barcode_decode_code39_packed(&p,&letter)?letter:0;
+    char other=0;bool a=barcode_decode_code39_letter(w,c);
+    bool b=barcode_decode_code39_packed(&p,&other);
+    assert(a==b && (!a || *c==other));return a;
 }
 int main(void){
     uint32_t w[29],r[29];char c=0;
@@ -48,7 +26,6 @@ int main(void){
         bool ok=both(recorded[i].widths,&c);
         printf("Replay %s: %s %c\n",recorded[i].name,ok?"accepted":"rejected",ok?c:'-');
         assert(ok && c==recorded[i].letter);
-        assert(packed_letter(recorded[i].widths)==recorded[i].letter);
         barcode_capture_t capture;barcode_capture_begin_drive(&capture);
         barcode_batch_t batch={.count=1,.edges={{1000,true}},.stats={.samples=1,.last_us=1000,.black=true}};
         barcode_capture_consume(&capture,&batch);
@@ -63,7 +40,6 @@ int main(void){
         assert(stop.stop && stop.left==0 && stop.right==0 && !strcmp(stop.state,"BARCODE_READ"));
         for(unsigned j=0;j<29;j++)r[j]=recorded[i].widths[28-j];
         assert(both(r,&c) && c==recorded[i].letter);
-        assert(packed_letter(r)==recorded[i].letter);
     }
     /* Exact v5.30 half-A edges through the continuous acquisition path.
      * One event only, no expected-letter input, and no duplicate from trailing noise. */
@@ -146,11 +122,11 @@ int main(void){
         make(letters[0],0,w);w[i]=750000;assert(!both(w,&c));
     }
     for(unsigned gap=9;gap<=19;gap+=10){make(letters[0],0,w);w[gap]=300;assert(!both(w,&c));}
-    make(letters[0],0,w);for(unsigned i=0;i<29;i++)if(w[i]==300)w[i]=150;
+    make(letters[0],0,w);for(unsigned i=0;i<29;i++)if(w[i]==300)w[i]=170;
     assert(!both(w,&c));
-    make(letters[0],0,w);for(unsigned i=0;i<29;i++)if(w[i]==300)w[i]=160;
+    make(letters[0],0,w);for(unsigned i=0;i<29;i++)if(w[i]==300)w[i]=180;
     assert(both(w,&c) && c=='A');
-    for(unsigned i=0;i<29;i++)if(w[i]==160)w[i]=159;
+    for(unsigned i=0;i<29;i++)if(w[i]==180)w[i]=179;
     assert(!both(w,&c));
     for(unsigned i=0;i<29;i++)w[i]=100;
     assert(!both(w,&c));
