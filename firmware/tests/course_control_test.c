@@ -6,7 +6,7 @@ static course_control_t c;
 static uint64_t now;
 static int32_t l,r;
 static encoder_sample_t enc(void){return (encoder_sample_t){.left_raw=(uint32_t)-l,.right_raw=(uint32_t)r};}
-static void reset(char action,unsigned n){now=1000000;l=r=0;char mapped=action=='s'?'s':action=='l'?(n==1?'l':n==2?'a':'c'):(n==1?'r':n==2?'b':'d');course_begin(&c,(course_config_t){mapped,'s',120},enc(),now);course_on_barcode(&c,'Y',enc(),now,false);}
+static void reset(char action,unsigned n){now=1000000;l=r=0;char mapped=action=='s'?'s':action=='l'?(n==1?'l':n==2?'a':'c'):(n==1?'r':n==2?'b':'d');course_begin(&c,(course_config_t){mapped,'s',120,{0}},enc(),now);course_on_barcode(&c,'Y',enc(),now,false);}
 static line_check_output_t step(bool left,bool right,int dl,int dr,unsigned us)
 {now+=us;l+=dl;r+=dr;return course_step(&c,(ir_roles_t){false,left,right},enc(),now);}
 static void cross(void)
@@ -76,9 +76,9 @@ int main(void)
     reset('s',1);for(unsigned i=0;i<9;i++)assert(!step(false,false,0,0,100000).stop);
     assert(step(false,false,0,0,100000).stop); /* no forward encoder progress */
     reset('s',1);o=step(false,false,-65,1,10000);assert(o.stop);
-    course_begin(&c,(course_config_t){'x',2,120},enc(),now);assert(c.phase==COURSE_FAILED);
+    course_begin(&c,(course_config_t){'x',2,120,{0}},enc(),now);assert(c.phase==COURSE_FAILED);
     /* No selection may trigger motion/turn until a mapped barcode arrives. */
-    reset('s',1);course_begin(&c,(course_config_t){'b','l',120},enc(),now);
+    reset('s',1);course_begin(&c,(course_config_t){'b','l',120,{0}},enc(),now);
     cross();leave();cross();leave();assert(c.phase==COURSE_FOLLOW&&!c.turns&&!c.route_updates);
     assert(!strcmp(course_on_barcode(&c,'A',enc(),now,false),"IGNORED_UNMAPPED"));assert(!c.remaining_junctions);
     course_on_barcode(&c,'Y',enc(),now,false);assert(c.remaining_junctions==2);
@@ -115,8 +115,8 @@ int main(void)
     }
     /* Every documented action is valid and maps to the correct future count. */
     const char all[]="sLRUlrabcdx";
-    for(unsigned i=0;i<sizeof(all)-1;i++)assert(course_config_valid((course_config_t){all[i],all[i],120}));
-    assert(!course_config_valid((course_config_t){'Q','s',120}));
-    assert(!course_config_valid((course_config_t){'s','s',0}));
+    for(unsigned i=0;i<sizeof(all)-1;i++)assert(course_config_valid((course_config_t){all[i],all[i],120,{0}}));
+    assert(!course_config_valid((course_config_t){'Q','s',120,{0}}));
+    assert(!course_config_valid((course_config_t){'s','s',0,{0}}));
     puts("Course tests passed: debouncing, encounter latch, straight crossings, barcode-relative left/right, replacements, deferral/STOP, immediate L/R/U, centering, calibrated turn, bounded reacquire, one-shot and faults.");
 }

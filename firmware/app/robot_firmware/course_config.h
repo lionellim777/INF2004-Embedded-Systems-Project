@@ -4,7 +4,12 @@
 #include <stdint.h>
 /* Y/Z are test-track symbols. Their actions are user-configured, not official
  * assessment meanings. Delayed actions count crossings after the barcode. */
-typedef struct { char y_action,z_action; uint16_t advance_mm; } course_config_t;
+typedef struct {
+    char y_action,z_action; uint16_t advance_mm;
+    /* Other letters A-X: index letter-'A'. 0 = unmapped (record only).
+     * Y and Z always use y_action/z_action above. */
+    char letter_action[26];
+} course_config_t;
 static inline const char *course_action_name(char a)
 {
     switch(a){
@@ -23,6 +28,20 @@ static inline unsigned course_action_junctions(char a)
 {return a=='l'||a=='r'?1u:a=='a'||a=='b'?2u:a=='c'||a=='d'?3u:0u;}
 static inline bool course_action_left(char a)
 {return a=='L'||a=='l'||a=='a'||a=='c';}
+/* Action for a decoded letter, or 0 if that letter is not mapped. */
+static inline char course_config_action(const course_config_t *c,char letter)
+{
+    if(letter=='Y')return c->y_action;
+    if(letter=='Z')return c->z_action;
+    if(letter<'A'||letter>'X')return 0;
+    return c->letter_action[letter-'A'];
+}
 static inline bool course_config_valid(course_config_t c)
-{return course_action_valid(c.y_action)&&course_action_valid(c.z_action)&&c.advance_mm>=60&&c.advance_mm<=250;}
+{
+    if(!course_action_valid(c.y_action)||!course_action_valid(c.z_action)||c.advance_mm<60||c.advance_mm>250)
+        return false;
+    for(unsigned i=0;i<24u;i++)
+        if(c.letter_action[i]&&!course_action_valid(c.letter_action[i]))return false;
+    return true;
+}
 #endif

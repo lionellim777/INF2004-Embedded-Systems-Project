@@ -18,7 +18,7 @@ int main(void){
  /* A new stopped countdown replaces the previous ring completely. */
  for(unsigned i=31;i<62;i++)center_baseline_add(&b,600,i*10000);
  assert(center_baseline_value(&b,610000,&median,&spread) && median==600);
- course_control_t c;course_begin(&c,(course_config_t){'s','s',120},enc(0,0),0);
+ course_control_t c;course_begin(&c,(course_config_t){'s','s',120,{0}},enc(0,0),0);
  course_set_center_reference(&c,650);
  for(unsigned i=1;i<=20;i++){
   course_center_level(&c,i%2?797:637); /* log-like peak then ordinary black */

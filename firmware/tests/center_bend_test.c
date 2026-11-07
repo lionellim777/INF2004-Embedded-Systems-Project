@@ -12,7 +12,7 @@ static line_check_output_t step(int level,bool right,int dl,int dr,unsigned dt){
         (encoder_sample_t){.left_raw=(uint32_t)-l,.right_raw=(uint32_t)r},now);
 }
 static void setup(void){
-    now=1000000;l=r=0;course_begin(&c,(course_config_t){'s','s',120},(encoder_sample_t){0},now);
+    now=1000000;l=r=0;course_begin(&c,(course_config_t){'s','s',120,{0}},(encoder_sample_t){0},now);
     course_set_center_reference(&c,800);c.drive.launch_complete=true;
     for(int i=0;i<12;i++)assert(!step(800,false,60,60,100000).stop);
     assert(c.bend_ready);

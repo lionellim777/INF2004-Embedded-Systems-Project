@@ -222,7 +222,7 @@ static void retry_tests(void){
     /* Without an obstacle/fault, output must match the existing course
      * controller for identical sensor and encoder inputs. */
     course_control_t original;
-    course_begin(&original,(course_config_t){'s','s',120},enc,now);
+    course_begin(&original,(course_config_t){'s','s',120,{0}},enc,now);
     course_set_center_reference(&original,700);
     for(unsigned i=0;i<150;i++){
         now+=10000;enc.left_raw=(uint32_t)-(int32_t)(i*6);enc.right_raw=i*6;

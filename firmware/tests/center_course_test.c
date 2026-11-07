@@ -6,7 +6,7 @@ static course_control_t c;
 static uint64_t now;
 static int32_t l,r;
 static encoder_sample_t enc(void){return (encoder_sample_t){.left_raw=(uint32_t)-l,.right_raw=(uint32_t)r};}
-static void reset(void){now=1000000;l=r=0;course_begin(&c,(course_config_t){'s','x',120},enc(),now);c.drive.launch_complete=true;} /* Isolate steering here; launch has separate plant tests. */
+static void reset(void){now=1000000;l=r=0;course_begin(&c,(course_config_t){'s','x',120,{0}},enc(),now);c.drive.launch_complete=true;} /* Isolate steering here; launch has separate plant tests. */
 static line_check_output_t step(bool center,bool right,int dl,int dr,unsigned us)
 {now+=us;l+=dl;r+=dr;return course_step(&c,(ir_roles_t){0,center,right},enc(),now);}
 int main(void){

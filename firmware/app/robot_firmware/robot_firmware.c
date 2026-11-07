@@ -477,8 +477,8 @@ static void barcode_drain(bool end)
             }
             printf("[BARCODE EVENT] seq=%u letter=%c at_ms=%lu action=%s\n",
                    stream_logged+1,letter,(unsigned long)(barcode_capture.events[stream_logged].us/1000u),disposition);
-            if(course_run && !end && (letter=='Y'||letter=='Z')){
-                char action=letter=='Y'?course.config.y_action:course.config.z_action;
+            if(course_run && !end && course_config_action(&course.config,letter)){
+                char action=course_config_action(&course.config,letter);
                 printf("[ROUTE BARCODE] source=%c selected=%s prior_waiting=%c remaining=%u deferred=%u.\n",
                        letter,course_action_name(action),previous?previous:'-',course.remaining_junctions,course.deferred);
             }
@@ -694,7 +694,7 @@ int main(void)
     /* Power-bank reboot must not fall back to line-follow when GP20 is pressed. */
     selected = MOTION_STRAIGHT_30CM;
 #endif
-    course_config_t selected_course={'s','s',120};
+    course_config_t selected_course={'s','s',120,{0}};
     static motion_control_t motion;
     motion_init(&motion);
     static run_diagnostics_t diagnostics = {0};
@@ -771,6 +771,13 @@ int main(void)
                     if(course_config_valid(config)){
                         selected_course=config;selected=MOTION_COURSE;
                         printf("[SELECT Y/Z] Y=%s Z=%s junction_advance_mm=%u timer=none travel_limit=160000counts; GP20 starts; actions trigger on barcode.\n",course_action_name(config.y_action),course_action_name(config.z_action),config.advance_mm);
+                        printf("[SELECT LETTERS]");
+                        unsigned mapped=0;
+                        for(char l='A';l<='X';l++){
+                            char a=course_config_action(&config,l);
+                            if(a){printf(" %c=%s",l,course_action_name(a));mapped++;}
+                        }
+                        printf(mapped?"; others record only.\n":" none; A-X record only.\n");
                     }else printf("[SELECT] Use course settings on the web page.\n");
                 }
             } else if (ch == '?') {

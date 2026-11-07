@@ -194,7 +194,7 @@ int calibration_wifi_getchar(void){
     if(start_us&&clock_us-start_us>(scenario>=41?15000000u:scenario>=7?10000000u:4500000u)&&!input_count++){return 'x';}
     return -1;
 }
-course_config_t calibration_wifi_course_config(void){return (course_config_t){scenario>=16?'s':scenario==11?'b':scenario==12?'R':scenario==13?'x':(scenario==14||scenario==15)?'l':scenario>=7?'r':'s',scenario==14?'R':scenario==15?'x':'s',120};}
+course_config_t calibration_wifi_course_config(void){return (course_config_t){scenario>=16?'s':scenario==11?'b':scenario==12?'R':scenario==13?'x':(scenario==14||scenario==15)?'l':scenario>=7?'r':'s',scenario==14?'R':scenario==15?'x':'s',120,{0}};}
 uint32_t calibration_wifi_max_poll_us(void){return 0;}void calibration_wifi_help(void){}void calibration_wifi_reset_timing(void){}
 static unsigned exported_samples;
 void calibration_wifi_set_waveform(const uint16_t *samples,unsigned count,const char *details,uint32_t id,uint32_t hash)
@@ -223,7 +223,7 @@ static void independent_phase_test(void)
     const course_phase_t phases[]={COURSE_LOST,COURSE_TURN,COURSE_SEEK,COURSE_BRAKE};
     for(unsigned p=0;p<sizeof(phases)/sizeof(phases[0]);p++){
         clock_us=0;course=(course_control_t){0};course.phase=phases[p];
-        course.config=(course_config_t){'s','r',120};course_run=true;
+        course.config=(course_config_t){'s','r',120,{0}};course_run=true;
         stream_logged=0;stream_paused_fragments=0;barcode_trace_count=0;
         barcode_trace_overflow=false;
         barcode_sampler_begin_levels(&barcode_sampler,226,220);

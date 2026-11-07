@@ -85,8 +85,8 @@ const char *course_on_barcode(course_control_t *c,char letter,encoder_sample_t e
 {
     (void)enc;
     if(c->phase==COURSE_FAILED)return "IGNORED_STOPPED";
-    if(letter!='Y'&&letter!='Z')return "IGNORED_UNMAPPED";
-    char action=letter=='Y'?c->config.y_action:c->config.z_action;
+    char action=course_config_action(&c->config,letter);
+    if(!action)return "IGNORED_UNMAPPED";
     if(!course_action_valid(action)){stopped(c,"COURSE_BAD_CONFIG");return "INVALID_CONFIG";}
     c->route_updates++;
     if(action=='x'){

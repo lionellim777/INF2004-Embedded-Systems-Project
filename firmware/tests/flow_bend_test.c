@@ -14,7 +14,7 @@ static line_check_output_t step(int center,int side,int dl,int dr,unsigned dt)
 }
 static void setup(void)
 {
-    now=1000000;l=r=0;course_begin(&c,(course_config_t){'s','s',120},(encoder_sample_t){0},now);
+    now=1000000;l=r=0;course_begin(&c,(course_config_t){'s','s',120,{0}},(encoder_sample_t){0},now);
     course_enable_flow_follow(&c,true);course_set_center_reference(&c,800);c.drive.launch_complete=true;
     for(unsigned i=0;i<12;i++)assert(!step(800,0,60,60,100000).stop);
     assert(c.bend_ready);

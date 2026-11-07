@@ -109,11 +109,23 @@ bool calibration_parse_cursor(const char *text, uint32_t *value)
 bool calibration_course_command(calibration_core_t *c,const char *path)
 {
     if(!c->selection_allowed || c->pending)return false;
+    /* /mission/Y/Z/advance, optionally /24 actions for A-X ('-' = record only). */
     size_t n=strlen(path);
-    if((n!=15 && n!=16) || strncmp(path,"/mission/",9)!=0 || path[10]!='/' || path[12]!='/')return false;
+    if(n<15)return false;
+    const char *letters=strchr(path+13,'/');
+    size_t head=letters?(size_t)(letters-path):n;
+    if((head!=15 && head!=16) || strncmp(path,"/mission/",9)!=0 || path[10]!='/' || path[12]!='/')return false;
+    if(letters && n!=head+1u+24u)return false;
+    char digits[4]={0};
+    memcpy(digits,path+13,head-13u);
     uint32_t advance;
-    if(!calibration_parse_cursor(path+13,&advance) || advance<60 || advance>250 || path[13]=='0')return false;
-    course_config_t config={path[9],path[11],(uint16_t)advance};
+    if(!calibration_parse_cursor(digits,&advance) || advance<60 || advance>250 || path[13]=='0')return false;
+    course_config_t config={path[9],path[11],(uint16_t)advance,{0}};
+    for(unsigned i=0;letters && i<24u;i++){
+        char a=letters[1+i];
+        if(a!='-' && !course_action_valid(a))return false;
+        config.letter_action[i]=a=='-'?0:a;
+    }
     if(!course_config_valid(config))return false;
     c->course=config;c->pending='q';return true;
 }

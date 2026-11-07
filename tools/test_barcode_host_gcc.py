@@ -58,6 +58,9 @@ for t in ['center_course', 'center_recovery', 'motion_control_host']:
     ok &= run(t, [tests / f'{t}_test.c', app / 'motion_control.c'])
 ok &= run('course_control', [tests / 'course_control_test.c',
                              app / 'course_control.c', app / 'motion_control.c'])
+ok &= run('course_letter', [tests / 'course_letter_test.c',
+                            app / 'course_control.c', app / 'motion_control.c',
+                            app / 'wireless/calibration_core.c'])
 ok &= run('run_diagnostics', [tests / 'run_diagnostics_test.c',
                               app / 'run_diagnostics.c'])
 d = tests / 'barcode_decoder_test'

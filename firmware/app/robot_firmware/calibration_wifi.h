@@ -20,7 +20,7 @@ void calibration_wifi_set_waveform(const uint16_t *samples,unsigned count,
 static inline void calibration_wifi_capture_init(void) {}
 static inline bool calibration_wifi_init(void) { return false; }
 static inline void calibration_wifi_poll(bool allowed) { (void)allowed; }
-static inline course_config_t calibration_wifi_course_config(void) { return (course_config_t){'s','s',120}; }
+static inline course_config_t calibration_wifi_course_config(void) { return (course_config_t){'s','s',120,{0}}; }
 static inline int calibration_wifi_getchar(void) { return -1; }
 static inline uint32_t calibration_wifi_max_poll_us(void) { return 0u; }
 static inline void calibration_wifi_help(void) {}

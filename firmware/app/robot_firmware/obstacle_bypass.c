@@ -96,7 +96,7 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
         motion_begin_distance(&a->leg,mm,enc,now);
         a->leg.alignment_drive=p==AVOID_TAPE_PROBE||p==AVOID_AXLE_ADVANCE;
     }else if(p==AVOID_VERIFY){
-        course_begin(&a->line,(course_config_t){'s','s',SENSOR_LEAD_MM},enc,now);
+        course_begin(&a->line,(course_config_t){'s','s',SENSOR_LEAD_MM,{0}},enc,now);
         course_set_center_reference(&a->line,a->reference);
         a->line.recovery_limit_counts=240;
     }
@@ -106,7 +106,7 @@ void obstacle_bypass_begin(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t no
     memset(a,0,sizeof(*a));a->phase=AVOID_FOLLOW;a->servo_angle=90;a->last_us=now;
     a->origin.start=enc;a->reference=reference;a->wall_us=a->active_us=now;
     a->encoder_seen[0]=enc.left_invalid;a->encoder_seen[1]=enc.right_invalid;
-    course_begin(&a->line,(course_config_t){'s','s',SENSOR_LEAD_MM},enc,now);
+    course_begin(&a->line,(course_config_t){'s','s',SENSOR_LEAD_MM,{0}},enc,now);
     course_set_center_reference(&a->line,reference);
 }
 static int32_t mean_mm(const motion_control_t *m,encoder_sample_t enc)
