@@ -9,16 +9,19 @@ The car stays on its support; no track, barcode or hump is needed.
 
 1. Keep both powered wheels free of the table, normal motor power available,
    and the USB data cable connected. Leave the old USB helper closed.
-2. Connect this Mac to the Wi-Fi network to be used for the test. The network
-   must support 2.4 GHz and permit the Pico and Mac to communicate. No internet
-   service/cloud broker is required.
+2. Connect this Mac to the home router used for the test. The Pico needs that
+   router's **2.4 GHz network name**; the Mac may remain on the router's 5 GHz
+   network if both bands share the same LAN. The router must permit the Pico
+   and Mac to communicate. No internet service/cloud broker is required.
 3. Run in Terminal:
 
    ```sh
    sh "/Users/cyix/Github/INF2004-Embedded-Systems-Project/tools/run_rtos_network.sh"
    ```
 
-4. Enter the Wi-Fi name and its password at the local prompts. The password is
+4. Enter the **2.4 GHz Wi-Fi name** and its password at the local prompts. A
+   separate name ending in `_5G` or `_6G` is unsuitable for the Pico W, even
+   if the router also supports 2.4 GHz. The password is
    hidden. Accept the displayed Mac broker address if it matches the current
    Wi-Fi interface. It was `192.168.1.9` when prepared; the tool detects it again.
    Do not paste passwords into chat.

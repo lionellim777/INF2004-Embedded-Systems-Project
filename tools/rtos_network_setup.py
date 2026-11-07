@@ -87,7 +87,7 @@ def prepare(folder=PRIVATE):
     ip = mac_wifi_ip()
     reuse = settings and input("Reuse the saved local Wi-Fi settings? [Y/n]: ").strip().lower() != "n"
     if not reuse:
-        print("Use the same 2.4 GHz-capable Wi-Fi network as this Mac. Password entry stays hidden.")
+        print("Enter the Pico's 2.4 GHz Wi-Fi name. This Mac may use another band on the same home router. Password entry stays hidden.")
         ssid = input("Wi-Fi name (SSID): ")
         password = getpass.getpass("Wi-Fi password: ")
         settings = dict(ssid=ssid, wifi_password=password, broker_ip=ip, port=1883, prefix=PREFIX,

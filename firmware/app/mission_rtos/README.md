@@ -11,6 +11,10 @@ v0.3 adds the local Wi-Fi provisioning/broker console and network diagnostics.
 Use the [next physical network checklist](../../../docs/testing/rtos-network-first-physical-check.md).
 The [v0.3 setup validation](../../../docs/testing/rtos-v0_3-setup-validation.json)
 records software-only checks; it does not claim a completed Pico radio test.
+The subsequent [stationary Pico Wi-Fi/MQTT acceptance](../../../docs/testing/rtos-v0_3-stationary-mqtt-acceptance.json)
+confirms association, DHCP, real binary motion telemetry and an empty STOP
+acknowledgement after selecting the router's 2.4 GHz SSID. Motor-under-network
+stop tests and live Pico broker-restart recovery remain pending.
 
 ## What is implemented
 
