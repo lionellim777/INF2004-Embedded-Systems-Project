@@ -436,14 +436,14 @@
       }
     }
   },
-  "measurement_tool_sha256": "c6ec1aa73665729d66299d68e0d31600df75dd7c1c05d8b4602704bab5d8902d",
+  "measurement_tool_sha256": "12ddef12dd4e6bc767111403daa25e2c85ad93614c1637cc5c3cab649e8d4cc8",
   "memory_before": {
     "arithmetic_remainder_bytes": 46900,
     "bss_bytes": 223436,
     "chip_sram_bytes": 270336,
     "data_bytes": 0,
     "elf_flash_matches_frozen_uf2": true,
-    "elf_sha256": "3c53eec1edc722b8fb5e8ad67866a9017ce795583c9c7e7c7534e6d5dad8bb0e",
+    "elf_sha256": "7ccc614452c39673090c421f897445ff3c922b9b15a3db11e86c3ee96334674d",
     "frozen_uf2_sha256": "a4e2eccb6fb4e74cd49a6d25214bc1be1807c7e8c23de6664ecd32dac1f6a2a3",
     "kernel_pool_on_wifi_branch_bytes": 98304,
     "largest_ram_symbols": [

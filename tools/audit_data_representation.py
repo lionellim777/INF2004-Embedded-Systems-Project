@@ -403,7 +403,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "baseline.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     with (args.output / "fields.csv").open("w", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     print(f"PASS: measured {len(rows)} fields across {sum(len(v['types']) for v in result['layouts'].values())} target types")

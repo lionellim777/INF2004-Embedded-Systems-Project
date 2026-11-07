@@ -1,0 +1,85 @@
+{
+  "version": "rtos-motion-v0.1",
+  "date_local": "2026-11-07",
+  "branch": "yixuan/rtos-motion-foundation",
+  "baseline_main": "fefad265ff5aaf11a1de789b6937fdd09c1042da",
+  "kernel_repository": "https://github.com/tron-forum/mtk3_bsp",
+  "kernel_commit": "15ed232c08f2d89e54e514db79de150e224307e3",
+  "bridge_source_commit": "0a7604d807a7457a79c481a3a4758ac41fab45d7",
+  "pico_sdk_commit": "bddd20f928ce76142793bef434d4f75f4af6e433",
+  "compiler": "arm-none-eabi-gcc (Arm GNU Toolchain 14.2.Rel1 (Build arm-14.52)) 14.2.1 20241119",
+  "file": "build/rtos-motion/robocar_rtos_motion.uf2",
+  "uf2_sha256": "c15aa97eb18894600b90814f04243eeb061331bfa9e346b6b00c39ccf82266c4",
+  "uf2_bytes": 143360,
+  "uf2_blocks": 280,
+  "uf2_contiguous_image_matches_binary": true,
+  "elf_sha256": "81b089c2fb10f6f50e709b36003d73ac9c2e12ffb29875d30dc25fdf7b2668ed",
+  "linked_text_bytes": 71472,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 45720,
+  "kernel_pool_bytes": 32768,
+  "main_stack_reservation_bytes": 4096,
+  "application_task_requested_stacks_bytes": [
+    4096,
+    4096
+  ],
+  "runtime_stack_margins_measured": false,
+  "physical_tests_performed": false,
+  "flashed": false,
+  "firmware_baseline_unchanged": true,
+  "baseline_uf2_sha256": "a4e2eccb6fb4e74cd49a6d25214bc1be1807c7e8c23de6664ecd32dac1f6a2a3",
+  "test_results": {
+    "native_equivalent_record_bytes": 28,
+    "binary_record_bytes": 13,
+    "safety_gate_bytes": 8,
+    "runtime_bytes": 200,
+    "codec_cases": 5005,
+    "test_type": "Host SDK simulation and target compile; no hardware/RTOS scheduling execution"
+  },
+  "stop_design": {
+    "service_deadline_us": 40000,
+    "alarm_period_us": 5000,
+    "physical_latency_measured": false
+  },
+  "scope": {
+    "real": [
+      "micro T-Kernel scheduler linked",
+      "encoder driver",
+      "calibrated motor controller",
+      "local start/stop gate",
+      "binary motion snapshots"
+    ],
+    "unavailable": [
+      "MQTT",
+      "Wi-Fi/browser",
+      "barcode capture and execution",
+      "terrain",
+      "obstacle avoidance"
+    ],
+    "simulation": "Host SDK fixtures test actual gate/board/runtime; the RTOS scheduler has not been run on hardware in this turn"
+  },
+  "memory_comparison_limit": "45720 BSS is for the smaller motion-only feature set; it is not measured whole-firmware least-bits savings",
+  "source_sha256": {
+    "firmware/app/mission_rtos/CMakeLists.txt": "c0807f3093cb61af8ad16eebe20c97d414a56e28d526845190d5da21b4930680",
+    "firmware/app/mission_rtos/board.c": "5410192a3a646df1fbc2a4dd7bb5429cc76a847438f8fb0f7834646988b5669d",
+    "firmware/app/mission_rtos/board.h": "f5e887d16bc4b750b237d4cccd01081f14de150eb79c0b87bec2eb9b55d713db",
+    "firmware/app/mission_rtos/main.c": "d6650d656707e90308b3946b1f2417b62729fbca9feb4ae2fe71a65e66634b71",
+    "firmware/app/mission_rtos/motion_record.c": "18a90475bf3ed52b35d312e3c387fd1cbeb7c0d2386798f790266f619211900a",
+    "firmware/app/mission_rtos/motion_record.h": "02cc001f6920388de27b217dd71c110fadc9c810416ac37d7c8bc983b740ddd7",
+    "firmware/app/mission_rtos/motion_runtime.c": "591592e553bb48aeb9e3db1a1eb9c0c83fe71b19fb0db7544cb672bddb35854a",
+    "firmware/app/mission_rtos/motion_runtime.h": "08a8cfe28a609ea0128379fe97091b1eaf006c4ef3495b4acd4985d9a02b5496",
+    "firmware/app/mission_rtos/port/mtk_bridge.c": "b32230c50d95846f75fa18ad2471facce26269f41a31217c4856f30395c8fea9",
+    "firmware/app/mission_rtos/port/mtk_bridge.h": "6d1858c616ca5cffa7b4c14680ffd7280caf8376c7f97e157fe073fbfcffab45",
+    "firmware/app/mission_rtos/safety_gate.c": "83732fb4f00487162e412318be9dce3acd85700c0d3aaafa0a526248c0fd4926",
+    "firmware/app/mission_rtos/safety_gate.h": "46e38a72a8cbd12ecbdb9a7171938f5d9ed9b0acdab8165f01b64b7ca54091b0",
+    "firmware/app/robot_firmware/encoders.c": "1b684c010e0db68f029b620a7fd04fa412762c04770fb921d8bd2bf7cd1b6f66",
+    "firmware/app/robot_firmware/encoders.h": "618231847534e8d709a71a6c1f1afd27de6d262f41235151dd05ff32a4c0c450",
+    "firmware/app/robot_firmware/motion_control.c": "d6d17594a193624b3f15a038152cbb493a4394afee79790db5d25cb00c60fe53",
+    "firmware/app/robot_firmware/motion_control.h": "fb7303f7f1be44e1cb9812cc7bd6ccbc648ff501a1c418377f2bb72757372980",
+    "tools/build_rtos_motion.sh": "4ca72f523b5480d4eedae364023ff007fe4e6a783b2adc10cb3b4a55137553f0",
+    "tools/decode_motion_record.py": "51f4e5150474f3e1b2241a35364dcc8aef2ce52066d413e6a875b943c74df9c6",
+    "tools/test_rtos_motion.py": "5e1c2c3ca7d4151d998fad3b5d832f8f70de5fbd8e26f1e8d8b341e3ca909242",
+    "firmware/tests/mission_rtos/foundation_test.c": "18a04ad2d2be0856873d0e1596804da372446b5140e17b1ed83584c84b1c2d0c",
+    "firmware/tests/mission_rtos/test_sdk.h": "556672e24b0586faeb9f35dcda4a36a873ac97673e5f59a6c55fe18763a57fef"
+  }
+}
