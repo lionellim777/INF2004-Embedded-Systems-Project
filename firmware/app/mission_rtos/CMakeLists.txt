@@ -16,6 +16,11 @@ if(NOT MTK_REV STREQUAL "15ed232c08f2d89e54e514db79de150e224307e3")
 endif()
 set(MTK "${MTK_BSP_PATH}")
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/network_settings.local.h")
+    configure_file(network_settings.local.h "${CMAKE_BINARY_DIR}/generated/network_settings.h" COPYONLY)
+else()
+    configure_file(network_settings.example.h "${CMAKE_BINARY_DIR}/generated/network_settings.h" COPYONLY)
+endif()
 file(READ "${MTK}/config/config.h" MTK_CONFIG)
 foreach(OPTION USE_TMONITOR USE_SDEV_DRV USE_SHUTDOWN USE_SYSTEM_MESSAGE USE_EXCEPTION_DBG_MSG)
     string(REGEX REPLACE "#define[ \t]+${OPTION}[ \t]+\\(1\\)"
@@ -47,6 +52,7 @@ target_include_directories(mtkernel PRIVATE "${CMAKE_BINARY_DIR}/generated"
 
 set(BASELINE "${CMAKE_CURRENT_LIST_DIR}/../robot_firmware")
 add_executable(robocar_rtos_motion main.c board.c safety_gate.c motion_record.c motion_runtime.c
+    binary_protocol.c network_service.c
     port/mtk_bridge.c "${BASELINE}/encoders.c" "${BASELINE}/motion_control.c")
 target_include_directories(robocar_rtos_motion PRIVATE "${CMAKE_CURRENT_LIST_DIR}"
     "${BASELINE}" "${CMAKE_BINARY_DIR}/generated" "${MTK}/config" "${MTK}/include")
@@ -54,7 +60,7 @@ target_compile_definitions(robocar_rtos_motion PRIVATE _PICO_RP2040_
     PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
 target_compile_options(robocar_rtos_motion PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(robocar_rtos_motion PRIVATE mtkernel pico_stdlib
-    hardware_clocks hardware_exception hardware_pwm m)
+    hardware_clocks hardware_exception hardware_pwm pico_rand pico_cyw43_arch_lwip_poll pico_lwip_mqtt m)
 pico_enable_stdio_usb(robocar_rtos_motion 1)
 pico_enable_stdio_uart(robocar_rtos_motion 0)
 pico_add_extra_outputs(robocar_rtos_motion)

@@ -16,4 +16,5 @@ ROBOT_NINJA="${ROBOT_NINJA:-$ROBOT_ROOT/build/dependencies/venv/bin/ninja}"
     -DCMAKE_MAKE_PROGRAM="$ROBOT_NINJA" \
     '-DCMAKE_C_FLAGS=-mcpu=cortex-m0plus -mthumb'
 "$ROBOT_CMAKE" --build "$ROBOT_ROOT/build/rtos-motion" --parallel 8
+cp "$ROBOT_ROOT/build/rtos-motion/robocar_rtos_motion.uf2" "$ROBOT_ROOT/build/rtos-motion/robocar_rtos_motion_v0_2.uf2"
 "$PICO_TOOLCHAIN_PATH/bin/arm-none-eabi-size" "$ROBOT_ROOT/build/rtos-motion/robocar_rtos_motion.elf"

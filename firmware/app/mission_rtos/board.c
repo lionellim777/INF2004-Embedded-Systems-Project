@@ -10,26 +10,39 @@ enum { BUTTON_PIN = 20, LEFT_A = 8, LEFT_B = 9, RIGHT_A = 10, RIGHT_B = 11 };
 static safety_gate_t gate;
 static repeating_timer_t guard_timer;
 static uint16_t wrap;
-enum { SELECT_MASK = 7u, READY = 8u };
-static uint8_t control; /* selection bits0..2, driver ready bit3; one protected word */
+enum { SELECT_MASK = 7u, READY = 8u, LAST_REASON_MASK = 112u };
+static uint8_t control; /* selection0..2, ready3, last stop reason4..6 */
 static uint8_t latest[MOTION_RECORD_BYTES];
+static uint32_t stop_sequence, stop_requested_us, stop_disabled_us, alarm_gap_us, last_alarm_us;
 
 static void zero_outputs(void)
 {
     pwm_set_both_levels(pwm_gpio_to_slice_num(LEFT_A), 0, 0);
     pwm_set_both_levels(pwm_gpio_to_slice_num(RIGHT_A), 0, 0);
 }
+static void trip_outputs(uint8_t reason)
+{
+    stop_requested_us=time_us_32();
+    zero_outputs();
+    stop_disabled_us=time_us_32();
+    ++stop_sequence;
+    control=(uint8_t)((control&~LAST_REASON_MASK) | (reason<<4u));
+}
 static bool guard_callback(repeating_timer_t *timer)
 {
     (void)timer;
     uint32_t irq = save_and_disable_interrupts();
-    if (safety_gate_tick(&gate, time_us_32(), board_button_down())) zero_outputs();
+    uint32_t now=time_us_32(), gap=now-last_alarm_us; last_alarm_us=now;
+    if (gap>alarm_gap_us) alarm_gap_us=gap;
+    if (safety_gate_tick(&gate, now, board_button_down())) trip_outputs(safety_gate_reason(&gate));
     restore_interrupts(irq);
     return true;
 }
 bool board_init(void)
 {
     control = 0;
+    stop_sequence=stop_requested_us=stop_disabled_us=alarm_gap_us=0;
+    last_alarm_us=time_us_32();
     safety_gate_init(&gate);
     gpio_init(BUTTON_PIN);
     gpio_set_dir(BUTTON_PIN, GPIO_IN);
@@ -56,9 +69,11 @@ bool board_button_down(void) { return !gpio_get(BUTTON_PIN); }
 void board_stop(uint8_t reason)
 {
     uint32_t irq = save_and_disable_interrupts();
+    bool was_armed=safety_gate_armed(&gate);
     if (reason == STOP_INIT) control &= (uint8_t)~READY;
     safety_gate_stop(&gate, reason);
-    zero_outputs();
+    if (was_armed) trip_outputs(safety_gate_reason(&gate));
+    else zero_outputs();
     restore_interrupts(irq);
 }
 void board_note_release(void)
@@ -79,6 +94,7 @@ bool board_start(uint16_t *token)
     uint32_t irq = save_and_disable_interrupts();
     bool result = (control & READY) && (control & SELECT_MASK) != 0 && !board_button_down() &&
         safety_gate_arm(&gate, time_us_32(), token);
+    if (result) { alarm_gap_us=0; last_alarm_us=time_us_32(); }
     restore_interrupts(irq);
     return result;
 }
@@ -94,15 +110,18 @@ static void drive(uint pin, float throttle)
 bool board_apply(uint16_t token, float left, float right)
 {
     uint32_t irq = save_and_disable_interrupts();
+    bool was_armed=safety_gate_armed(&gate);
     bool result = (control & READY) && isfinite(left) && isfinite(right) &&
         !board_button_down() && safety_gate_service(&gate, token, time_us_32());
     if (result) {
         drive(LEFT_A, left); drive(RIGHT_A, right);
     } else {
         /* An old token may remove output, but can never revive a newer run. */
-        if (safety_gate_armed(&gate))
-            safety_gate_stop(&gate, board_button_down() ? STOP_BUTTON : STOP_MOTION);
-        zero_outputs();
+        if (was_armed) {
+            if (safety_gate_armed(&gate))
+                safety_gate_stop(&gate, board_button_down() ? STOP_BUTTON : STOP_MOTION);
+            trip_outputs(safety_gate_reason(&gate));
+        } else zero_outputs();
     }
     restore_interrupts(irq);
     return result;
@@ -145,5 +164,12 @@ void board_read(uint8_t output[MOTION_RECORD_BYTES])
 {
     uint32_t irq = save_and_disable_interrupts();
     memcpy(output, latest, sizeof latest);
+    restore_interrupts(irq);
+}
+void board_stop_trace(board_stop_trace_t *trace)
+{
+    uint32_t irq=save_and_disable_interrupts();
+    *trace=(board_stop_trace_t){.sequence=stop_sequence,.requested_us=stop_requested_us,
+        .disabled_us=stop_disabled_us,.alarm_gap_us=alarm_gap_us,.reason=(control>>4u)&7u};
     restore_interrupts(irq);
 }

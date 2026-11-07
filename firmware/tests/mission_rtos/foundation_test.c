@@ -101,6 +101,9 @@ static void runtime_tests(void)
     hold(true,5); hold(false,5); assert(armed()); /* fresh gesture after boot hold */
     hold(false,12); assert(outputs[4][0]>0 && outputs[5][0]>0);
     tick(true); stopped(); assert(runtime.motion.phase==MOTION_ABORTED);
+    board_stop_trace_t trace;board_stop_trace(&trace);
+    assert(trace.sequence==1 && trace.reason==STOP_BUTTON && trace.disabled_us==trace.requested_us);
+    assert(trace.alarm_gap_us==5000);
     hold(true,5); hold(false,5); stopped(); /* stop-release cannot restart */
     hold(true,5); hold(false,5); assert(armed());
     assert(!board_apply(0,0.5f,0.5f)); stopped(); /* stale hardware apply */

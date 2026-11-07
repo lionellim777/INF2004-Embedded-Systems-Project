@@ -8,7 +8,7 @@
   "bridge_source_commit": "0a7604d807a7457a79c481a3a4758ac41fab45d7",
   "pico_sdk_commit": "bddd20f928ce76142793bef434d4f75f4af6e433",
   "compiler": "arm-none-eabi-gcc (Arm GNU Toolchain 14.2.Rel1 (Build arm-14.52)) 14.2.1 20241119",
-  "file": "build/rtos-motion/robocar_rtos_motion.uf2",
+  "file": "build/rtos-motion-v0_1/robocar_rtos_motion.uf2",
   "uf2_sha256": "c15aa97eb18894600b90814f04243eeb061331bfa9e346b6b00c39ccf82266c4",
   "uf2_bytes": 143360,
   "uf2_blocks": 280,
@@ -81,5 +81,6 @@
     "tools/test_rtos_motion.py": "5e1c2c3ca7d4151d998fad3b5d832f8f70de5fbd8e26f1e8d8b341e3ca909242",
     "firmware/tests/mission_rtos/foundation_test.c": "18a04ad2d2be0856873d0e1596804da372446b5140e17b1ed83584c84b1c2d0c",
     "firmware/tests/mission_rtos/test_sdk.h": "556672e24b0586faeb9f35dcda4a36a873ac97673e5f59a6c55fe18763a57fef"
-  }
+  },
+  "source_commit": "80c3960"
 }

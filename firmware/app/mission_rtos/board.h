@@ -17,4 +17,9 @@ bool board_select(uint8_t kind);
 uint8_t board_selected(void);
 void board_publish(const motion_record_t *record);
 void board_read(uint8_t output[MOTION_RECORD_BYTES]);
+typedef struct {
+    uint32_t sequence, requested_us, disabled_us, alarm_gap_us;
+    uint8_t reason;
+} board_stop_trace_t;
+void board_stop_trace(board_stop_trace_t *trace);
 #endif
