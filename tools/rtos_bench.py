@@ -19,6 +19,9 @@ REASONS = ["boot/none", "user stop", "motor service deadline", "motion fault", "
 
 class Capture:
     def __init__(self, path):
+        from rtos_runtime_capture import RuntimeCapture
+        self.runtime=RuntimeCapture()
+        self.usb_generation=0
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.raw = self.path.with_suffix(".log").open("x", buffering=1)
@@ -27,12 +30,24 @@ class Capture:
         self.summary = dict(decoded_packets=0, parse_errors=0, max_motion_gap_us=0,
                             phases_seen=[], fault_codes_seen=[], stop_traces=[], commands_requested=[])
 
+    def connection_opened(self):
+        # USB carries no boot ID. Scope each reconnection separately rather
+        # than merge a reset Pico's reused run tokens with an older boot.
+        self.usb_generation+=1;self.runtime.boot_id('usb'+str(self.usb_generation))
+
     def line(self, line):
         self.raw.write(line + "\n")
         info = re.search(r"\[RTOS_INFO\] version=(\S+)", line)
         if info:
-            self.ready = info[1] in ("0.2", "0.3", "0.4", "0.4.1", "0.4.2")
+            self.ready = info[1] in ("0.2", "0.3", "0.4", "0.4.1", "0.4.2", "0.5")
             self.summary["firmware_version"] = info[1]
+        if line.startswith('[RUNTIME_V1] '):
+            from rtos_runtime_capture import decode_runtime
+            try:
+                value=decode_runtime(bytes.fromhex(line.split()[1]));self.runtime.accept(value)
+                self.summary['runtime']=self.runtime.summary()
+            except (ValueError,IndexError):self.summary['parse_errors']+=1
+            return None
         match = re.search(r"\[MOTION_V1\] ([0-9a-fA-F]+) gap_us=(\d+)", line)
         if match:
             try:
@@ -79,7 +94,7 @@ class Capture:
             raise ValueError("Use f, l, r, u, x or q")
         if not self.ready:
             raise ValueError("Waiting for supported RTOS identity; no commands sent")
-        if key=='t' and self.summary.get('firmware_version') not in ('0.4','0.4.1','0.4.2'):
+        if key=='t' and self.summary.get('firmware_version') not in ('0.4','0.4.1','0.4.2','0.5'):
             raise ValueError('Track mode requires the configured v0.4 or newer track firmware')
         if key in "flrut" and self.latest and not self.latest["stop_latched"]:
             raise ValueError("Stop the current test before choosing another")
@@ -120,6 +135,7 @@ def main():
                     candidate = None
                     try:
                         candidate = serial.Serial(port, 115200, timeout=0.05, write_timeout=0.5)
+                        capture.connection_opened()
                         candidate.dtr = True
                         device = candidate; pending = bytearray(); waiting = False
                         print("Connected. Waiting for RTOS identity...", flush=True)

@@ -13,6 +13,8 @@
 #include "pico/stdlib.h"
 #include "pico/stdio_usb.h"
 #include "network_settings.h"
+#include "runtime_report.h"
+#include "port/task_observe.h"
 #ifndef RTOS_WAIT_FOR_USB
 #define RTOS_WAIT_FOR_USB 0
 #endif
@@ -32,14 +34,22 @@ static void motion_task(int start_code, void *context)
     (void)start_code; (void)context;
     motion_runtime_init(&runtime, encoders_snapshot(), time_us_32(), board_button_down());
     for (;;) {
+        bool armed;uint8_t reason;board_gate_snapshot(&armed,&reason);
+        runtime_measure_run(runtime.token,armed);
+        runtime_span_t span=runtime_measure_begin(RUNTIME_MOTION,time_us_32());
         motion_runtime_step(&runtime, encoders_snapshot(), time_us_64(), board_button_down());
+        board_gate_snapshot(&armed,&reason);runtime_measure_run(runtime.token,armed);
+        runtime_measure_end(RUNTIME_MOTION,span,time_us_32());
         mtk_bridge_delay_ms(1);
     }
 }
 static void decoder_task(int start_code,void *context)
 {
     (void)start_code;(void)context;
-    for(;;){track_service();mtk_bridge_delay_ms(1);}
+    for(;;){
+        runtime_span_t span=runtime_measure_begin(RUNTIME_DECODER,time_us_32());
+        track_service();runtime_measure_end(RUNTIME_DECODER,span,time_us_32());mtk_bridge_delay_ms(1);
+    }
 }
 static void observer_task(int start_code, void *context)
 {
@@ -51,6 +61,7 @@ static void observer_task(int start_code, void *context)
     uint32_t last_stop = 0;
     uint16_t last_reads=0;
     for (;;) {
+        runtime_span_t observer_span=runtime_measure_begin(RUNTIME_OBSERVER,time_us_32());
         int command = getchar_timeout_us(0);
         uint8_t selected = command == 't' ? MOTION_COURSE : command == 'f' ? MOTION_STRAIGHT_30CM :
             command == 'l' ? MOTION_LEFT_90 : command == 'r' ? MOTION_RIGHT_90 :
@@ -67,6 +78,7 @@ static void observer_task(int start_code, void *context)
             last_stop=trace.sequence;
         }
         if (command=='?' || (uint32_t)(now-last_info)>=1000u) {
+            runtime_report_poll();
             printf("[RTOS_INFO] version=" RTOS_FIRMWARE_VERSION " network_state=%u network_error=%u wifi_link=%d wifi_pm_result=%d uptime_ms=%" PRIu32 "\n",network_state(),network_error(),network_wifi_link(),network_wifi_pm_result(),now);
             last_info=now;
             track_diagnostics_t d;track_diagnostics(&d);
@@ -82,6 +94,12 @@ static void observer_task(int start_code, void *context)
                 reads,letter?letter:'-',d.queue_peak,d.faults,d.decode_max_us,d.adc_max_us,recoveries);
             if(reads && reads!=last_reads)printf("[BARCODE_READ] letter=%c count=%u\n",letter,reads);
             last_reads=reads;
+            for(unsigned slot=0;slot<=RUNTIME_TASKS;slot++){
+                uint8_t bytes[RUNTIME_PACKET_BYTES];size_t length=runtime_report_packet(slot,now,bytes);
+                if(length){
+                    printf("[RUNTIME_V1] ");for(size_t i=0;i<length;i++)printf("%02x",bytes[i]);puts("");
+                }
+            }
         }
         if ((uint32_t)(now - last_print) >= 200u) {
             uint8_t bytes[MOTION_RECORD_BYTES];
@@ -91,15 +109,15 @@ static void observer_task(int start_code, void *context)
             printf(" gap_us=%" PRIu32 "\n", runtime.max_gap_us);
             last_print = now;
         }
-        mtk_bridge_delay_ms(10);
+        runtime_measure_end(RUNTIME_OBSERVER,observer_span,time_us_32());mtk_bridge_delay_ms(10);
     }
 }
 int usermain(void)
 {
-    if (!mtk_bridge_start_task(motion_task, 2, 4096) ||
-        !mtk_bridge_start_task(decoder_task,4,8192) ||
-        !mtk_bridge_start_task(network_task, 8, 4096) ||
-        !mtk_bridge_start_task(observer_task, 9, 4096)) {
+    if (!rtos_observed_start(RUNTIME_MOTION,motion_task, 2, 4096) ||
+        !rtos_observed_start(RUNTIME_DECODER,decoder_task,4,8192) ||
+        !rtos_observed_start(RUNTIME_NETWORK,network_task, 8, 4096) ||
+        !rtos_observed_start(RUNTIME_OBSERVER,observer_task, 9, 4096)) {
         board_stop(STOP_INIT);
         puts("[RTOS_BOOT] error=task_create");
         stdio_flush();
@@ -111,6 +129,7 @@ int usermain(void)
 }
 int main(void)
 {
+    runtime_measure_init();
     bool initialized = board_init(); /* outputs zero before console/kernel */
     stdio_init_all();
     /* Default USB bench mode waits for its logger before starting the kernel,

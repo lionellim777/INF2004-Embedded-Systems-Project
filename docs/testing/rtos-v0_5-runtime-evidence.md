@@ -1,0 +1,111 @@
+# v0.5 runtime measurement candidate
+
+Branch `yixuan/rtos-runtime-evidence`. Implementation and software checks are
+complete. **Not flashed; no physical v0.5 measurements yet.** The user deferred
+connection until tomorrow. Installed-image metadata and the first-passing
+private UF2 backup still identify v0.4.2. No teammate module, scanner algorithm,
+steering calibration or motor-service threshold changed in this candidate.
+
+## Implemented
+
+- Stack allocation/request, remaining marker prefix, observed watermark,
+  priority, observation flag and low-stack marker for all four application tasks.
+- Per-task loop count and maximum entry gap/elapsed work duration, with lifetime
+  maxima separated from each armed run. Stopped reconnects cannot inflate the
+  driving-only maxima. Elapsed work includes preemptions/IRQs, not pure CPU use.
+- Maximum observed guard spacing and motor-service age while armed. Idle does
+  not enlarge these values; arming resets them.
+- Stop sequence/source/reason and timestamps. API timing begins at `board_stop`
+  entry, including delay before its IRQ lock; guard timing begins at its sampled
+  observation; output rejection timing begins at the gate check. The endpoint
+  follows both PWM-off writes. The first effective stop wins.
+- Stack-monitor count/duration and compiler `.su` records. Identical binary
+  observations reach existing USB/MQTT logs and JSON summaries.
+
+These are observations, not worst-case guarantees. Do not sum preemption-
+inclusive task durations to calculate CPU utilization. Button-edge detection
+delay, physical braking time/distance, main/startup stack use and free heap are
+not measured. The 40ms service deadline and 5ms hardware guard are unchanged.
+
+## Stack method
+
+Generated kernel configuration enables `USE_DBGSPT=1` for public `td_ref_tsk`.
+The pinned vendor dependency and copied `mtk_bridge.c/h` are unmodified. A new
+observed-start wrapper uses the same dynamic `tk_cre_tsk` request and attributes.
+It does not add static stacks or move them out of the existing32KiB kernel pool.
+
+The ARMv6-M port allocates request+128 system bytes:4224 each for Motion,
+Network and Observer,8320 for Decoder; total20992 bytes inside the pool.
+`td_ref_tsk` locates the extent while the task is dormant. Its top128bytes are
+left untouched to preserve the initial CPU context. The remainder is painted
+0xa5 before `tk_sta_tsk`, never repainted after starting. The observed watermark
+includes the unpainted128bytes conservatively.
+
+Observer scans with interrupts/preemption enabled, once per second. Only short
+native metadata copies use IRQ locks; encoding and transmission happen outside
+them. A changed low16-byte marker requests the existing latched initialization
+stop. This is diagnostic detection, not an MPU boundary or guaranteed overflow
+prevention. Preemption and values coincidentally equal to0xa5 limit watermark
+interpretation. The pinned port's task system-stack observations can include IRQ
+use, without separately measuring an ISR-only bound. Kernel-pool free space and
+unexecuted paths remain unmeasured. No stack was downsized.
+
+## Binary fields and representations
+
+Topic `inf2004/aai10/robot1/v1/runtime_diag`, repeated with status approximately
+once a second at QoS0. Robot ACL permits publication; observer credentials cannot
+forge telemetry. USB emits `[RUNTIME_V1] <hex>`. Existing schemas stay unchanged.
+Fields are LSB-first with zero padding. Common header: kind8/run16/capture-ms32.
+
+| Record | Bytes | Fields after the seven-byte header |
+| --- | ---: | --- |
+| kind0 summary |36| armed1/source2/reason3/pad2; stop-sequence, request-us, disabled-us, armed guard-gap max, armed service-age max, monitor-work max, stack-scan count:32 each |
+| kind1 task |34| ID2/priority5/valid1; requested14/allocated14/marker-prefix14/guard-intact1/observed1/pad4; iterations, lifetime gap/work max, armed gap/work max:32 each |
+
+IDs0..3 mean Motion/Decoder/Network/Observer; source0..3 means boot/no event,
+stop-API entry, guard observation, output rejection. Reasons retain0..6.
+Stack dimensions are below16384 and priorities1..16; counters/timestamps retain
+their32-bit domains. Clock differences use modulo32 within the measured window.
+New runs clear armed maxima; old preempted spans cannot contaminate a new run.
+MQTT records are scoped by status boot ID. USB has no boot ID and scopes each
+reconnection separately. Older delayed records remain in raw logs but do not
+replace newer summary values.
+
+## Software evidence
+
+`tools/test_rtos_runtime.py` executes actual observer/measurement/report code
+with sanitized kernel/SDK call mocks. It checks creation attributes, dormant
+context preservation, pre-start painting, creation/reference/start cleanup,
+watermarks, low-marker stop, idle/armed separation, run reset, stale spans,
+wrap, bounds/padding and independent Python decode. These are not physical
+watermark or timing observations.
+
+Board/runtime regressions verify API timing includes simulated lock delay and
+both PWM writes across wrap, plus guard/service and rejection sources. Existing
+start/stop/deadline/token and actual ADC-to-PWM A/A/Z recovery checks pass.
+Runtime packet delivery, explicit lengths, existing scan export, backpressure,
+reconnect and role ACLs pass through local real brokers. USB/MQTT console tests
+cover v0.5 identity, saved observations and reconnection namespaces.
+
+The ARM build uses `-Wall -Wextra -Werror -fstack-usage`. UF2 reconstruction is
+compared to the linked binary. Compiler `.su` values describe individual frames,
+not full call chains or runtime watermarks. See the JSON report for hashes and
+resource figures. Firmware timing and task startup still need the Pico check.
+
+## Tomorrow: no-track first check
+
+1. Connect the Pico to the Mac normally by USB, with battery disconnected and
+   both powered wheels raised. No BOOTSEL or GP20 press.
+2. The agent checks the broker IP and, if changed, rebuilds with saved local
+   settings. No password is needed in chat. Verify the candidate image hash.
+3. Flash/verify using the existing USB picotool; Finder mounting is unnecessary.
+   Retain v0.4.2 for rollback.
+4. Confirm v0.5, idle/stop-latched/no fault, then collect observations for all
+   four tasks with their expected allocations and intact markers. Keep motors
+   stopped. Verify data and idle MQTT STOP acknowledgement; save real results.
+5. Update installed-image metadata only after successful installation/check.
+
+Later checks use normal motor power with raised wheels for GP20/USB/MQTT abort,
+then a real A/A/Z pass for loaded Decoder observations. A bounded move completing
+before a STOP arrives is completion, not a demonstrated moving abort. No physical
+step is requested tonight; the candidate is not installed by preparing it.

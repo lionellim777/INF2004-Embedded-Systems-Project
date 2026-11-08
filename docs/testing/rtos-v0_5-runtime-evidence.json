@@ -1,0 +1,1157 @@
+{
+  "version": "0.5",
+  "recorded_utc": "2026-11-08T16:33:31.641227+00:00",
+  "branch": "yixuan/rtos-runtime-evidence",
+  "base_commit": "d4f8eff",
+  "status": "Built and software-tested; NOT installed, no physical runtime measurements yet. User deferred USB connection until tomorrow.",
+  "candidate": {
+    "file": "build/rtos-network-v0_5/robocar_rtos_network_v0_5.uf2",
+    "credentials_embedded": true,
+    "sha256": "0ac6a2fbb944522991f0958a141fd72c9980fa3843559fc28a5c5ddbb6dbb5c6",
+    "bytes": 902144,
+    "blocks": 1762,
+    "uf2_payload_compared_to_bin": true,
+    "elf_sha256": "31ff4c9a80c0daa4458e475588a98cee14bb242828b0034b07fe352c0b76bc32",
+    "text": 451032,
+    "data": 0,
+    "bss": 206304,
+    "bss_increase_over_v0_4_2": 436,
+    "kernel_pool_bytes": 32768,
+    "task_requested_bytes": [
+      4096,
+      8192,
+      4096,
+      4096
+    ],
+    "expected_kernel_allocated_bytes": [
+      4224,
+      8320,
+      4224,
+      4224
+    ],
+    "native_stack_allocations_unchanged": true,
+    "enable_read_only_kernel_debug_reference": true,
+    "source_sha256": {
+      "firmware/app/mission_rtos/CMakeLists.txt": "5db104bacd5a979e1391e7569ccc42fe079be4d2bccaac0fd37392932cc74787",
+      "firmware/app/mission_rtos/board.c": "7f7848fa9423f6cd919b44a0a9b4a1c27a8e314d3ac704c97f45aa15c70db229",
+      "firmware/app/mission_rtos/board.h": "5cbc4514cc448478444315d0086f6c8ef666d05382062de5fc3704a25fb51499",
+      "firmware/app/mission_rtos/main.c": "20d563e1e654ecd9c26e299b21b79ce519fdab66db22adeb748947a7056f9415",
+      "firmware/app/mission_rtos/network_service.c": "82aa0cda6ee30935612ae0e8c7a3ecf3bd544986744fb04385c4544b6b11d705",
+      "firmware/app/mission_rtos/version.h": "23381c3e543602e2f8b26b8eb166d8b5bac7d8ec3c23a1a1259ee3b7c250d87a",
+      "firmware/app/mission_rtos/runtime_measure.c": "02d251cc7e3d069c3d54624bba251a3798f2c5a014a332367a5c64fe8c6ec8fa",
+      "firmware/app/mission_rtos/runtime_measure.h": "5f72c63ff657426576e285dc0c55437fc3671020e227fab95185d2fd95a1fdb1",
+      "firmware/app/mission_rtos/runtime_report.c": "ea24d46529d494d4bdac371708a442929af0269bc1090b7430072ccd23b19462",
+      "firmware/app/mission_rtos/runtime_report.h": "b2628ecad21bb8f37f9af38037d940786d3821b27cb0d27e60c48486a6a4819f",
+      "firmware/app/mission_rtos/port/task_observe.c": "a7caabb9f950bb1cfc42bca0cf96a2bace0f6ff9a8c2642385a7f59229bc8cd8",
+      "firmware/app/mission_rtos/port/task_observe.h": "f243ae66bf08c4224bf388893bbc20cc0ac3875bdc6c1112574e1cf9c09c0f56"
+    }
+  },
+  "tests": {
+    "runtime_observer": "PASS: sanitized actual observer/measurement/report with kernel-call mocks, pre-start paint, original allocations/attributes, context preservation, failure cleanup, monotonic markers, active/idle/run/wrap/old-span checks",
+    "protected_motors": "PASS: original gate/board/runtime regressions and 5005 codec cases; API request-to-writes includes mocked delay and wrap; guard/service and output-rejection sources distinguished",
+    "track_pipeline": "PASS: original actual ADC/queue/decoder/course/PWM A/A/Z and abort/recovery/storage checks; scanner and course sources unchanged from passing build",
+    "local_MQTT": {
+      "production_service_sdk_mock": "PASS",
+      "independent_binary_decode": "PASS",
+      "local_broker_binary_roundtrip_packets": 419,
+      "hardware_network_tested": false,
+      "local_broker_restart_cycles": 1,
+      "packet_sizes": {
+        "motion": [
+          13
+        ],
+        "line": [
+          9
+        ],
+        "barcode": [
+          5
+        ],
+        "status": [
+          10
+        ],
+        "link": [
+          1
+        ],
+        "command_result": [
+          1
+        ],
+        "scan_diag": [
+          4,
+          31,
+          46,
+          81,
+          101,
+          133,
+          153
+        ],
+        "runtime_diag": [
+          34,
+          36
+        ]
+      }
+    },
+    "auth_console": "PASS: real authenticated runtime topic ACL, spoof rejection, broker restart/cancel/EOF cleanup and quit-during-waveform download",
+    "runtime_receiver": "PASS: independent binary decode, malformed lengths/padding, delayed timestamps, clock wrap and boot isolation",
+    "USB_console": "PASS: v0.5 identity/selection gates, stored USB/MQTT runtime records and separate serial-reconnection namespaces",
+    "ARM_build": "PASS: strict Pico W build and UF2/bin comparison; -fstack-usage records collected"
+  },
+  "packet_bytes": {
+    "summary": 36,
+    "task": 34
+  },
+  "compiler_stack_frames": {
+    "scope": "Individual compiler-reported frames, NOT full call chains or runtime stack watermarks",
+    "records": [
+      {
+        "source": "firmware/app/robot_firmware/barcode_decoder.c",
+        "line": 252,
+        "function": "barcode_decode_code39_geometry",
+        "bytes": 568,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 97,
+        "function": "barcode_waveform_decode",
+        "bytes": 376,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/main.c",
+        "line": 54,
+        "function": "observer_task",
+        "bytes": 288,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 194,
+        "function": "step",
+        "bytes": 288,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 235,
+        "function": "track_scan_export",
+        "bytes": 264,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_decoder.c",
+        "line": 40,
+        "function": "classify_pattern",
+        "bytes": 256,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 113,
+        "function": "course_step",
+        "bytes": 184,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 210,
+        "function": "motion_poll",
+        "bytes": 152,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_report.c",
+        "line": 13,
+        "function": "runtime_report_packet",
+        "bytes": 144,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_decoder.c",
+        "line": 208,
+        "function": "barcode_decode_code39_packed",
+        "bytes": 144,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_decoder.c",
+        "line": 214,
+        "function": "barcode_inspect_code39",
+        "bytes": 144,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 244,
+        "function": "barcode_waveform_details",
+        "bytes": 144,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_runtime.c",
+        "line": 27,
+        "function": "track_runtime_begin",
+        "bytes": 136,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_decoder.c",
+        "line": 130,
+        "function": "decode_direction.constprop",
+        "bytes": 136,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/motion_runtime.c",
+        "line": 28,
+        "function": "motion_runtime_step",
+        "bytes": 128,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 222,
+        "function": "track_scan_state",
+        "bytes": 128,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/main.c",
+        "line": 32,
+        "function": "motion_task",
+        "bytes": 112,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/task_observe.c",
+        "line": 8,
+        "function": "rtos_observed_start",
+        "bytes": 112,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_runtime.c",
+        "line": 41,
+        "function": "track_runtime_step",
+        "bytes": 112,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 157,
+        "function": "track_service",
+        "bytes": 96,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_drive.h",
+        "line": 66,
+        "function": "barcode_drive_step_profile.constprop.isra",
+        "bytes": 96,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 47,
+        "function": "board_init",
+        "bytes": 88,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/motion_record.c",
+        "line": 50,
+        "function": "motion_record_decode",
+        "bytes": 88,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 135,
+        "function": "wheel_update",
+        "bytes": 88,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 278,
+        "function": "network_task",
+        "bytes": 80,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/task_observe.c",
+        "line": 26,
+        "function": "rtos_observed_poll",
+        "bytes": 80,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/motion_record.c",
+        "line": 31,
+        "function": "motion_record_encode",
+        "bytes": 72,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_decoder.c",
+        "line": 201,
+        "function": "barcode_decode_code39_letter",
+        "bytes": 72,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 164,
+        "function": "board_publish",
+        "bytes": 64,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/scan_diagnostic.c",
+        "line": 25,
+        "function": "scan_state_encode",
+        "bytes": 64,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/scan_diagnostic.c",
+        "line": 35,
+        "function": "scan_attempt_encode",
+        "bytes": 64,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/scan_diagnostic.c",
+        "line": 43,
+        "function": "scan_snapshot_encode",
+        "bytes": 64,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/scan_diagnostic.c",
+        "line": 53,
+        "function": "scan_words_encode",
+        "bytes": 64,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_runtime.c",
+        "line": 20,
+        "function": "track_runtime_idle",
+        "bytes": 64,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 274,
+        "function": "remember_attempt",
+        "bytes": 64,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 297,
+        "function": "barcode_waveform_update",
+        "bytes": 64,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 34,
+        "function": "retain_first_failure",
+        "bytes": 56,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 118,
+        "function": "board_apply",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 190,
+        "function": "board_runtime_trace",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 178,
+        "function": "connect_broker",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/mtk_bridge.c",
+        "line": 8,
+        "function": "mtk_bridge_start_task",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_measure.c",
+        "line": 62,
+        "function": "runtime_task_encode",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_measure.c",
+        "line": 72,
+        "function": "runtime_summary_encode",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/scan_diagnostic.c",
+        "line": 16,
+        "function": "profile",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/scan_diagnostic.c",
+        "line": 51,
+        "function": "scan_profile_encode",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/scan_diagnostic.c",
+        "line": 60,
+        "function": "scan_done_encode",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_runtime.c",
+        "line": 25,
+        "function": "track_runtime_observe",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 68,
+        "function": "sample",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_decoder.c",
+        "line": 234,
+        "function": "barcode_decode_code39_coherent",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 368,
+        "function": "barcode_waveform_update_motion",
+        "bytes": 48,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/binary_protocol.c",
+        "line": 7,
+        "function": "line_record_encode",
+        "bytes": 40,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 98,
+        "function": "network_line",
+        "bytes": 40,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_runtime.c",
+        "line": 11,
+        "function": "sensors",
+        "bytes": 40,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 237,
+        "function": "barcode_waveform_save_partial",
+        "bytes": 40,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/encoders.c",
+        "line": 58,
+        "function": "encoders_init",
+        "bytes": 40,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 111,
+        "function": "motion_begin_distance",
+        "bytes": 40,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_measure.c",
+        "line": 21,
+        "function": "runtime_measure_begin",
+        "bytes": 36,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/binary_protocol.c",
+        "line": 38,
+        "function": "status_record_encode",
+        "bytes": 32,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/binary_protocol.c",
+        "line": 55,
+        "function": "binary_command_append",
+        "bytes": 32,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 148,
+        "function": "data",
+        "bytes": 32,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_measure.c",
+        "line": 35,
+        "function": "runtime_measure_end",
+        "bytes": 32,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 94,
+        "function": "track_sensor_init",
+        "bytes": 32,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 19,
+        "function": "course_begin",
+        "bytes": 32,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/binary_protocol.c",
+        "line": 22,
+        "function": "barcode_record_encode",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 33,
+        "function": "guard_callback",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 76,
+        "function": "board_stop",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 139,
+        "function": "board_gate_snapshot",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/main.c",
+        "line": 46,
+        "function": "decoder_task",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 84,
+        "function": "network_barcode",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/mtk_bridge.c",
+        "line": 36,
+        "function": "mtk_bridge_create_mutex",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/scan_diagnostic.c",
+        "line": 9,
+        "function": "begin",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 207,
+        "function": "snapshot",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 71,
+        "function": "apply_action",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 84,
+        "function": "course_on_barcode",
+        "bytes": 24,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 104,
+        "function": "track_sensor_read",
+        "bytes": 20,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/encoders.c",
+        "line": 26,
+        "function": "encoder_gpio_callback",
+        "bytes": 20,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/binary_protocol.c",
+        "line": 47,
+        "function": "binary_command_begin",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 100,
+        "function": "board_start",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 145,
+        "function": "board_select",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 183,
+        "function": "board_stop_trace",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/motion_runtime.c",
+        "line": 19,
+        "function": "motion_runtime_init",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 140,
+        "function": "incoming",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_measure.c",
+        "line": 12,
+        "function": "runtime_measure_run",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_measure.c",
+        "line": 45,
+        "function": "runtime_measure_task",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_report.c",
+        "line": 7,
+        "function": "runtime_report_poll",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 108,
+        "function": "track_request",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 140,
+        "function": "track_diagnostics",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 144,
+        "function": "track_event_take",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 69,
+        "function": "motion_begin",
+        "bytes": 16,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 20,
+        "function": "safety_gate_arm",
+        "bytes": 12,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 33,
+        "function": "safety_gate_service",
+        "bytes": 12,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 43,
+        "function": "safety_gate_tick",
+        "bytes": 12,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 117,
+        "function": "track_stop",
+        "bytes": 12,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 26,
+        "function": "course_center_level",
+        "bytes": 12,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 87,
+        "function": "board_note_release",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 93,
+        "function": "board_ready_to_start",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 177,
+        "function": "board_read",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/main.c",
+        "line": 115,
+        "function": "usermain",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/main.c",
+        "line": 130,
+        "function": "main",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/motion_record.c",
+        "line": 20,
+        "function": "valid",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/mtk_bridge.c",
+        "line": 45,
+        "function": "mtk_bridge_delete_mutex",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/mtk_bridge.c",
+        "line": 51,
+        "function": "mtk_bridge_lock_mutex",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/mtk_bridge.c",
+        "line": 64,
+        "function": "mtk_bridge_unlock_mutex",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/mtk_bridge.c",
+        "line": 70,
+        "function": "mtk_bridge_delay_ms",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/mtk_bridge.c",
+        "line": 76,
+        "function": "mtk_bridge_sleep_forever",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/port/task_observe.c",
+        "line": 40,
+        "function": "rtos_observed_stack",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_measure.c",
+        "line": 10,
+        "function": "runtime_measure_init",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 4,
+        "function": "safety_gate_init",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_runtime.c",
+        "line": 62,
+        "function": "track_runtime_end",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 27,
+        "function": "barcode_waveform_begin",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 39,
+        "function": "course_note_barcode_activity",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/encoders.c",
+        "line": 91,
+        "function": "encoders_snapshot",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 62,
+        "function": "motion_init",
+        "bytes": 8,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/binary_protocol.c",
+        "line": 33,
+        "function": "barcode_record_valid",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 75,
+        "function": "board_button_down",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/board.c",
+        "line": 157,
+        "function": "board_selected",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 28,
+        "function": "scan_ack",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 76,
+        "function": "network_state",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 77,
+        "function": "network_error",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 78,
+        "function": "network_wifi_link",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 79,
+        "function": "network_wifi_pm_result",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 121,
+        "function": "connection",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/network_service.c",
+        "line": 132,
+        "function": "subscribed",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/runtime_measure.c",
+        "line": 50,
+        "function": "runtime_measure_context",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 8,
+        "function": "safety_gate_armed",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 9,
+        "function": "safety_gate_ready",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 10,
+        "function": "safety_gate_reason",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 11,
+        "function": "safety_gate_stop",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/safety_gate.c",
+        "line": 16,
+        "function": "safety_gate_release",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 124,
+        "function": "track_ready",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 130,
+        "function": "track_faulted",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 135,
+        "function": "track_recording",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 214,
+        "function": "track_recoveries",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/mission_rtos/track_sensor.c",
+        "line": 218,
+        "function": "track_scan_run",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_decoder.c",
+        "line": 23,
+        "function": "array_run_get",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/barcode_waveform.c",
+        "line": 197,
+        "function": "barcode_waveform_reason",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 35,
+        "function": "course_set_center_reference",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 37,
+        "function": "course_set_cruise_limit",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 41,
+        "function": "course_enable_flow_follow",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 43,
+        "function": "course_right_level",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/course_control.c",
+        "line": 107,
+        "function": "course_reads_barcodes",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/encoders.c",
+        "line": 77,
+        "function": "encoder_left_count",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/encoders.c",
+        "line": 84,
+        "function": "encoder_right_count",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 40,
+        "function": "motion_left_position",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 47,
+        "function": "motion_right_position",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 127,
+        "function": "motion_abort",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 309,
+        "function": "motion_name",
+        "bytes": 0,
+        "classification": "static"
+      },
+      {
+        "source": "firmware/app/robot_firmware/motion_control.c",
+        "line": 324,
+        "function": "motion_fault_name",
+        "bytes": 0,
+        "classification": "static"
+      }
+    ]
+  },
+  "installed_unchanged": {
+    "version": "0.4.2",
+    "sha256": "e46e1dc253ba054d2a6c179052b7b282961e440104eaed21e4d7312cb13cffff",
+    "private_backup_preserved": true
+  },
+  "physical_tested": false,
+  "flashed": false,
+  "physical_motor_starts": false,
+  "remaining": [
+    "Connect Pico normally with battery disconnected and wheels raised; no BOOTSEL or GP20.",
+    "Verify current broker address, install candidate, and read genuine idle task stack/timing observations.",
+    "Later validate loaded motor stop/decoder timing and stack margins; no observed worst-case or mechanical braking claim.",
+    "Continue whole-application range/ownership and minimum-bit review; this candidate is not completion of that requirement."
+  ]
+}

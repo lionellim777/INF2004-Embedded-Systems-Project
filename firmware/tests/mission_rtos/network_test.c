@@ -17,6 +17,13 @@ static bool mock_scan_stopped;
 static int init_result,pm_result;
 static unsigned sta_calls,pm_calls;
 static struct { char topic[128]; uint8_t bytes[SCAN_PACKET_BYTES]; size_t length; } sent[256];
+size_t runtime_report_packet(unsigned slot,uint32_t ms,uint8_t out[RUNTIME_PACKET_BYTES])
+{
+ if(slot>4)return 0;
+ if(!slot){runtime_summary_t s={.ms=ms,.run=mock_scan_run,.stop_sequence=1,.requested_us=10,.disabled_us=12,.source=1,.reason=1,.stack_scans=3};return runtime_summary_encode(&s,out);}
+ runtime_stack_t stack={4096,4224,3000,(uint8_t)(slot+1u),7};runtime_task_t task={.iterations=10,.gap_us=10000,.work_us=100,.active_gap_us=5000,.active_work_us=50};
+ return runtime_task_encode(ms,mock_scan_run,slot-1,&stack,&task,out);
+}
 uint16_t track_scan_run(void){return mock_scan_run;}
 size_t track_scan_state(uint8_t out[SCAN_PACKET_BYTES])
 { scan_state_t s={.run=mock_scan_run,.ms=1234,.ready=true,.sealed=mock_scan_stopped,.recoveries=33};return scan_state_encode(&s,out); }
@@ -58,6 +65,7 @@ err_t mqtt_publish(mqtt_client_t *c,const char *t,const void *p,u16_t n,u8_t qos
 }
 int ipaddr_aton(const char *s,ip_addr_t *a) { (void)s;a->addr=1;return 1; }
 uint32_t get_rand_32(void) { return 1; }
+uint32_t time_us_32(void) { return 0; }
 uint64_t get_absolute_time(void) { return 0; }
 uint32_t to_ms_since_boot(uint64_t t) { return (uint32_t)(t/1000); }
 void mtk_bridge_delay_ms(uint32_t ms) { (void)ms; }

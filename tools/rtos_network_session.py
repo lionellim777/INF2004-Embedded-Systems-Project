@@ -34,6 +34,8 @@ WIFI_LINKS = {-3:'authentication failed',-2:'Wi-Fi name not found',-1:'connectio
 class Telemetry:
     def __init__(self, path):
         from rtos_scan_capture import ScanCapture
+        from rtos_runtime_capture import RuntimeCapture
+        self.runtime=RuntimeCapture()
         self.scan=ScanCapture(Path(path).parent)
         self.stream=Path(path).open('x',buffering=1)
         self.lock=threading.Lock()
@@ -93,6 +95,9 @@ class Telemetry:
                 if value['boot_id'] not in self.summary['boot_ids']: self.summary['boot_ids'].append(value['boot_id'])
                 self.summary['last_status']=value
                 self.scan.boot_id(value['boot_id'])
+                self.runtime.boot_id(value['boot_id'])
+            elif value['type']=='runtime_diag':
+                self.runtime.accept(value);self.summary['runtime']=self.runtime.summary()
             elif value['type']=='scan_diag':
                 scan_messages=self.scan.accept(value)
                 if value['record']=='state':self.summary['last_scan_state']=value
@@ -231,6 +236,7 @@ class USB:
             candidate=None
             try:
                 candidate=serial.Serial(ports[0],115200,timeout=0,write_timeout=0.5)
+                self.capture.connection_opened()
                 candidate.dtr=True;self.device=candidate;self.pending.clear()
                 print('USB connected. Waiting for RTOS identity...',flush=True)
             except (OSError,serial.SerialException):
@@ -258,7 +264,7 @@ class USB:
 
     def command(self,key):
         if self.device is None:raise ValueError('USB not connected')
-        if key!='x' and self.capture.summary.get('firmware_version') not in ('0.3','0.4','0.4.1','0.4.2'):
+        if key!='x' and self.capture.summary.get('firmware_version') not in ('0.3','0.4','0.4.1','0.4.2','0.5'):
             raise ValueError('Flash the configured RTOS firmware before selecting a test')
         self.device.write(self.capture.command(key))
 

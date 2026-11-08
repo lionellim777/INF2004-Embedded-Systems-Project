@@ -191,6 +191,13 @@ async def authenticated_roundtrip(settings, folder):
             if len(received)>=2:break
             await asyncio.sleep(.01)
         assert received==[(PREFIX+'motion',payload),(PREFIX+'scan_diag',diagnostic)]
+        runtime_fixture=bytes.fromhex(json.loads((Path(__file__).resolve().parents[1]/'build/rtos-v0_5-tests/runtime-fixtures.json').read_text())[1])
+        info=robot.publish(PREFIX+'runtime_diag',runtime_fixture,qos=1)
+        await asyncio.to_thread(info.wait_for_publish,3)
+        for _ in range(100):
+            if len(received)>=3:break
+            await asyncio.sleep(.01)
+        assert received==[(PREFIX+'motion',payload),(PREFIX+'scan_diag',diagnostic),(PREFIX+'runtime_diag',runtime_fixture)]
         info=observer.publish(PREFIX+'command/stop',b'',qos=1)
         await asyncio.to_thread(info.wait_for_publish,3)
         for _ in range(100):
@@ -200,7 +207,7 @@ async def authenticated_roundtrip(settings, folder):
         # Operator credentials cannot forge robot telemetry.
         observer.publish(PREFIX+'motion',b'forged',qos=0)
         await asyncio.sleep(.2)
-        assert received==[(PREFIX+'motion',payload),(PREFIX+'scan_diag',diagnostic)]
+        assert received==[(PREFIX+'motion',payload),(PREFIX+'scan_diag',diagnostic),(PREFIX+'runtime_diag',runtime_fixture)]
     finally:
         for c in clients:c.disconnect()
         for c in clients:await asyncio.to_thread(c.loop_stop)

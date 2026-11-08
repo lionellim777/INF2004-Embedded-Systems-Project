@@ -14,6 +14,10 @@
 #include "lwip/apps/mqtt.h"
 #include "lwip/ip_addr.h"
 #include <string.h>
+#ifdef RTOS_RUNTIME_EVIDENCE
+#include "runtime_report.h"
+static const char runtime_topic[]=RTOS_TOPIC_PREFIX "runtime_diag";
+#endif
 static mqtt_client_t *client;
 #ifdef RTOS_TRACK
 #include "track_sensor.h"
@@ -230,6 +234,12 @@ static void step(uint32_t now)
                 flags&=(uint16_t)~FORCE_STATUS; status_ms=now;
             }
             (void)publish(barcode_topic,barcode,sizeof barcode,0);
+#ifdef RTOS_RUNTIME_EVIDENCE
+            for(unsigned slot=0;slot<=RUNTIME_TASKS;slot++){
+                uint8_t bytes[RUNTIME_PACKET_BYTES];size_t length=runtime_report_packet(slot,now,bytes);
+                if(length)(void)publish(runtime_topic,bytes,length,0);
+            }
+#endif
 #ifdef RTOS_TRACK
             uint8_t scan[SCAN_PACKET_BYTES];size_t scan_length=track_scan_state(scan);
             if(scan_length)(void)publish(scan_topic,scan,scan_length,0);
@@ -270,6 +280,9 @@ void network_task(int start_code,void *context)
     (void)start_code; (void)context;
     boot_id=get_rand_32();
     for (;;) {
+#ifdef RTOS_RUNTIME_EVIDENCE
+        runtime_span_t span=runtime_measure_begin(RUNTIME_NETWORK,time_us_32());
+#endif
         uint32_t now=to_ms_since_boot(get_absolute_time());
         if (network_configured) {
             if (!(flags&INITIALIZED)) {
@@ -280,6 +293,9 @@ void network_task(int start_code,void *context)
                 }
             } else { cyw43_arch_poll(); step(now); }
         }
+#ifdef RTOS_RUNTIME_EVIDENCE
+        runtime_measure_end(RUNTIME_NETWORK,span,time_us_32());
+#endif
         mtk_bridge_delay_ms(network_configured?5:1000);
     }
 }

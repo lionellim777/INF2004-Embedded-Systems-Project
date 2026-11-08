@@ -1,4 +1,8 @@
-# µT-Kernel track integration v0.4.2
+# µT-Kernel runtime evidence candidate v0.5
+
+v0.5 implements task stack observations, moving/idle timing and stop-source
+measurements. See the [implementation and first hardware check](../../../docs/testing/rtos-v0_5-runtime-evidence.md).
+It is not flashed yet; the installed/first-passing v0.4.2 image is preserved.
 
 One [physical RTOS A/A/Z pass is verified](../../../docs/testing/rtos-v0_4_2-track-acceptance.json),
 including Z during continued line recovery. Preserve this image/source while
@@ -133,8 +137,8 @@ python3 tools/test_rtos_motion.py
 The build helper accepts `PICO_SDK_PATH`, `PICO_TOOLCHAIN_PATH`, `MTK_BSP_PATH`,
 `ROBOT_CMAKE`, `ROBOT_NINJA` and `ROBOT_PICOTOOL_DIR` overrides. Its default
 picotool directory is the one already used by the calibration build.
-Default build output is `build/rtos-motion-v0_4_2/robocar_rtos_motion_v0_4_2.uf2`; network
-setup builds separately under `build/rtos-network-v0_4_2/` using a private settings
+Default build output is `build/rtos-motion-v0_5/robocar_rtos_motion_v0_5.uf2`; network
+setup builds separately under `build/rtos-network-v0_5/` using a private settings
 header supplied by `RTOS_NETWORK_SETTINGS_FILE`. Nothing is flashed
 by these commands. Build/host evidence is in
 [the v0.2 report](../../../docs/testing/rtos-motion-v0_2.json).
@@ -158,6 +162,7 @@ environment (already prepared on this workstation):
 python3 -m venv build/dependencies/rtos-tools-venv
 build/dependencies/rtos-tools-venv/bin/python -m pip install -r tools/requirements-rtos-tools.txt
 python3 tools/test_rtos_track.py
+python3 tools/test_rtos_runtime.py
 build/dependencies/rtos-tools-venv/bin/python tools/test_rtos_network.py
 build/dependencies/rtos-tools-venv/bin/python tools/test_rtos_bench.py
 ```

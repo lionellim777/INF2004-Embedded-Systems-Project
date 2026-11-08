@@ -22,4 +22,10 @@ typedef struct {
     uint8_t reason;
 } board_stop_trace_t;
 void board_stop_trace(board_stop_trace_t *trace);
+enum { STOP_SOURCE_BOOT,STOP_SOURCE_API,STOP_SOURCE_GUARD,STOP_SOURCE_APPLY };
+typedef struct {
+    uint32_t sequence,requested_us,disabled_us,guard_gap_us,service_gap_us;
+    uint8_t reason,source;bool armed;
+} board_runtime_trace_t;
+void board_runtime_trace(board_runtime_trace_t *out);
 #endif

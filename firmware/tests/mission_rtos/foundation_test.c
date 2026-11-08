@@ -11,7 +11,11 @@ static bool button, timer_ok = true;
 static uint16_t outputs[8][2];
 static repeating_timer_t *alarm;
 static uint32_t irq_depth;
-uint32_t save_and_disable_interrupts(void) { return irq_depth++; }
+static uint32_t next_lock_delay_us,pwm_write_us;
+uint32_t save_and_disable_interrupts(void) {
+    if(!irq_depth && next_lock_delay_us){clock_us+=next_lock_delay_us;next_lock_delay_us=0;}
+    return irq_depth++;
+}
 void restore_interrupts(uint32_t previous) { assert(irq_depth > 0); irq_depth = previous; }
 uint32_t time_us_32(void) { return (uint32_t)clock_us; }
 uint32_t clock_get_hz(int clock) { (void)clock; return 125000000; }
@@ -22,7 +26,7 @@ void gpio_set_function(uint pin, int function) { (void)pin; (void)function; }
 bool gpio_get(uint pin) { assert(pin == 20); return !button; }
 uint pwm_gpio_to_slice_num(uint pin) { return (pin >> 1u) & 7u; }
 void pwm_set_both_levels(uint slice, uint16_t left, uint16_t right)
-{ outputs[slice][0] = left; outputs[slice][1] = right; }
+{ outputs[slice][0] = left; outputs[slice][1] = right;clock_us+=pwm_write_us; }
 void pwm_set_enabled(uint slice, bool enabled) { (void)slice; (void)enabled; }
 void pwm_set_clkdiv(uint slice, float divider) { (void)slice; (void)divider; }
 void pwm_set_wrap(uint slice, uint16_t wrap) { (void)slice; assert(wrap == 6249); }
@@ -57,7 +61,7 @@ static void tick(bool down)
 static void hold(bool down, unsigned ticks) { for (unsigned i=0; i<ticks; ++i) tick(down); }
 static void reset(void)
 {
-    clock_us=0; button=false; timer_ok=true; enc=(encoder_sample_t){0};
+    clock_us=0; button=false; timer_ok=true;next_lock_delay_us=pwm_write_us=0; enc=(encoder_sample_t){0};
     assert(board_init()); motion_runtime_init(&runtime, enc, 0, false);
     stopped();
 }
@@ -191,4 +195,16 @@ static void codec_tests(void)
         puts("");
     }
 }
-int main(void) { safety_tests(); runtime_tests(); codec_tests(); return 0; }
+static void stop_measurements(void)
+{
+    reset();start();clock_us=UINT32_MAX-3u;next_lock_delay_us=5;pwm_write_us=3;
+    board_stop(STOP_BUTTON);stopped();board_runtime_trace_t m;board_runtime_trace(&m);
+    assert(m.source==STOP_SOURCE_API && m.reason==STOP_BUTTON && m.disabled_us-m.requested_us==11u);
+    assert(m.requested_us==UINT32_MAX-3u && m.disabled_us==7u);
+    reset();start();advance(60000);stopped();board_runtime_trace(&m);
+    assert(m.source==STOP_SOURCE_GUARD && m.reason==STOP_SERVICE && m.service_gap_us==40000u && m.guard_gap_us==5000u);
+    reset();start();assert(!board_apply(0,.2f,.2f));stopped();board_runtime_trace(&m);
+    assert(m.source==STOP_SOURCE_APPLY && m.sequence==1);
+    puts("PASS stop observations: API-entry delay includes lock/preemption and both PWM writes, wrap, guard/service maxima and rejection source; physical braking not inferred");
+}
+int main(void) { safety_tests(); runtime_tests(); codec_tests(); stop_measurements();return 0; }

@@ -111,6 +111,8 @@ def main():
         usb.command('t');assert writes[-1]==b't'
         capture.line('[RTOS_INFO] version=0.4.2 network_state=1 network_error=0 uptime_ms=5')
         usb.command('t');assert writes[-1]==b't'
+        capture.line('[RTOS_INFO] version=0.5 network_state=1 network_error=0 uptime_ms=6')
+        usb.command('t');assert writes[-1]==b't'
         for key in ['start','go','s']:
             try:usb.command(key)
             except ValueError:pass
@@ -131,6 +133,14 @@ def main():
         telemetry.packet(PREFIX+'motion',bytes.fromhex('00000000000000000000000001'))
         telemetry.packet(PREFIX+'command_result',b'\x07')
         telemetry.packet(PREFIX+'motion',b'bad')
+        packets=json.loads((Path(__file__).resolve().parents[1]/'build/rtos-v0_5-tests/runtime-fixtures.json').read_text())
+        telemetry.packet(PREFIX+'runtime_diag',bytes.fromhex(packets[0]))
+        capture.line('[RUNTIME_V1] '+packets[0])
+        assert telemetry.summary['runtime']['session-65535']['tasks']['motion']['observed_watermark_bytes']==328
+        assert capture.summary['runtime']['session-65535']['tasks']['motion']['allocated_bytes']==4224
+        capture.connection_opened();capture.line('[RUNTIME_V1] '+packets[0])
+        capture.connection_opened();capture.line('[RUNTIME_V1] '+packets[0])
+        assert all(k in capture.summary['runtime'] for k in ['session-65535','usb1-65535','usb2-65535'])
         telemetry.save(folder/'mqtt-summary.json');capture.close()
         r=json.loads((folder/'mqtt-summary.json').read_text())
         assert r['valid_motion_packets']==1 and r['decode_errors']==1

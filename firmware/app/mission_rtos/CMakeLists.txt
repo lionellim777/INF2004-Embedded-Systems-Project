@@ -31,6 +31,8 @@ foreach(OPTION USE_TMONITOR USE_SDEV_DRV USE_SHUTDOWN USE_SYSTEM_MESSAGE USE_EXC
 endforeach()
 string(REGEX REPLACE "#define[ \t]+CNF_TIMER_PERIOD[ \t]+10"
     "#define CNF_TIMER_PERIOD 5" MTK_CONFIG "${MTK_CONFIG}")
+string(REGEX REPLACE "#define[ \t]+USE_DBGSPT[ \t]+\\(0\\)"
+    "#define USE_DBGSPT (1)" MTK_CONFIG "${MTK_CONFIG}")
 file(WRITE "${CMAKE_BINARY_DIR}/generated/config.h" "${MTK_CONFIG}")
 file(GLOB MTK_KERNEL "${MTK}/kernel/tkernel/*.c")
 file(GLOB MTK_STDLIB "${MTK}/kernel/tstdlib/*.c")
@@ -56,14 +58,14 @@ target_include_directories(mtkernel PRIVATE "${CMAKE_BINARY_DIR}/generated"
 set(BASELINE "${CMAKE_CURRENT_LIST_DIR}/../robot_firmware")
 add_executable(robocar_rtos_motion main.c board.c safety_gate.c motion_record.c motion_runtime.c
     binary_protocol.c network_service.c
-    track_sensor.c track_runtime.c scan_diagnostic.c
+    track_sensor.c track_runtime.c scan_diagnostic.c runtime_measure.c runtime_report.c port/task_observe.c
     "${BASELINE}/course_control.c" "${BASELINE}/barcode_waveform.c" "${BASELINE}/barcode_decoder.c"
     port/mtk_bridge.c "${BASELINE}/encoders.c" "${BASELINE}/motion_control.c")
 target_include_directories(robocar_rtos_motion PRIVATE "${CMAKE_CURRENT_LIST_DIR}"
     "${BASELINE}" "${CMAKE_BINARY_DIR}/generated" "${MTK}/config" "${MTK}/include")
 target_compile_definitions(robocar_rtos_motion PRIVATE _PICO_RP2040_
-    RTOS_TRACK=1 BARCODE_WAVE_RECOVERY_OPTICS=1 ROBOCAR_CENTER_LINE=1 PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
-target_compile_options(robocar_rtos_motion PRIVATE -Wall -Wextra -Werror)
+    RTOS_TRACK=1 RTOS_RUNTIME_EVIDENCE=1 BARCODE_WAVE_RECOVERY_OPTICS=1 ROBOCAR_CENTER_LINE=1 PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
+target_compile_options(robocar_rtos_motion PRIVATE -Wall -Wextra -Werror -fstack-usage)
 target_link_libraries(robocar_rtos_motion PRIVATE mtkernel pico_stdlib
     hardware_adc hardware_clocks hardware_exception hardware_pwm pico_rand pico_cyw43_arch_lwip_poll pico_lwip_mqtt m)
 pico_enable_stdio_usb(robocar_rtos_motion 1)

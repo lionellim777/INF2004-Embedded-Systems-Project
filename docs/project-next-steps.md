@@ -43,6 +43,13 @@ Static SRAM remainder is not measured runtime heap or stack headroom. Network
 arrival gaps reached2.22s in this pass, so delivery timing and local controller
 deadlines must be measured separately.
 
+Implementation update: the [v0.5 runtime measurement candidate](testing/rtos-v0_5-runtime-evidence.md)
+is now built and software-tested on `yixuan/rtos-runtime-evidence`. Task stack
+observations, armed/idle timing, stop sources and USB/MQTT records are implemented.
+Static BSS206304 adds436bytes over v0.4.2 with unchanged stack requests/pool.
+The candidate is not flashed; the user deferred physical connection until the
+next day. The installed v0.4.2 image and its private first-AAZ backup are intact.
+
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while
 members finish their portions. It is a proposal, not a team agreement. No
 teammate module is merged, and no changes are needed to their algorithms now.

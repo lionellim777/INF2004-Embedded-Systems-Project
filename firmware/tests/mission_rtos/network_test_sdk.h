@@ -40,6 +40,7 @@ err_t mqtt_subscribe(mqtt_client_t *,const char *,uint8_t,mqtt_request_cb_t,void
 err_t mqtt_publish(mqtt_client_t *,const char *,const void *,u16_t,u8_t,u8_t,mqtt_request_cb_t,void *);
 int ipaddr_aton(const char *,ip_addr_t *);
 uint32_t get_rand_32(void);
+uint32_t time_us_32(void);
 uint64_t get_absolute_time(void);
 uint32_t to_ms_since_boot(uint64_t);
 #endif
