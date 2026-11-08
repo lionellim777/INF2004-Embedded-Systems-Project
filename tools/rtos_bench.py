@@ -31,7 +31,7 @@ class Capture:
         self.raw.write(line + "\n")
         info = re.search(r"\[RTOS_INFO\] version=(\S+)", line)
         if info:
-            self.ready = info[1] in ("0.2", "0.3")
+            self.ready = info[1] in ("0.2", "0.3", "0.4")
             self.summary["firmware_version"] = info[1]
         match = re.search(r"\[MOTION_V1\] ([0-9a-fA-F]+) gap_us=(\d+)", line)
         if match:
@@ -61,15 +61,27 @@ class Capture:
             return "Test selected. Press and release GP20 on the car to start."
         if line.startswith("[RTOS_BOOT]"):
             return line
+        if line.startswith('[TRACK_INFO]'):
+            self.summary['last_track_info']=line
+            if 'status=TRACK_START_NOT_ALIGNED' in line:
+                if not self.summary.get('track_start_rejected'):
+                    self.summary['track_start_rejected']=True
+                    return 'Track start rejected: hold GP28 over black tape for one second, then press/release GP20 again.'
+            else:self.summary['track_start_rejected']=False
+        if line.startswith('[BARCODE_READ]'):
+            self.summary.setdefault('barcode_reads',[]).append(line)
+            return line
         return None
 
     def command(self, text):
         key = text.strip().lower()
-        if key not in ("f", "l", "r", "u", "x", "?"):
+        if key not in ("f", "l", "r", "u", "t", "x", "?"):
             raise ValueError("Use f, l, r, u, x or q")
         if not self.ready:
             raise ValueError("Waiting for supported RTOS identity; no commands sent")
-        if key in "flru" and self.latest and not self.latest["stop_latched"]:
+        if key=='t' and self.summary.get('firmware_version')!='0.4':
+            raise ValueError('Track mode requires the configured v0.4 firmware')
+        if key in "flrut" and self.latest and not self.latest["stop_latched"]:
             raise ValueError("Stop the current test before choosing another")
         self.summary["commands_requested"].append(key)
         self.raw.write(f"[HOST_COMMAND] {key}\n")

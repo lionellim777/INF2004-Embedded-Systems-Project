@@ -17,6 +17,12 @@ def decode(topic, payload):
     kind = topic.rsplit("/", 1)[-1]
     if kind == "motion":
         return dict(type=kind, **decode_motion(payload))
+    if kind=='line':
+        if len(payload)!=9:raise ValueError('Invalid line record length')
+        fields=int.from_bytes(payload[4:],'little');valid=bool(fields&(1<<39))
+        raw=[(fields>>(12*i))&4095 for i in range(3)];pattern=(fields>>36)&7
+        if not valid and (any(raw) or pattern):raise ValueError('Invalid line record has numeric values')
+        return dict(type=kind,captured_ms=int.from_bytes(payload[:4],'little'),raw_adc=raw,pattern=pattern,valid=valid)
     if kind == "barcode":
         if len(payload) != 5 or payload[4] & 128:
             raise ValueError("Invalid barcode length/padding")

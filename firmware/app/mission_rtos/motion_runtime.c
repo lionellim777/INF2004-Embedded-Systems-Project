@@ -34,7 +34,14 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
     if (!armed && r->motion.phase == MOTION_ACTIVE) {
         motion_abort(&r->motion);
         r->buttons &= (uint8_t)~PENDING;
+#ifdef RTOS_TRACK
+        if(r->motion.kind==MOTION_COURSE){track_runtime_end();r->track.status="TRACK_STOPPED";}
+#endif
     }
+#ifdef RTOS_TRACK
+    if(!armed)track_runtime_idle(&r->track,now);
+    else if(r->motion.kind!=MOTION_COURSE)track_runtime_observe(now);
+#endif
     if (down != ((r->buttons & RAW) != 0)) {
         r->buttons ^= RAW;
         r->changed_us = us;
@@ -49,19 +56,43 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
                 r->buttons &= (uint8_t)~PENDING;
                 /* Check before release prepares a FUTURE gesture: a stop
                  * during this press must cancel its pending start. */
-                if (board_ready_to_start() && board_start(&r->token) &&
-                    !motion_begin(&r->motion, (motion_kind_t)board_selected(), enc, now))
-                    board_stop(STOP_MOTION);
+                if (board_ready_to_start() && board_start(&r->token)) {
+                    bool began;
+#ifdef RTOS_TRACK
+                    if(board_selected()==MOTION_COURSE){
+                        motion_init(&r->motion);r->motion.kind=MOTION_COURSE;
+                        r->motion.start=enc;r->motion.start_us=now;r->motion.phase=MOTION_ACTIVE;
+                        began=track_runtime_begin(&r->track,r->token,enc,now);
+                        if(!began){motion_abort(&r->motion);track_runtime_end();}
+                    }else
+#endif
+                    began=motion_begin(&r->motion,(motion_kind_t)board_selected(),enc,now);
+                    if(!began)board_stop(STOP_MOTION);
+                }
             }
         }
         if (!down) board_note_release();
     }
     board_gate_snapshot(&armed, &reason);
     if (armed && r->motion.phase == MOTION_ACTIVE) {
+#ifdef RTOS_TRACK
+        if(r->motion.kind==MOTION_COURSE){
+            line_check_output_t out=track_runtime_step(&r->track,enc,now);
+            if(now-r->motion.start_us>=180000000u){
+                r->track.status="TRACK_TIME_LIMIT";
+                r->motion.phase=MOTION_DONE;board_stop(STOP_COMPLETE);track_runtime_end();
+            }else if(out.stop){
+                r->motion.phase=MOTION_FAULT;r->motion.fault=(motion_fault_t)MOTION_TRACK_FAULT;
+                board_stop(STOP_MOTION);track_runtime_end();
+            }else (void)board_apply(r->token,out.left,out.right);
+        }else
+#endif
+        {
         motion_poll(&r->motion, enc, now);
         if (r->motion.phase == MOTION_ACTIVE)
             (void)board_apply(r->token, r->motion.left.throttle, r->motion.right.throttle);
         else board_stop(r->motion.phase == MOTION_DONE ? STOP_COMPLETE : STOP_MOTION);
+        }
     }
     motion_record_t record = {.captured_ms = (uint32_t)(now / 1000u),
         .kind = (uint8_t)r->motion.kind, .phase = (uint8_t)r->motion.phase,
@@ -71,10 +102,11 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
     record.left_counts = motion_left_position(&r->motion, enc);
     record.right_counts = motion_right_position(&r->motion, enc);
     if (r->motion.kind == MOTION_NONE) record.left_counts = record.right_counts = 0;
+    int32_t count_limit=r->motion.kind==MOTION_COURSE?MOTION_TRACK_COUNTS:30000;
     record.valid = speed(-(int64_t)delta(enc.left_raw, r->previous_left), dt, &record.left_mm_s) &&
         speed(delta(enc.right_raw, r->previous_right), dt, &record.right_mm_s) &&
-        record.left_counts >= -30000 && record.left_counts <= 30000 &&
-        record.right_counts >= -30000 && record.right_counts <= 30000;
+        record.left_counts >= -count_limit && record.left_counts <= count_limit &&
+        record.right_counts >= -count_limit && record.right_counts <= count_limit;
     if (!record.valid) {
         if (armed && dt != 0) board_stop(STOP_RANGE);
         record.left_counts = record.right_counts = record.left_mm_s = record.right_mm_s = 0;

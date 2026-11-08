@@ -70,6 +70,11 @@ static void protocols(void)
  assert(barcode_record_encode(0,0,false,false,bytes));assert(barcode_record_valid(bytes,5));
  bytes[4]=128;assert(!barcode_record_valid(bytes,5));
  uint8_t s[10];assert(!status_record_encode(0,0,1,2,4,s));
+ uint16_t raw[3]={0,4095,141};uint8_t line_bytes[LINE_RECORD_BYTES];
+ assert(line_record_encode(UINT32_MAX,raw,7,true,line_bytes) && line_bytes[8]&128u);
+ raw[0]=4096;assert(!line_record_encode(0,raw,0,true,line_bytes));
+ assert(line_record_encode(0,raw,0,false,line_bytes));
+ for(unsigned i=4;i<9;i++)assert(line_bytes[i]==0);
  binary_command_frame_t f;binary_command_t out={.kind=99};uint8_t period[]={0xc8,0};
  assert(binary_command_begin(&f,2,2));assert(!binary_command_append(&f,period,1,false,&out));
  assert(out.kind==99);assert(binary_command_append(&f,period+1,1,true,&out));assert(out.period_ms==200);
@@ -87,7 +92,8 @@ int main(void)
  init_result=0;assert(initialize_radio() && network_wifi_pm_result()==0 && pm_calls==1);
  pm_result=-1;assert(initialize_radio() && network_wifi_pm_result()==-1 && pm_calls==2);
  pm_result=0;
- protocols();online(UINT32_MAX-500);step(0);
+ protocols();uint16_t raw[3]={191,2908,141};assert(network_line(0,raw,2,true));
+ online(UINT32_MAX-500);step(0);
  bool motion_seen=false;
  for(unsigned i=0;i<transmitted;++i) if(strstr(sent[i].topic,"/motion")) {
   motion_seen=true;assert(sent[i].length==13 && sent[i].bytes[0]==0 && sent[i].bytes[12]==1);

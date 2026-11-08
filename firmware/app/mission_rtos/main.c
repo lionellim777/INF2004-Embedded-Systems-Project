@@ -2,17 +2,19 @@
 #include "encoders.h"
 #include "motion_runtime.h"
 #include "network_service.h"
+#include "track_sensor.h"
 #include "version.h"
 #include "port/mtk_bridge.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include "hardware/clocks.h"
 #include "hardware/exception.h"
+#include "hardware/sync.h"
 #include "pico/stdlib.h"
 #include "pico/stdio_usb.h"
 #include "network_settings.h"
 #ifndef RTOS_WAIT_FOR_USB
-#define RTOS_WAIT_FOR_USB (!RTOS_NETWORK_CONFIGURED)
+#define RTOS_WAIT_FOR_USB 0
 #endif
 
 /* Startup/exception adapter follows Justin's pinned single-core bridge.
@@ -31,20 +33,26 @@ static void motion_task(int start_code, void *context)
     motion_runtime_init(&runtime, encoders_snapshot(), time_us_32(), board_button_down());
     for (;;) {
         motion_runtime_step(&runtime, encoders_snapshot(), time_us_64(), board_button_down());
-        mtk_bridge_delay_ms(10);
+        mtk_bridge_delay_ms(1);
     }
+}
+static void decoder_task(int start_code,void *context)
+{
+    (void)start_code;(void)context;
+    for(;;){track_service();mtk_bridge_delay_ms(1);}
 }
 static void observer_task(int start_code, void *context)
 {
     (void)start_code; (void)context;
-    puts("RTOS motion foundation v" RTOS_FIRMWARE_VERSION ": encoders/motion REAL; barcode/terrain/obstacle UNAVAILABLE");
-    puts("Select f=30cm,l=L90,r=R90,u=R180. GP20 press/release starts; next press stops. x=stop. No remote start.");
+    puts("RTOS track integration v" RTOS_FIRMWARE_VERSION ": real motion/line/barcode producers; terrain/obstacle UNAVAILABLE");
+    puts("Default t=track AAZ scan. Optional f=30cm,l=L90,r=R90,u=R180. GP20 press/release starts; next press stops. x=stop. No remote start.");
     uint32_t last_print = 0;
     uint32_t last_info = 0;
     uint32_t last_stop = 0;
+    uint16_t last_reads=0;
     for (;;) {
         int command = getchar_timeout_us(0);
-        uint8_t selected = command == 'f' ? MOTION_STRAIGHT_30CM :
+        uint8_t selected = command == 't' ? MOTION_COURSE : command == 'f' ? MOTION_STRAIGHT_30CM :
             command == 'l' ? MOTION_LEFT_90 : command == 'r' ? MOTION_RIGHT_90 :
             command == 'u' ? MOTION_RIGHT_180 : MOTION_NONE;
         if (command == 'x') board_stop(STOP_BUTTON);
@@ -61,6 +69,19 @@ static void observer_task(int start_code, void *context)
         if (command=='?' || (uint32_t)(now-last_info)>=1000u) {
             printf("[RTOS_INFO] version=" RTOS_FIRMWARE_VERSION " network_state=%u network_error=%u wifi_link=%d wifi_pm_result=%d uptime_ms=%" PRIu32 "\n",network_state(),network_error(),network_wifi_link(),network_wifi_pm_result(),now);
             last_info=now;
+            track_diagnostics_t d;track_diagnostics(&d);
+            track_ir_t ir;track_sensor_read(&ir);
+            uint32_t irq=save_and_disable_interrupts();
+            const char *status=runtime.track.status;uint16_t reads=runtime.track.reads;
+            char letter=runtime.track.letter;unsigned recoveries=runtime.track.course.recoveries;
+            restore_interrupts(irq);
+            printf("[TRACK_INFO] status=%s raw=%u/%u/%u age_us=%" PRIu32 " samples=%" PRIu32
+                " frames=%" PRIu32 " rejected=%" PRIu32 " reads=%u letter=%c queue_peak=%u"
+                " faults=%u decode_max_us=%" PRIu32 " adc_max_us=%" PRIu32 " recoveries=%u\n",
+                status?status:"IDLE",ir.raw[0],ir.raw[1],ir.raw[2],ir.age_us,d.samples,d.frames,d.rejected,
+                reads,letter?letter:'-',d.queue_peak,d.faults,d.decode_max_us,d.adc_max_us,recoveries);
+            if(reads && reads!=last_reads)printf("[BARCODE_READ] letter=%c count=%u\n",letter,reads);
+            last_reads=reads;
         }
         if ((uint32_t)(now - last_print) >= 200u) {
             uint8_t bytes[MOTION_RECORD_BYTES];
@@ -76,6 +97,7 @@ static void observer_task(int start_code, void *context)
 int usermain(void)
 {
     if (!mtk_bridge_start_task(motion_task, 2, 4096) ||
+        !mtk_bridge_start_task(decoder_task,4,8192) ||
         !mtk_bridge_start_task(network_task, 8, 4096) ||
         !mtk_bridge_start_task(observer_task, 9, 4096)) {
         board_stop(STOP_INIT);
@@ -102,6 +124,13 @@ int main(void)
         for (;;) tight_loop_contents();
     }
     encoders_init();
+    if(!track_sensor_init()){
+        board_stop(STOP_INIT);puts("[RTOS_BOOT] error=adc_timer");
+        for(;;)tight_loop_contents();
+    }
+    /* Autonomous power-bank boot selects the tested scan route, never starts
+     * it. Motion still requires a fresh debounced physical GP20 gesture. */
+    (void)board_select(MOTION_COURSE);
     knl_lowmem_top = kernel_pool;
     knl_lowmem_limit = kernel_pool + sizeof kernel_pool;
     (void)exception_set_exclusive_handler(PENDSV_EXCEPTION, knl_dispatch_entry);

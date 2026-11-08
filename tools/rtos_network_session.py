@@ -19,7 +19,7 @@ import threading
 import time
 from zoneinfo import ZoneInfo
 
-from rtos_bench import Capture
+from rtos_bench import Capture,PHASES
 from rtos_mqtt_observer import decode
 from rtos_network_setup import ROOT, PRIVATE, broker_config, prepare
 
@@ -60,10 +60,13 @@ class Telemetry:
             self.event('rejected',topic=topic,error=str(error),payload_hex=payload.hex())
             return
         self.event('packet',topic=topic,payload_hex=payload.hex(),retained=bool(retained),**value)
-        message=None;delay=None
+        message=None;delay=None;controller_message=None
         with self.lock:
             self.summary['packets']+=1
             if value['type']=='motion':
+                previous=self.summary.get('last_motion')
+                if previous is None or any(previous[k]!=value[k] for k in ['phase','fault','stop_latched']):
+                    controller_message=f"MQTT controller: {PHASES[value['phase']]} | stop latched: {value['stop_latched']} | fault code: {value['fault']}"
                 if value['valid']:
                     self.summary['valid_motion_packets']+=1
                     now=time.monotonic()
@@ -87,6 +90,14 @@ class Telemetry:
             elif value['type']=='status':
                 if value['boot_id'] not in self.summary['boot_ids']: self.summary['boot_ids'].append(value['boot_id'])
                 self.summary['last_status']=value
+            elif value['type']=='line':self.summary['last_line']=value
+            elif value['type']=='barcode' and value['valid']:
+                previous=self.summary.get('last_barcode')
+                if previous!=value:
+                    self.summary.setdefault('barcode_reads',[]).append(value)
+                    label=value['barcode'] or 'unreadable'
+                    message=f"MQTT barcode: {label} at {value['captured_ms']/1000:.1f}s"+(' [SIMULATED]' if value['simulated'] else '')
+                self.summary['last_barcode']=value
             elif value['type']=='link' and value['state']=='offline':
                 self.recovery_pending=True
             elif value['type']=='command_result' and value['accepted'] and value['command']==3:
@@ -94,6 +105,7 @@ class Telemetry:
                 message='MQTT: Pico acknowledged STOP. Check USB reports aborted/stop latched.'
         if delay is not None:self.event('motion_delivery_delay',**delay)
         if message: print(message,flush=True)
+        if controller_message:print(controller_message,flush=True)
 
     def save(self,path):
         with self.lock:
@@ -210,7 +222,7 @@ class USB:
             try:
                 candidate=serial.Serial(ports[0],115200,timeout=0,write_timeout=0.5)
                 candidate.dtr=True;self.device=candidate;self.pending.clear()
-                print('USB connected. Looking for v0.3 after flashing...',flush=True)
+                print('USB connected. Waiting for RTOS identity...',flush=True)
             except (OSError,serial.SerialException):
                 if candidate is not None:candidate.close()
                 return
@@ -236,8 +248,8 @@ class USB:
 
     def command(self,key):
         if self.device is None:raise ValueError('USB not connected')
-        if key!='x' and self.capture.summary.get('firmware_version')!='0.3':
-            raise ValueError('Flash the configured v0.3 firmware before selecting a test')
+        if key!='x' and self.capture.summary.get('firmware_version') not in ('0.3','0.4'):
+            raise ValueError('Flash the configured RTOS firmware before selecting a test')
         self.device.write(self.capture.command(key))
 
     def close(self):
@@ -268,7 +280,7 @@ def console_command(line):
     if not key:return None
     # Repeating a single key before Enter still requests only one action.
     if len(set(key))==1:key=key[0]
-    if key not in ('f','l','r','u','x','m','b','q','?'):
+    if key not in ('f','l','r','u','t','x','m','b','q','?'):
         raise ValueError('Enter one command letter, then press Enter: f, x, m, b or q.')
     return key
 
@@ -283,10 +295,10 @@ async def run(settings,image,folder,flash_hint=True):
     commands=CommandInput(sys.stdin)
     try:
         await link.start()
-        print('\nKeep BOTH powered wheels clear of the table. No track is needed.')
+        print('\nKeep the car stopped. Raise both powered wheels for bench tests; use the prepared track for t.')
         if flash_hint:print('Flash this file using BOOTSEL, then reconnect normally:',image)
-        else:print('Reusing configured v0.3. No flashing is needed; waiting for the Pico.')
-        print('f=select 30cm | x=USB stop | m=MQTT stop | b=restart broker | q=save/exit')
+        else:print('Reusing the configured RTOS image. No flashing requested; waiting for the Pico.')
+        print('t=track scan (v0.4 default) | f=30cm bench | x=USB stop | m=MQTT stop | b=restart broker | q=save/exit')
         print('Type a command letter, then press Enter.')
         print('There is no remote START. GP20 starts and stops physically. Logs:',logs,flush=True)
         if flash_hint and sys.platform=='darwin':subprocess.Popen(['open','-R',str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -304,7 +316,7 @@ async def run(settings,image,folder,flash_hint=True):
                     elif key=='b':
                         if restart is None or restart.done():restart=asyncio.create_task(link.restart())
                         else:print('Broker restart is already in progress.',flush=True)
-                    elif key in ('f','l','r','u','x','?'):usb.command(key)
+                    elif key in ('f','l','r','u','t','x','?'):usb.command(key)
                     else:print('Use f, x, m, b or q; start with GP20.',flush=True)
                 except (ValueError,OSError) as error:print(error,flush=True)
             if restart is not None and restart.done():
@@ -316,7 +328,13 @@ async def run(settings,image,folder,flash_hint=True):
         try:usb.command('x')
         except (ValueError,OSError):pass
         if link.client.is_connected():
-            try:link.stop()
+            try:
+                before=telemetry.summary['mqtt_stop_acks'];link.stop()
+                until=time.monotonic()+5
+                while telemetry.summary['mqtt_stop_acks']==before and time.monotonic()<until:
+                    usb.poll();await asyncio.sleep(.03)
+                if telemetry.summary['mqtt_stop_acks']==before:
+                    print('MQTT STOP was not acknowledged. Use GP20 and confirm drive is off.',flush=True)
             except ValueError:pass
         if restart is not None:
             if not restart.done():restart.cancel()
@@ -329,7 +347,7 @@ async def run(settings,image,folder,flash_hint=True):
         await link.close()
         telemetry.save(logs/'mqtt-summary.json')
         print('Saved USB and MQTT logs in:',logs)
-        print('Confirm the wheels are undriven before lowering the car.')
+        print('Confirm drive is off before handling the car.')
 
 
 def main():
@@ -341,7 +359,7 @@ def main():
         if args.reuse:
             settings=json.loads((PRIVATE/'settings.json').read_text())
             metadata=json.loads((PRIVATE/'firmware-info.json').read_text())
-            image=ROOT/'build/rtos-network/robocar_rtos_network_v0_3.uf2'
+            image=Path(metadata.get('file',ROOT/'build/rtos-network/robocar_rtos_network_v0_3.uf2'))
             if not image.exists():parser.error('Run setup once before --reuse')
             from rtos_network_setup import mac_wifi_ip
             current_ip=mac_wifi_ip()

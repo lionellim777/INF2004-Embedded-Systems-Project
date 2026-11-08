@@ -4,6 +4,21 @@ static void put32(uint8_t *b, uint32_t value)
 {
     for (unsigned i=0;i<4;++i) b[i]=(uint8_t)(value>>(8u*i));
 }
+bool line_record_encode(uint32_t ms,const uint16_t raw[3],uint8_t pattern,bool valid,uint8_t out[LINE_RECORD_BYTES])
+{
+    if(out==NULL || raw==NULL || pattern>7)return false;
+    uint8_t b[9]={0};put32(b,ms);
+    uint64_t fields=0;
+    if(valid){
+        for(unsigned i=0;i<3;i++){
+            if(raw[i]>4095)return false;
+            fields|=(uint64_t)raw[i]<<(12u*i);
+        }
+        fields|=(uint64_t)pattern<<36u;fields|=UINT64_C(1)<<39u;
+    }
+    for(unsigned i=0;i<5;i++)b[4+i]=(uint8_t)(fields>>(8u*i));
+    memcpy(out,b,sizeof b);return true;
+}
 bool barcode_record_encode(uint32_t ms, char letter, bool valid, bool simulated, uint8_t out[BARCODE_RECORD_BYTES])
 {
     if (out==NULL || (!valid && (letter!=0 || simulated))) return false;

@@ -101,6 +101,7 @@ def main():
                 decode(topic,payload);packets.append((topic,payload))
         assert any(decode(t,p).get("barcode")=="Z" for t,p in packets)
         assert any(len(p)==13 and b"\0" in p for t,p in packets)
+        assert any(decode(t,p).get('raw_adc')==[191,2908,141] for t,p in packets)
         for topic,data in [("inf2004/aai10/robot1/v1/barcode",b"\0"*4+b"\xff"),
                            ("inf2004/aai10/robot1/v1/status",b"\xff"*10),
                            ("inf2004/aai10/robot1/v1/motion",b"\0")]:
@@ -112,7 +113,7 @@ def main():
                     local_broker_binary_roundtrip_packets=count,hardware_network_tested=False,
                     local_broker_restart_cycles=1,
                     packet_sizes={kind:sorted({len(p) for t,p in packets if t.endswith('/'+kind)})
-                                  for kind in ["motion","barcode","status","link","command_result"]})
+                                  for kind in ["motion","line","barcode","status","link","command_result"]})
         (ROOT/"build/rtos-network-tests.json").write_text(json.dumps(result,indent=2)+"\n")
         print(f"PASS local MQTT broker: {count} binary packets retained byte-for-byte, including Z and zero bytes")
 

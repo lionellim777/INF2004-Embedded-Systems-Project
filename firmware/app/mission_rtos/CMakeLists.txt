@@ -56,14 +56,16 @@ target_include_directories(mtkernel PRIVATE "${CMAKE_BINARY_DIR}/generated"
 set(BASELINE "${CMAKE_CURRENT_LIST_DIR}/../robot_firmware")
 add_executable(robocar_rtos_motion main.c board.c safety_gate.c motion_record.c motion_runtime.c
     binary_protocol.c network_service.c
+    track_sensor.c track_runtime.c
+    "${BASELINE}/course_control.c" "${BASELINE}/barcode_waveform.c" "${BASELINE}/barcode_decoder.c"
     port/mtk_bridge.c "${BASELINE}/encoders.c" "${BASELINE}/motion_control.c")
 target_include_directories(robocar_rtos_motion PRIVATE "${CMAKE_CURRENT_LIST_DIR}"
     "${BASELINE}" "${CMAKE_BINARY_DIR}/generated" "${MTK}/config" "${MTK}/include")
 target_compile_definitions(robocar_rtos_motion PRIVATE _PICO_RP2040_
-    PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
+    RTOS_TRACK=1 ROBOCAR_CENTER_LINE=1 PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
 target_compile_options(robocar_rtos_motion PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(robocar_rtos_motion PRIVATE mtkernel pico_stdlib
-    hardware_clocks hardware_exception hardware_pwm pico_rand pico_cyw43_arch_lwip_poll pico_lwip_mqtt m)
+    hardware_adc hardware_clocks hardware_exception hardware_pwm pico_rand pico_cyw43_arch_lwip_poll pico_lwip_mqtt m)
 pico_enable_stdio_usb(robocar_rtos_motion 1)
 pico_enable_stdio_uart(robocar_rtos_motion 0)
 pico_add_extra_outputs(robocar_rtos_motion)

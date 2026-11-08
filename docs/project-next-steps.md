@@ -32,6 +32,13 @@ track with networking active. It can be prepared before the terrain/obstacle
 owners finish their algorithms; their interfaces and motor ownership must be
 agreed before connecting them. Keep the accepted v5.63 build available.
 
+Implementation update, 8 November: v0.4 now links that core on
+`yixuan/rtos-track-integration`. The exact v5.63 course/waveform sources are
+unchanged. The host ADC-to-PWM pipeline tests and stationary Pico boot/network
+check pass; the [first combined moving-track check](testing/rtos-v0_4-first-track-check.md)
+is next. Treat the AAZ software simulation as software evidence, not a moving
+hardware result. No teammate terrain/obstacle branch has been merged.
+
 Prioritize a first integrated core during Week 11, then add the owners' ready
 navigation/terrain/obstacle modules and reserve Week 12 for course regressions,
 minimum-bit measurements and assessment evidence. These are planning targets,

@@ -1,9 +1,15 @@
-# µT-Kernel motion foundation v0.3
+# µT-Kernel track integration v0.4
 
 This separate Pico W target starts the real µT-Kernel scheduler and uses the
 existing quadrature encoder driver and calibrated motion controller. It is a
-USB bench-test build, not the combined line/barcode/obstacle/terrain mission.
+first combined line-following/barcode/motion/MQTT build. Terrain and obstacle
+manoeuvres are not connected yet; the complete autonomous mission is pending.
 The v5.63 target and accepted UF2 remain unchanged.
+
+Use the [v0.4 first track instructions](../../../docs/testing/rtos-v0_4-first-track-check.md).
+The [v0.4 build/test report](../../../docs/testing/rtos-v0_4-track-integration.json)
+separates host pipeline tests, stationary Pico checks and pending moving-course
+acceptance. Track mode is selected at normal boot; GP20 alone starts motion.
 
 The v0.2 USB hardware check now has [recorded acceptance evidence](../../../docs/testing/rtos-v0_2-usb-acceptance.json):
 bounded completion plus GP20/USB aborts, with no reported controller faults.
@@ -29,21 +35,27 @@ motion, bounded timing and combined-mission integration remain separate checks.
 
 ## What is implemented
 
-- One Motion task (priority 2) requests a 10 ms delay between polls. Calibrated
+- One Motion task (priority 2) requests a 1 ms kernel delay between polls. Calibrated
   speed PI still updates at its existing 100 ms interval; endpoints are checked
   on every poll. Actual scheduling periods require board measurement.
 - One lower-priority Observer task (priority 9) reads USB selections and emits
   a motion record every 200 ms. It cannot remotely start a run.
+- One decoder task (priority 4, 8KiB requested stack) consumes a 14-byte/sample
+  IRQ queue and runs the unmodified v5.63 grey waveform/geometry decoder.
+  The ADC IRQ remains the only owner of GP26/28/27 conversions: 2kHz sampling,
+  the existing 12-sample filter and one retained reading every 2ms. Neither
+  Wi-Fi nor line recovery suspends that acquisition. Run tokens discard stale
+  results after abort/restart. Overflow and missing samples stop track motion.
 - One Network task (priority 8) owns CYW43/lwIP/MQTT. The default candidate is
   unconfigured: the task sleeps without initializing the radio. Its complete
   network path is compiled and can be enabled with a local settings file.
-- Default USB bench mode waits for a connected USB logger before starting the
-  kernel, with motor outputs zero. A boot-stage line is emitted before dispatch.
-  A locally configured radio build can start without USB.
+- Normal v0.4 boot does not wait for a USB logger, and preselects track scan
+  without moving. This permits normal power-bank operation. An explicit
+  private `RTOS_WAIT_FOR_USB=1` can still request the earlier bring-up wait.
 - A Pico hardware-alarm callback checks the raw GP20 stop input and 40 ms
   motor-service deadline every 5 ms, independently of foreground tasks.
-- Starts require an explicit USB selection followed by a debounced GP20
-  press/release. Releasing the abort button cannot restart motion. STOP cancels
+- Starts require a debounced GP20 press/release; USB may change the preselected
+  mode but cannot start it. Releasing the abort button cannot restart motion. STOP cancels
   a prepared start; stale service tokens cannot re-enable outputs.
 - Raw encoder counters retain the existing modulo-32-bit, never-reset
   behaviour. A consistent copy is taken with local interrupts excluded.
@@ -54,10 +66,10 @@ motion, bounded timing and combined-mission integration remain separate checks.
   state three bits. The network packs its period/state and control flags.
 
 Binary Wi-Fi/MQTT support is linked; radio association requires local settings.
-There is no browser page, barcode capture, terrain estimator, servo or obstacle
-controller in this target. Missing sensor modules are labelled UNAVAILABLE;
-no invented sensor samples are presented as real data. The new barcode wire
-codec supports A–Z, but a real barcode producer has not been connected here.
+There is no calibration browser page, terrain estimator, servo or obstacle
+controller in this target. Real line ADC records and accepted A-Z barcode reads
+now feed MQTT. Missing sensor modules stay UNAVAILABLE. Y/Z actions remain
+straight for the initial AAZ comparison; teammate command mapping comes later.
 
 ## Kernel and resource ownership
 
@@ -85,7 +97,7 @@ synchronization**. Do not move it to two cores without changing that contract.
 Only the local button path may call start/release APIs. Future communication
 adapters must preserve that restriction.
 
-The kernel has a 32 KiB pool, with three requested 4 KiB application task stacks
+The kernel has a 32 KiB pool, with three requested 4 KiB stacks and one 8 KiB decoder stack
 allocated by the kernel. Do not add those stacks to the pool twice. Main also
 reserves a 4 KiB startup/IRQ stack. Runtime stack and allocation margins are
 unmeasured. Task creation or hardware-timer failure permanently disables arming
@@ -107,8 +119,8 @@ python3 tools/test_rtos_motion.py
 The build helper accepts `PICO_SDK_PATH`, `PICO_TOOLCHAIN_PATH`, `MTK_BSP_PATH`,
 `ROBOT_CMAKE`, `ROBOT_NINJA` and `ROBOT_PICOTOOL_DIR` overrides. Its default
 picotool directory is the one already used by the calibration build.
-Default build output is `build/rtos-motion/robocar_rtos_motion_v0_3.uf2`; network
-setup builds separately under `build/rtos-network/` using a private settings
+Default build output is `build/rtos-motion-v0_4/robocar_rtos_motion_v0_4.uf2`; network
+setup builds separately under `build/rtos-network-v0_4/` using a private settings
 header supplied by `RTOS_NETWORK_SETTINGS_FILE`. Nothing is flashed
 by these commands. Build/host evidence is in
 [the v0.2 report](../../../docs/testing/rtos-motion-v0_2.json).
@@ -141,10 +153,10 @@ through a real loopback-only MQTT broker, restarts the broker, and verifies
 resubscription and subsequent packets. Pico radio/network timing is still a
 hardware test.
 
-## First physical acceptance
+## Earlier USB bench acceptance
 
-The v0.2 USB candidate has now run on the robot; the first network-enabled
-v0.3 physical test remains pending. Keep the v5.63 UF2 for normal track use.
+The v0.2 USB and v0.3 networking checks are complete within their recorded scopes.
+Current moving-track acceptance uses the v0.4 guide above. Keep v5.63 available.
 The steps below describe the original USB check; do not repeat them solely
 because the software version changed. Follow the network checklist next.
 
@@ -192,13 +204,19 @@ Bits are numbered least significant first within the byte stream:
 | Right relative wheel count | 48–63 | Signed -30000..30000 |
 | Left measured speed, mm/s | 64–73 | Signed -500..500 |
 | Right measured speed, mm/s | 74–83 | Signed -500..500 |
-| Selected motion kind | 84–86 | 0 none; 1 straight; 2 left90; 3 right90; 4 right180 |
+| Selected motion kind | 84–86 | 0 none; 1 straight; 2 left90; 3 right90; 4 right180; 7 track |
 | Motion phase | 87–89 | 0 idle; 1 active; 2 done; 3 aborted; 4 fault |
-| Controller fault | 90–92 | Existing motion fault codes 0..5 |
+| Controller fault | 90–92 | Existing codes 0..5; kind7 also allows 6, track supervisor |
 | Stop reason | 93–95 | 0 boot/none; 1 user; 2 service; 3 motion; 4 init; 5 range; 6 complete |
 | Numeric measurement valid | 96 | Boolean |
 | Output stop latched | 97 | Boolean, independent of the controller's latest phase |
-| Byte padding | 98–103 | Zero; reject nonzero |
+| Tail bits | 98–103 | Kind0..4: zero padding. Kind7: left upper3 at98..100, right upper3 at101..103 |
+
+For kind7, join each count's existing low16 bits with its upper3 bits, then
+sign-extend from bit18. The resulting signed19 count range is limited to
+±160000 by the encoder/course contract. All other offsets stay unchanged.
+Kinds5/6 remain reserved. Legacy kind0..4 bytes are unchanged; old receivers
+reject unknown kind7 instead of silently decoding it with truncated counts.
 
 Invalid records zero all four numeric count/speed fields, retain time/state and
 clear validity. Consumers must not treat those zeros as valid measurements.
@@ -207,7 +225,7 @@ Out-of-range data is rejected before narrowing. Capture uptime keeps the full
 reducing it. ±30000 relative-count bounds are explicit message limits and do
 not change raw counters or the motion controller's arithmetic.
 
-The 98 useful bits occupy 13 bytes. The equivalent native staging record is
+The 98 useful bench bits or 104 useful track bits occupy 13 bytes. The equivalent native staging record is
 28 ARM bytes; its wider inputs allow range checks before narrowing. This is a
 **new-schema encoding comparison**, not measured savings for the entire old
 firmware or a replacement for the multi-producer 603-byte JSON fixture.
@@ -231,6 +249,7 @@ It replaces JSON/sample stores with compact latest-value messages:
 | Topic suffix under `inf2004/aai10/robot1/v1/` | Bytes | Representation |
 | --- | ---: | --- |
 | `motion` | 13 | Schema above; real encoder/controller data |
+| `line` | 9 | Capture ms32, ADC12x3 in GP26/28/27 order, black pattern3, valid1 |
 | `barcode` | 5 | Capture ms32, code5 (none/A–Z/unreadable), valid1, simulated1, zero tail1 |
 | `status` | 10 | Capture ms32, boot ID32, valid-source mask5, simulated-source mask5, connection state3, zero tail3 |
 | `link` | 1 | Numeric 0 unknown / 1 offline / 2 online; zero upper bits |
@@ -262,10 +281,10 @@ default has empty credentials and does not attempt association.
 
 The simpler operator route is now `sh tools/run_rtos_network.sh`. It prompts
 locally for Wi-Fi settings, generates password-protected robot/observer accounts
-with topic permissions, builds the actual configured v0.3 image and runs one
+with topic permissions, builds the actual configured v0.4 image and runs one
 console for USB and MQTT evidence. `m` sends MQTT STOP and `b` restarts only its
 own broker; it never sends START. Both source code and existing shared formats
-remain compatible with the v1 binary receiver. Credentials and configured UF2s
+use the updated receiver, which also accepts legacy bench records. Credentials and configured UF2s
 stay under ignored `build/`; no passwords are logged. The software tests use
 temporary synthetic settings and loopback brokers, not the user's Wi-Fi key.
 
@@ -276,9 +295,8 @@ broker is loopback-only and is not the robot's LAN broker.
 
 ## Remaining integration
 
-The existing validated barcode implementation is untouched. Add its sampling
-and low-priority decoding only after motor/stop scheduling is demonstrated.
-The binary adapter and receiver are implemented; physical Wi-Fi/MQTT and
+The existing validated barcode implementation is linked unchanged, with
+independent acquisition and decoding. Physical v0.4 track acceptance and
 loaded control timing remain pending. The A–D-only formatter remains in Justin's
 unmodified branch; this target uses the new A–Z codec.
 Terrain, obstacle manoeuvres and barcode-command execution remain with their

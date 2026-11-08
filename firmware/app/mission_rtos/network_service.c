@@ -29,13 +29,14 @@ static volatile uint16_t flags; /* one network writer; aligned diagnostic reads 
 static volatile int8_t wifi_link; /* SDK states -3..3; USB diagnostic only */
 static volatile int8_t wifi_pm_result=INT8_MIN; /* not attempted, then SDK result */
 static uint32_t state_ms, status_ms, motion_ms, online_ms, boot_id;
-static uint8_t barcode_latest[BARCODE_RECORD_BYTES], result;
+static uint8_t barcode_latest[BARCODE_RECORD_BYTES],line_latest[LINE_RECORD_BYTES], result;
 static binary_command_frame_t command_frame;
 static mqtt_client_t *client;
 static struct mqtt_connect_client_info_t info;
 static ip_addr_t address;
 static const char motion_topic[]=RTOS_TOPIC_PREFIX "motion";
 static const char barcode_topic[]=RTOS_TOPIC_PREFIX "barcode";
+static const char line_topic[]=RTOS_TOPIC_PREFIX "line";
 static const char status_topic[]=RTOS_TOPIC_PREFIX "status";
 static const char link_topic[]=RTOS_TOPIC_PREFIX "link";
 static const char status_command[]=RTOS_TOPIC_PREFIX "command/get_status";
@@ -63,6 +64,18 @@ static void read_barcode(uint8_t bytes[BARCODE_RECORD_BYTES])
 {
     uint32_t irq=save_and_disable_interrupts();
     memcpy(bytes,barcode_latest,BARCODE_RECORD_BYTES);
+    restore_interrupts(irq);
+}
+bool network_line(uint32_t ms,const uint16_t raw[3],uint8_t pattern,bool valid)
+{
+    uint8_t b[LINE_RECORD_BYTES];
+    if(!line_record_encode(ms,raw,pattern,valid,b))return false;
+    uint32_t irq=save_and_disable_interrupts();memcpy(line_latest,b,sizeof b);
+    restore_interrupts(irq);return true;
+}
+static void read_line(uint8_t b[LINE_RECORD_BYTES])
+{
+    uint32_t irq=save_and_disable_interrupts();memcpy(b,line_latest,LINE_RECORD_BYTES);
     restore_interrupts(irq);
 }
 static void fail(uint32_t now,uint8_t code)
@@ -174,9 +187,9 @@ static void step(uint32_t now)
         if (!mqtt_client_is_connected(client)) { fail(now,11); return; }
         if ((uint32_t)(now-online_ms)>=30000u) flags&=(uint16_t)~RETRY_MASK;
         if ((flags&FORCE_STATUS) || (uint32_t)(now-status_ms)>=1000u) {
-            uint8_t barcode[5],status_bytes[10],motion[MOTION_RECORD_BYTES]; read_barcode(barcode);
+            uint8_t barcode[5],status_bytes[10],motion[MOTION_RECORD_BYTES],line[LINE_RECORD_BYTES]; read_barcode(barcode);read_line(line);
             board_read(motion);
-            uint8_t available=(uint8_t)((motion[12]&1u) | ((barcode[4]&32u)?2u:0u));
+            uint8_t available=(uint8_t)((motion[12]&1u) | ((barcode[4]&32u)?2u:0u) | ((line[8]&128u)?4u:0u));
             uint8_t simulated=(barcode[4]&64u)?2u:0u;
             (void)status_record_encode(now,boot_id,available,simulated,NETWORK_ONLINE,status_bytes);
             uint8_t online_code=2;
@@ -192,6 +205,8 @@ static void step(uint32_t now)
         if ((uint32_t)(now-motion_ms)>=(policy&8191u)) {
             uint8_t motion[MOTION_RECORD_BYTES]; board_read(motion);
             if (publish(motion_topic,motion,sizeof motion,0)) motion_ms=now;
+            uint8_t line[LINE_RECORD_BYTES];read_line(line);
+            (void)publish(line_topic,line,sizeof line,0);
         }
     } else if (current==NETWORK_RETRYING) {
         unsigned shift=(flags&RETRY_MASK)>>RETRY_SHIFT;

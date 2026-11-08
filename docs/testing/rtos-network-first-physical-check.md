@@ -1,5 +1,8 @@
 # First Pico Wi-Fi and binary MQTT hardware check
 
+This page records the earlier v0.3 networking bring-up. The current combined
+target is v0.4; use [its track instructions](rtos-v0_4-first-track-check.md).
+
 The v0.2 USB run is accepted for observed RTOS boot, one bounded completion and
 two user-stop events. See [the saved bench evidence](rtos-v0_2-usb-acceptance.json).
 The next check connects the Pico to an authenticated MQTT broker on this Mac.

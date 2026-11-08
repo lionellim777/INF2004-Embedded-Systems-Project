@@ -10,6 +10,10 @@
  * simulated5, connection_state3, padding3. Simulation is a subset of available. */
 #define BARCODE_RECORD_BYTES 5u
 #define STATUS_RECORD_BYTES 10u
+/* Line: time32, ADC12x3 in GP26/GP28/GP27 order, pattern3, valid1. */
+#define LINE_RECORD_BYTES 9u
+bool line_record_encode(uint32_t ms,const uint16_t raw[3],uint8_t pattern,
+                        bool valid,uint8_t out[LINE_RECORD_BYTES]);
 bool barcode_record_encode(uint32_t ms, char letter, bool valid, bool simulated,
                            uint8_t out[BARCODE_RECORD_BYTES]);
 bool barcode_record_valid(const uint8_t *bytes, size_t size);

@@ -135,7 +135,11 @@ void board_gate_snapshot(bool *armed, uint8_t *reason)
 bool board_select(uint8_t kind)
 {
     uint32_t irq = save_and_disable_interrupts();
-    bool result = kind >= 1 && kind <= 4 && !safety_gate_armed(&gate);
+    bool supported=kind>=1 && kind<=4;
+#ifdef RTOS_TRACK
+    supported=supported || kind==MOTION_TRACK_KIND;
+#endif
+    bool result = supported && !safety_gate_armed(&gate);
     if (result) control = (uint8_t)((control & (uint8_t)~SELECT_MASK) | kind);
     restore_interrupts(irq);
     return result;

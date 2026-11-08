@@ -9,8 +9,8 @@ if [ -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ]; then
 fi
 ROBOT_CMAKE="${ROBOT_CMAKE:-$ROBOT_ROOT/build/dependencies/venv/bin/cmake}"
 ROBOT_NINJA="${ROBOT_NINJA:-$ROBOT_ROOT/build/dependencies/venv/bin/ninja}"
-ROBOT_BUILD_DIR="${ROBOT_BUILD_DIR:-$ROBOT_ROOT/build/rtos-motion}"
-ROBOT_OUTPUT_NAME="${ROBOT_OUTPUT_NAME:-robocar_rtos_motion_v0_3.uf2}"
+ROBOT_BUILD_DIR="${ROBOT_BUILD_DIR:-$ROBOT_ROOT/build/rtos-motion-v0_4}"
+ROBOT_OUTPUT_NAME="${ROBOT_OUTPUT_NAME:-robocar_rtos_motion_v0_4.uf2}"
 "$ROBOT_CMAKE" -S "$ROBOT_ROOT/firmware/app/mission_rtos" -B "$ROBOT_BUILD_DIR" -G Ninja \
     -DPICO_BOARD=pico_w -DCMAKE_BUILD_TYPE=Release \
     -DPICO_NO_PICOTOOL=0 \

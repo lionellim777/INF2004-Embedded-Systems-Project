@@ -29,6 +29,13 @@ def delays_and_command_input():
         assert output.getvalue().count('resumed after the interruption')==1
         assert t.summary['motion_delay_events']==2 and t.summary['reconnections_confirmed']==1
         assert t.summary['max_motion_delay_seconds']==2
+        barcode_output=io.StringIO()
+        with contextlib.redirect_stdout(barcode_output):
+            t.packet(PREFIX+'barcode',bytes([0,0,0,0,33]))
+            t.packet(PREFIX+'barcode',bytes([0,0,0,0,33]))
+            t.packet(PREFIX+'barcode',bytes([1,0,0,0,33]))
+        assert len(t.summary['barcode_reads'])==2
+        assert barcode_output.getvalue().count('MQTT barcode: A')==2
         t.save(folder/'summary.json')
         events=[json.loads(l) for l in (folder/'mqtt.jsonl').read_text().splitlines()]
         assert sum(e['event']=='motion_delivery_delay' for e in events)==2
@@ -95,6 +102,11 @@ def main():
         usb.command('x');assert writes==[b'x']
         capture.line('[RTOS_INFO] version=0.3 network_state=1 network_error=0 uptime_ms=2')
         usb.command('f');assert writes[-1]==b'f'
+        try:usb.command('t')
+        except ValueError:pass
+        else:raise AssertionError('Track mode accepted on old firmware')
+        capture.line('[RTOS_INFO] version=0.4 network_state=1 network_error=0 uptime_ms=3')
+        usb.command('t');assert writes[-1]==b't'
         for key in ['start','go','s']:
             try:usb.command(key)
             except ValueError:pass
@@ -121,7 +133,7 @@ def main():
         assert r['mqtt_stops_requested']==1 and r['mqtt_stop_acks']==1
         assert r['physical_observations_pending']
         assert all('fixture-password' not in p.read_text() for p in folder.iterdir())
-    print('PASS network console: v0.3 selection gate, no START, exact empty MQTT STOP, telemetry/ack logs, no password in evidence')
+    print('PASS network console: v0.3/v0.4 selection gates, no START, exact empty MQTT STOP, telemetry/ack logs, no password in evidence')
     reuse_address_guard()
     delays_and_command_input()
 
