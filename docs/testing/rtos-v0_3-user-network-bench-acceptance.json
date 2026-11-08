@@ -1,0 +1,40 @@
+{
+  "date_local": "2026-11-08",
+  "reviewed_utc": "2026-11-08T13:37:26.857801+00:00",
+  "source_commit": "d830704a4314336f809b0ffdf287a68c64e433f4",
+  "firmware": "rtos-network-v0.3",
+  "stationary_network_bench_complete": true,
+  "scope": "Authenticated Pico Wi-Fi/MQTT bench foundation; not combined autonomous mission acceptance",
+  "user_session": "serial-output/rtos-network-20261108-213425",
+  "mqtt_valid_motion_packets": 320,
+  "mqtt_decode_errors": 0,
+  "usb_decoded_packets": 428,
+  "usb_parse_errors": 0,
+  "controller_fault_codes": [
+    0
+  ],
+  "broker_restart_completed": true,
+  "broker_restart_seconds": 2.121,
+  "pico_connected_and_published_after_restart": true,
+  "continuous_pico_reconnect_exercised_this_session": false,
+  "prior_continuous_reconnect_evidence": "docs/testing/rtos-v0_3-telemetry-delay-and-input-check.json",
+  "mqtt_stop_acknowledged": true,
+  "final_stop_latched": true,
+  "phases_seen": [
+    0
+  ],
+  "motion_delay_events": 8,
+  "maximum_motion_delay_seconds": 2.91684,
+  "raw_capture_sha256": {
+    "usb.log": "ccb06ff3e35d0caf2a7e3d3ef6484524b90db8125f5a2bf83527a3af505575c4",
+    "usb.json": "308cbe362d3638b07e42d993d59a6ff3cb5d6072320bfb0c4ef30f3339e06b28",
+    "mqtt.jsonl": "a785df27f9c38fcd56a08313bddcec0b842622418d7324800502567b48a35797",
+    "mqtt-summary.json": "0c0db93dee1f933f34480d343f79868f224ba21cf4479779629be1c9c9c74da4"
+  },
+  "limits": [
+    "Broker restart in this user session preceded the first Pico packet; prior live test covers interruption of an established Pico stream",
+    "This session remained idle; physical wheel stopping and loaded motion were not exercised here",
+    "Delivery delays remain; no worst-case wireless or RTOS deadline guarantee",
+    "Mission/sensor producer integration and runtime stack margins remain pending"
+  ]
+}

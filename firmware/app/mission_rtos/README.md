@@ -22,6 +22,10 @@ The [later delivery/input check](../../../docs/testing/rtos-v0_3-telemetry-delay
 distinguishes packet delays from actual reconnects and verifies buffered/repeated
 command input. The radio requests no power saving; the SDK result is visible
 over USB. Observed arrival gaps decreased, but timing guarantees remain pending.
+The [final user network bench capture](../../../docs/testing/rtos-v0_3-user-network-bench-acceptance.json)
+completes stationary networking acceptance: broker restart, live real motion
+telemetry, STOP acknowledgement and saved fault-free captures. Physical loaded
+motion, bounded timing and combined-mission integration remain separate checks.
 
 ## What is implemented
 
