@@ -115,6 +115,28 @@ The console supports selection and STOP, never remote START. Each run needs
 GP20. Network failure does not authorize or restart motion. The standard
 v5.63 track firmware remains unchanged and available for restoring normal use.
 
+## Reading telemetry and entering commands
+
+An `online; error: none` line with valid motion packets means the MQTT session
+is established. Delivery gaps are not automatically disconnects: packets may
+arrive in bursts while the Pico remains online. The console reports delayed
+telemetry once and logs every gap over one second as `motion_delivery_delay`,
+including host arrival time and source-record interval. The summary contains
+delay count and maximum duration. `motion telemetry resumed` is reserved for a
+known broker/observer interruption or an offline robot-link event.
+
+Type a command letter and press Enter. Incoming output may appear beside the
+letter while it is still waiting for Enter; it does not erase the input.
+Repeated identical letters such as `bb` are treated as one request. Accepted
+commands are recorded as `console_command` events. Buffered complete lines are
+processed without waiting for another keypress.
+
+The latency-test build requests `CYW43_NONE_PM` after Wi-Fi station setup;
+`wifi_pm_result=0` in USB diagnostics confirms the SDK accepted the request.
+This trades radio power saving for responsiveness. It does not guarantee
+delivery timing or establish a physical stopping bound. See
+[Raspberry Pi's networking API](https://www.raspberrypi.com/documentation/pico-sdk/networking.html).
+
 ## Repeat sessions and evidence boundaries
 
 Normal reruns offer to reuse settings and rebuild. If both settings and the

@@ -11,11 +11,15 @@ static int link=CYW43_LINK_UP;
 static bool client_connected=true;
 static err_t publication_error, subscription_error;
 static unsigned stops, transmitted;
+static int init_result,pm_result;
+static unsigned sta_calls,pm_calls;
 static struct { char topic[128]; uint8_t bytes[16]; size_t length; } sent[128];
 uint32_t save_and_disable_interrupts(void) { return 0; }
 void restore_interrupts(uint32_t s) { (void)s; }
-int cyw43_arch_init(void) { return 0; }
-void cyw43_arch_enable_sta_mode(void) {}
+int cyw43_arch_init(void) { return init_result; }
+void cyw43_arch_enable_sta_mode(void) { ++sta_calls; }
+int cyw43_wifi_pm(cyw43_t *c,uint32_t pm)
+{ assert(c==&cyw43_state && pm==CYW43_NONE_PM && sta_calls>pm_calls);++pm_calls;return pm_result; }
 void cyw43_arch_poll(void) {}
 int cyw43_arch_wifi_connect_async(const char *s,const char *p,uint32_t auth) { (void)s;(void)p;(void)auth;return 0; }
 int cyw43_tcpip_link_status(cyw43_t *c,int itf) { (void)c;(void)itf;return link; }
@@ -78,6 +82,11 @@ static void protocols(void)
 }
 int main(void)
 {
+ assert(network_wifi_pm_result()==INT8_MIN);
+ init_result=-1;assert(!initialize_radio() && sta_calls==0 && pm_calls==0);
+ init_result=0;assert(initialize_radio() && network_wifi_pm_result()==0 && pm_calls==1);
+ pm_result=-1;assert(initialize_radio() && network_wifi_pm_result()==-1 && pm_calls==2);
+ pm_result=0;
  protocols();online(UINT32_MAX-500);step(0);
  bool motion_seen=false;
  for(unsigned i=0;i<transmitted;++i) if(strstr(sent[i].topic,"/motion")) {

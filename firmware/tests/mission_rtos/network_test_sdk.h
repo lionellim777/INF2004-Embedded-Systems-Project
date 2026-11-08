@@ -15,6 +15,7 @@ extern cyw43_t cyw43_state;
 enum { ERR_OK, ERR_ARG, MQTT_CONNECT_ACCEPTED=0, MQTT_DATA_FLAG_LAST=1,
        CYW43_LINK_UP=3, CYW43_ITF_STA=0, CYW43_AUTH_WPA2_AES_PSK=1 };
 enum { MQTT_CONNECT_DISCONNECTED=256, MQTT_CONNECT_TIMEOUT=257 };
+#define CYW43_NONE_PM 16u
 typedef void (*mqtt_request_cb_t)(void *,err_t);
 struct mqtt_connect_client_info_t {
  const char *client_id,*client_user,*client_pass;
@@ -26,6 +27,7 @@ uint32_t save_and_disable_interrupts(void);
 void restore_interrupts(uint32_t state);
 int cyw43_arch_init(void);
 void cyw43_arch_enable_sta_mode(void);
+int cyw43_wifi_pm(cyw43_t *,uint32_t);
 void cyw43_arch_poll(void);
 int cyw43_arch_wifi_connect_async(const char *,const char *,uint32_t);
 int cyw43_tcpip_link_status(cyw43_t *,int);

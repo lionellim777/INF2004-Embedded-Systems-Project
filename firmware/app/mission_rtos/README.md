@@ -18,6 +18,10 @@ acknowledgement after selecting the router's 2.4 GHz SSID. The subsequent
 confirms telemetry recovery without a Pico reset and with the stop latch retained,
 after fixing the host console's broker shutdown. User confirmation of physical
 stopping under network traffic and measured timing/stack margins remain pending.
+The [later delivery/input check](../../../docs/testing/rtos-v0_3-telemetry-delay-and-input-check.json)
+distinguishes packet delays from actual reconnects and verifies buffered/repeated
+command input. The radio requests no power saving; the SDK result is visible
+over USB. Observed arrival gaps decreased, but timing guarantees remain pending.
 
 ## What is implemented
 

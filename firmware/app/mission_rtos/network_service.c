@@ -27,6 +27,7 @@ static volatile uint16_t policy=200u;
 static const volatile uint8_t network_configured=RTOS_NETWORK_CONFIGURED;
 static volatile uint16_t flags; /* one network writer; aligned diagnostic reads */
 static volatile int8_t wifi_link; /* SDK states -3..3; USB diagnostic only */
+static volatile int8_t wifi_pm_result=INT8_MIN; /* not attempted, then SDK result */
 static uint32_t state_ms, status_ms, motion_ms, online_ms, boot_id;
 static uint8_t barcode_latest[BARCODE_RECORD_BYTES], result;
 static binary_command_frame_t command_frame;
@@ -45,6 +46,7 @@ static const char result_topic[]=RTOS_TOPIC_PREFIX "command_result";
 uint8_t network_state(void) { return (uint8_t)(policy>>13u); }
 uint8_t network_error(void) { return (uint8_t)((flags&ERROR_MASK)>>ERROR_SHIFT); }
 int8_t network_wifi_link(void) { return wifi_link; }
+int8_t network_wifi_pm_result(void) { return wifi_pm_result; }
 static void error_code(uint8_t code)
 { flags=(uint16_t)((flags&~ERROR_MASK) | ((uint16_t)code<<ERROR_SHIFT)); }
 static void state(uint8_t value,uint32_t now)
@@ -200,6 +202,16 @@ static void step(uint32_t now)
         }
     }
 }
+static bool initialize_radio(void)
+{
+    if (cyw43_arch_init()!=0) return false;
+    cyw43_arch_enable_sta_mode();
+    /* Robot command latency takes precedence over radio power saving.
+     * SDK requires this after STA setup. Failure remains visible over USB
+     * without preventing otherwise usable Wi-Fi association. */
+    wifi_pm_result=(int8_t)cyw43_wifi_pm(&cyw43_state,CYW43_NONE_PM);
+    return true;
+}
 void network_task(int start_code,void *context)
 {
     (void)start_code; (void)context;
@@ -209,8 +221,8 @@ void network_task(int start_code,void *context)
         if (network_configured) {
             if (!(flags&INITIALIZED)) {
                 if (network_state()!=NETWORK_RETRYING || (uint32_t)(now-state_ms)>=1000u) {
-                    if (cyw43_arch_init()==0) {
-                        flags|=INITIALIZED; cyw43_arch_enable_sta_mode(); join(now);
+                    if (initialize_radio()) {
+                        flags|=INITIALIZED; join(now);
                     } else fail(now,1);
                 }
             } else { cyw43_arch_poll(); step(now); }

@@ -10,6 +10,7 @@ import hashlib
 from datetime import datetime, timezone
 import json
 import logging
+import os
 from pathlib import Path
 import select
 import subprocess
@@ -36,8 +37,15 @@ class Telemetry:
         self.lock=threading.Lock()
         self.summary=dict(packets=0,decode_errors=0,valid_motion_packets=0,boot_ids=[],
                           fault_codes=[],broker_restarts_requested=0,mqtt_stops_requested=0,
-                          mqtt_stop_acks=0,connections=0,disconnections=0,physical_observations_pending=True)
+                          mqtt_stop_acks=0,connections=0,disconnections=0,physical_observations_pending=True,
+                          motion_delay_events=0,max_motion_delay_seconds=0,reconnections_confirmed=0)
         self.last_valid_motion_at=None
+        self.last_source_ms=None
+        self.recovery_pending=False
+
+    def interruption(self,reason):
+        with self.lock:self.recovery_pending=True
+        self.event('telemetry_interruption',reason=reason)
 
     def event(self, event_type, **values):
         with self.lock:
@@ -52,7 +60,7 @@ class Telemetry:
             self.event('rejected',topic=topic,error=str(error),payload_hex=payload.hex())
             return
         self.event('packet',topic=topic,payload_hex=payload.hex(),retained=bool(retained),**value)
-        message=None
+        message=None;delay=None
         with self.lock:
             self.summary['packets']+=1
             if value['type']=='motion':
@@ -61,17 +69,30 @@ class Telemetry:
                     now=time.monotonic()
                     if self.summary['valid_motion_packets']==1:
                         message='MQTT: valid motion data received from the Pico.'
-                    elif self.last_valid_motion_at is not None and now-self.last_valid_motion_at>1:
+                    elif self.recovery_pending:
+                        self.summary['reconnections_confirmed']+=1
                         message='MQTT: motion telemetry resumed after the interruption.'
+                    elif self.last_valid_motion_at is not None and now-self.last_valid_motion_at>1:
+                        gap=now-self.last_valid_motion_at
+                        self.summary['motion_delay_events']+=1
+                        self.summary['max_motion_delay_seconds']=max(self.summary['max_motion_delay_seconds'],gap)
+                        delay=dict(seconds=round(gap,6),source_interval_ms=(value['captured_ms']-self.last_source_ms)&0xffffffff)
+                        if self.summary['motion_delay_events']==1:
+                            message='MQTT: delayed telemetry detected; timing details are being logged.'
+                    self.recovery_pending=False
                     self.last_valid_motion_at=now
+                    self.last_source_ms=value['captured_ms']
                 if value['fault'] not in self.summary['fault_codes']: self.summary['fault_codes'].append(value['fault'])
                 self.summary['last_motion']=value
             elif value['type']=='status':
                 if value['boot_id'] not in self.summary['boot_ids']: self.summary['boot_ids'].append(value['boot_id'])
                 self.summary['last_status']=value
+            elif value['type']=='link' and value['state']=='offline':
+                self.recovery_pending=True
             elif value['type']=='command_result' and value['accepted'] and value['command']==3:
                 self.summary['mqtt_stop_acks']+=1
                 message='MQTT: Pico acknowledged STOP. Check USB reports aborted/stop latched.'
+        if delay is not None:self.event('motion_delivery_delay',**delay)
         if message: print(message,flush=True)
 
     def save(self,path):
@@ -106,6 +127,7 @@ class Link:
         del client,context,flags,properties
         with self.telemetry.lock:self.telemetry.summary['disconnections']+=1
         self.telemetry.event('observer_disconnect',reason=str(reason))
+        self.telemetry.interruption('observer disconnected')
 
     async def start_broker(self):
         log=Path(self.telemetry.stream.name).parent/'broker.log'
@@ -156,6 +178,7 @@ class Link:
     async def restart(self):
         with self.telemetry.lock:self.telemetry.summary['broker_restarts_requested']+=1
         self.telemetry.event('broker_restart_begin')
+        self.telemetry.interruption('requested broker restart')
         print('Pausing the broker for two seconds. GP20 and USB stop remain available.',flush=True)
         try:
             await self.stop_broker()
@@ -221,6 +244,35 @@ class USB:
         if self.device is not None:self.device.close()
 
 
+class CommandInput:
+    """Read complete lines without TextIO read-ahead hiding queued commands."""
+    def __init__(self,stream):
+        self.fd=stream.fileno();self.pending=bytearray();self.eof=False
+
+    def readline(self):
+        if b'\n' not in self.pending and not self.eof:
+            if not select.select([self.fd],[],[],0)[0]:return None
+            chunk=os.read(self.fd,4096)
+            if chunk:self.pending.extend(chunk)
+            else:self.eof=True
+        if b'\n' in self.pending:
+            line,_,rest=self.pending.partition(b'\n');self.pending=bytearray(rest)
+            return line.decode(errors='replace')+'\n'
+        if self.eof:
+            line=self.pending.decode(errors='replace');self.pending.clear();return line
+        return None
+
+
+def console_command(line):
+    key=line.strip().lower()
+    if not key:return None
+    # Repeating a single key before Enter still requests only one action.
+    if len(set(key))==1:key=key[0]
+    if key not in ('f','l','r','u','x','m','b','q','?'):
+        raise ValueError('Enter one command letter, then press Enter: f, x, m, b or q.')
+    return key
+
+
 async def run(settings,image,folder,flash_hint=True):
     stamp=datetime.now(ZoneInfo('Asia/Singapore')).strftime('%Y%m%d-%H%M%S')
     logs=ROOT/'serial-output'/('rtos-network-'+stamp);logs.mkdir(parents=True)
@@ -228,21 +280,25 @@ async def run(settings,image,folder,flash_hint=True):
     telemetry=Telemetry(logs/'mqtt.jsonl')
     link=Link(settings,folder,telemetry);usb=USB(capture)
     restart=None
+    commands=CommandInput(sys.stdin)
     try:
         await link.start()
         print('\nKeep BOTH powered wheels clear of the table. No track is needed.')
         if flash_hint:print('Flash this file using BOOTSEL, then reconnect normally:',image)
         else:print('Reusing configured v0.3. No flashing is needed; waiting for the Pico.')
         print('f=select 30cm | x=USB stop | m=MQTT stop | b=restart broker | q=save/exit')
+        print('Type a command letter, then press Enter.')
         print('There is no remote START. GP20 starts and stops physically. Logs:',logs,flush=True)
         if flash_hint and sys.platform=='darwin':subprocess.Popen(['open','-R',str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         while True:
             usb.poll()
-            if select.select([sys.stdin],[],[],0)[0]:
-                line=sys.stdin.readline()
+            line=commands.readline()
+            if line is not None:
                 if not line:break
-                key=line.strip().lower()
                 try:
+                    key=console_command(line)
+                    if key is None:continue
+                    telemetry.event('console_command',key=key)
                     if key=='q':break
                     if key=='m':link.stop()
                     elif key=='b':

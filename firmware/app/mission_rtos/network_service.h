@@ -9,6 +9,7 @@ void network_task(int start_code,void *context);
 uint8_t network_state(void);
 uint8_t network_error(void);
 int8_t network_wifi_link(void);
+int8_t network_wifi_pm_result(void);
 /* Latest barcode snapshot, not an unbounded/offline event queue. Thread-safe
  * on core0; rejected writes leave the previous snapshot unchanged. */
 bool network_barcode(uint32_t ms,char letter,bool valid,bool simulated);
