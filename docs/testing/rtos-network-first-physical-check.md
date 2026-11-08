@@ -121,6 +121,17 @@ Normal reruns offer to reuse settings and rebuild. If both settings and the
 Mac address are unchanged, `run_rtos_network.sh --reuse` skips the setup/build;
 it verifies the saved firmware and settings hashes before starting services.
 If the Mac address changes, rebuild so the Pico has the correct broker address.
+This means the Mac's Wi-Fi **IPv4 address**, not its hardware/MAC address.
+The Pico also needs the newly built image flashed; rebuilding alone does not
+change its installed broker address. The console displays the saved and current
+IP addresses when they differ. Failure to detect an address is reported
+separately and should be resolved by reconnecting the Mac's Wi-Fi before retrying.
+
+On the evening of 8 November the Mac's address had changed from `192.168.1.9`
+to `192.168.1.5`. Updating only the private broker setting, rebuilding/flashing
+and running the actual `--reuse` console restored real Pico telemetry. The saved
+Wi-Fi name/password and MQTT credentials were retained. See
+[broker-address update evidence](rtos-v0_3-broker-ip-update.json).
 
 The 8 November restart check exposed a host-helper shutdown hang with an open
 TCP connection. The broker now runs as an owned child process with bounded

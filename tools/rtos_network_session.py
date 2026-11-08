@@ -288,7 +288,11 @@ def main():
             image=ROOT/'build/rtos-network/robocar_rtos_network_v0_3.uf2'
             if not image.exists():parser.error('Run setup once before --reuse')
             from rtos_network_setup import mac_wifi_ip
-            if mac_wifi_ip()!=settings['broker_ip']:parser.error('Mac address changed; rerun without --reuse to rebuild')
+            current_ip=mac_wifi_ip()
+            if not current_ip:
+                parser.error('Could not detect this Mac\'s Wi-Fi IPv4 address; connect to the home Wi-Fi and retry')
+            if current_ip!=settings['broker_ip']:
+                parser.error(f"Mac Wi-Fi IP changed from {settings['broker_ip']} to {current_ip}; rerun without --reuse, then flash the newly built firmware")
             if hashlib.sha256(image.read_bytes()).hexdigest()!=metadata['sha256'] or \
                hashlib.sha256(json.dumps(settings,sort_keys=True).encode()).hexdigest()!=metadata['settings_sha256']:
                 parser.error('Saved image/settings changed; rerun without --reuse to rebuild')

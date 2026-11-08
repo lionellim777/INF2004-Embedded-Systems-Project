@@ -4,10 +4,43 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
+import contextlib
+import hashlib
+import io
+from unittest.mock import patch
 
 from rtos_bench import Capture
 from rtos_network_session import Telemetry, Link, USB
 from rtos_network_setup import PREFIX
+
+
+def reuse_address_guard():
+    import rtos_network_session as session
+    with tempfile.TemporaryDirectory(prefix='rtos-reuse-') as name:
+        root=Path(name);private=root/'private';private.mkdir()
+        image=root/'build/rtos-network/robocar_rtos_network_v0_3.uf2'
+        image.parent.mkdir(parents=True);image.write_bytes(b'fixture image')
+        settings={'broker_ip':'192.168.1.9'}
+        (private/'settings.json').write_text(json.dumps(settings))
+        (private/'firmware-info.json').write_text(json.dumps(dict(
+            sha256=hashlib.sha256(image.read_bytes()).hexdigest(),
+            settings_sha256=hashlib.sha256(json.dumps(settings,sort_keys=True).encode()).hexdigest())))
+        invoked=[]
+        async def runner(*args,**kwargs):invoked.append(kwargs)
+        with patch.object(session,'ROOT',root),patch.object(session,'PRIVATE',private), \
+             patch.object(session,'run',runner),patch('sys.argv',['helper','--reuse']):
+            for current,expected in [('', ['Could not detect','retry']),
+                                     ('192.168.1.5',['192.168.1.9','192.168.1.5','flash'])]:
+                error=io.StringIO()
+                with patch('rtos_network_setup.mac_wifi_ip',return_value=current),contextlib.redirect_stderr(error):
+                    try:session.main()
+                    except SystemExit as result:assert result.code==2
+                    else:raise AssertionError('Reuse continued with unavailable or changed IP')
+                assert all(word in error.getvalue() for word in expected)
+                assert not invoked
+            with patch('rtos_network_setup.mac_wifi_ip',return_value=settings['broker_ip']):session.main()
+            assert invoked==[{'flash_hint':False}]
+    print('PASS reuse guard: missing IP distinguished from genuine change; both addresses and reflash shown; matching image/settings start without flashing')
 
 
 def main():
@@ -51,6 +84,7 @@ def main():
         assert r['physical_observations_pending']
         assert all('fixture-password' not in p.read_text() for p in folder.iterdir())
     print('PASS network console: v0.3 selection gate, no START, exact empty MQTT STOP, telemetry/ack logs, no password in evidence')
+    reuse_address_guard()
 
 
 if __name__=='__main__':main()
