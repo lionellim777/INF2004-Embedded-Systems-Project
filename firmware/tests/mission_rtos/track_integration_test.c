@@ -189,6 +189,14 @@ static void held_boot(void)
     start();board_stop(STOP_BUTTON);advance(10000);stopped();
     puts("PASS autonomous track selection: held boot/release cannot start; fresh GP20 gesture required");
 }
+static void first_failure_evidence(void)
+{
+    begin_test();start();samples(191,600000);samples(2200,1200000);samples(191,1200000);
+    assert(!read_count);track_diagnostics_t d;track_diagnostics(&d);assert(d.rejected);
+    frame(0x0d0,80000,false);samples(191,900000);assert(read_count==1 && reads[0]=='Z');
+    board_stop(STOP_BUTTON);advance(100000);stopped();diagnostic_export("first-failure");
+    puts("PASS first failed optical evidence survives a later accepted Z; no barcode guessing or change to motor start");
+}
 static void emit_packet(const char *label,const uint8_t *bytes,size_t n)
 { assert(n && n<=SCAN_PACKET_BYTES);printf("SCAN_FIXTURE %s ",label);for(size_t i=0;i<n;i++)printf("%02x",bytes[i]);puts(""); }
 static void diagnostic_boundaries(void)
@@ -218,4 +226,4 @@ static void diagnostic_boundaries(void)
     assert(!scan_words_encode(1,256,words,64,b));assert(!scan_words_encode(1,0,words,65,b));
     puts("PASS scan codec bounds: maximum 16384-word waveform, all 256 chunks, integer extremes and rejected overflow");
 }
-int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();diagnostic_boundaries();return 0;}
+int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();first_failure_evidence();diagnostic_boundaries();return 0;}

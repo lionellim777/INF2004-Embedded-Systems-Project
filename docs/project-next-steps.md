@@ -44,6 +44,15 @@ pass. The next one-run capture must identify the missed-Z cause before a fix
 is claimed. Treat software simulations as software evidence, not moving
 hardware results. No teammate terrain/obstacle branch has been merged.
 
+The next v0.4.1 run confirmed half A only. Its complete bend-Z waveform exposes
+a short-black interval floor rejecting a frame the existing bias-compensated
+validator can read. [v0.4.2](testing/rtos-v0_4_2-barcode-recovery.md) opts the RTOS
+target into bounded two-profile strict validation for one short black interval;
+the saved bend Z passes both batch and captured-cadence replay. Full A had an
+extra optical transition pair; its raw waveform must be retained to diagnose
+that separately. v0.4.2 preserves the first failed capture. Physical acceptance
+is pending; this is not a claim of a completed RTOS AAZ regression.
+
 Prioritize a first integrated core during Week 11, then add the owners' ready
 navigation/terrain/obstacle modules and reserve Week 12 for course regressions,
 minimum-bit measurements and assessment evidence. These are planning targets,

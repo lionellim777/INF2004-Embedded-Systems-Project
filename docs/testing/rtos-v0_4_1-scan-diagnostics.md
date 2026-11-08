@@ -1,5 +1,8 @@
 # v0.4.1 wireless scan diagnostics
 
+Historical build notes. The next run uses
+[v0.4.2 barcode recovery and first-failure capture](rtos-v0_4_2-barcode-recovery.md).
+
 The first physical v0.4 RTOS run confirmed A at 101868ms and A at 111876ms,
 but no Z. Retained USB counters showed 17520 retained samples, 7 frame checks,
 2 rejected captures, 2 accepted reads and 33 course recoveries. Capture faults

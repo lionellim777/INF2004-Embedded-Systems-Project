@@ -1,12 +1,16 @@
-# µT-Kernel track integration v0.4.1
+# µT-Kernel track integration v0.4.2
 
 This separate Pico W target starts the real µT-Kernel scheduler and uses the
 existing quadrature encoder driver and calibrated motion controller. It is a
 first combined line-following/barcode/motion/MQTT build. Terrain and obstacle
 manoeuvres are not connected yet; the complete autonomous mission is pending.
-The v5.63 target and accepted UF2 remain unchanged.
+The accepted v5.63 UF2 is preserved. Legacy builds keep the new recovery path
+disabled; the default decoder behaviour is covered by the same regressions.
 
-Use the [v0.4.1 diagnostic track instructions](../../../docs/testing/rtos-v0_4_1-scan-diagnostics.md).
+Use the [v0.4.2 recovery track instructions](../../../docs/testing/rtos-v0_4_2-barcode-recovery.md).
+The saved v0.4.1 bend Z now replays successfully using the opt-in short-black
+consensus path. An extra transition in full A still needs its raw capture;
+this diagnostic build preserves the first substantial failed waveform.
 The first moving v0.4 run decoded A/A but missed Z; it reported two rejected
 captures, 33 recoveries and zero scanner faults. v0.4.1 adds stopped waveform
 and per-attempt downloads, without changing the validated decoder/controller.
@@ -44,7 +48,8 @@ motion, bounded timing and combined-mission integration remain separate checks.
 - One lower-priority Observer task (priority 9) reads USB selections and emits
   a motion record every 200 ms. It cannot remotely start a run.
 - One decoder task (priority 4, 8KiB requested stack) consumes a 14-byte/sample
-  IRQ queue and runs the unmodified v5.63 grey waveform/geometry decoder.
+  IRQ queue and runs the v5.63 grey waveform/geometry decoder with the opt-in
+  RTOS short-black consensus path described in the v0.4.2 notes.
   The ADC IRQ remains the only owner of GP26/28/27 conversions: 2kHz sampling,
   the existing 12-sample filter and one retained reading every 2ms. Neither
   Wi-Fi nor line recovery suspends that acquisition. Run tokens discard stale
@@ -122,8 +127,8 @@ python3 tools/test_rtos_motion.py
 The build helper accepts `PICO_SDK_PATH`, `PICO_TOOLCHAIN_PATH`, `MTK_BSP_PATH`,
 `ROBOT_CMAKE`, `ROBOT_NINJA` and `ROBOT_PICOTOOL_DIR` overrides. Its default
 picotool directory is the one already used by the calibration build.
-Default build output is `build/rtos-motion-v0_4_1/robocar_rtos_motion_v0_4_1.uf2`; network
-setup builds separately under `build/rtos-network-v0_4_1/` using a private settings
+Default build output is `build/rtos-motion-v0_4_2/robocar_rtos_motion_v0_4_2.uf2`; network
+setup builds separately under `build/rtos-network-v0_4_2/` using a private settings
 header supplied by `RTOS_NETWORK_SETTINGS_FILE`. Nothing is flashed
 by these commands. Build/host evidence is in
 [the v0.2 report](../../../docs/testing/rtos-motion-v0_2.json).
@@ -160,7 +165,7 @@ hardware test.
 ## Earlier USB bench acceptance
 
 The v0.2 USB and v0.3 networking checks are complete within their recorded scopes.
-Current moving-track acceptance uses the v0.4.1 guide above. Keep v5.63 available.
+Current moving-track acceptance uses the v0.4.2 guide above. Keep v5.63 available.
 The steps below describe the original USB check; do not repeat them solely
 because the software version changed. Follow the network checklist next.
 
@@ -285,7 +290,7 @@ default has empty credentials and does not attempt association.
 
 The simpler operator route is now `sh tools/run_rtos_network.sh`. It prompts
 locally for Wi-Fi settings, generates password-protected robot/observer accounts
-with topic permissions, builds the actual configured v0.4.1 image and runs one
+with topic permissions, builds the actual configured v0.4.2 image and runs one
 console for USB and MQTT evidence. `m` sends MQTT STOP and `b` restarts only its
 own broker; it never sends START. Both source code and existing shared formats
 use the updated receiver, which also accepts legacy bench records. Credentials and configured UF2s
@@ -299,8 +304,8 @@ broker is loopback-only and is not the robot's LAN broker.
 
 ## Remaining integration
 
-The existing validated barcode implementation is linked unchanged, with
-independent acquisition and decoding. Full physical RTOS AAZ acceptance and
+The v5.63 barcode implementation supplies the base decoder, with the opt-in
+v0.4.2 exception above and independent acquisition. Full physical RTOS AAZ acceptance and
 loaded control timing remain pending. The A–D-only formatter remains in Justin's
 unmodified branch; this target uses the new A–Z codec.
 Terrain, obstacle manoeuvres and barcode-command execution remain with their

@@ -4,6 +4,11 @@ Batch pattern replay does not prove a moving path or missing quiet zone valid.
 """
 from pathlib import Path
 import json, os, re, struct, subprocess, sys, argparse
+parser=argparse.ArgumentParser()
+parser.add_argument('--expect',help='Expected batch letters, one per log; - means no acceptance assertion')
+parser.add_argument('--recovery-optics',action='store_true',help='Enable RTOS v0.4.2 single-short-black consensus path')
+parser.add_argument('files',nargs='+')
+args=parser.parse_args()
 
 root=Path(__file__).resolve().parents[1]
 app=root/'firmware/app/robot_firmware'
@@ -25,15 +30,12 @@ int main(int argc,char **argv){
     puts("");if(argv[2][0]!='-')assert(ok&&c==argv[2][0]);return 0;
 }
 ''')
-exe=build/'replay'
+exe=build/('replay-recovery' if args.recovery_optics else 'replay')
 env=dict(os.environ,SDKROOT='/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk')
 subprocess.run(['clang','-std=c11','-O1','-Wall','-Wextra','-Werror',
+    f'-DBARCODE_WAVE_RECOVERY_OPTICS={int(args.recovery_optics)}',
     '-fsanitize=address,undefined','-I'+str(app),str(driver),str(app/'barcode_waveform.c'),
     str(app/'barcode_decoder.c'),'-lm','-o',str(exe)],check=True,env=env)
-parser=argparse.ArgumentParser()
-parser.add_argument('--expect',help='Expected batch letters, one per log; - means no acceptance assertion')
-parser.add_argument('files',nargs='+')
-args=parser.parse_args()
 if args.expect and len(args.expect)!=len(args.files):parser.error('--expect must contain one letter per log')
 for input_index,name in enumerate(args.files):
     text=Path(name).read_text()

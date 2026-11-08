@@ -5,6 +5,9 @@
 #include <string.h>
 #include <math.h>
 #include "barcode_recorded_fixtures.h"
+#ifndef BARCODE_WAVE_RECOVERY_OPTICS
+#define BARCODE_WAVE_RECOVERY_OPTICS 0
+#endif
 
 static barcode_waveform_t w,restored;
 static barcode_signal_t filter;
@@ -344,10 +347,78 @@ static void long_bar_recross(void)
     }
     puts("PASS10mm transverse recross within simulated260mm bars; leaving the printed band cannot complete a partial frame.");
 }
+static void short_optical_bar(void)
+{
+    unsigned recovered=0;
+    for(unsigned c=0;c<26;c++)for(unsigned reverse=0;reverse<2;reverse++)for(unsigned size=0;size<2;size++){
+        uint32_t runs[29];unsigned n=size?81000:40500;
+        for(unsigned i=0;i<29;i++){
+            unsigned p=i/10==1?patterns[c]:0x094;
+            bool wide=i%10<9 && (p&(1u<<(8-i%10)));
+            runs[i]=n*(wide?3u:1u)+(i%2?(int)(n*8/10):-(int)(n*8/10));
+        }
+        /* Shorten ONE measured narrow black, moving its two optical edges
+         * inwards equally. All actual black-bar centres remain unchanged. */
+        unsigned delta=runs[2]-2100; runs[2]=2100;runs[1]+=delta/2;runs[3]+=delta-delta/2;
+        for(unsigned bad=0;bad<5;bad++){
+            uint32_t r[29];memcpy(r,runs,sizeof r);
+            if(bad==1){unsigned d=r[22]-2100;r[22]=2100;r[21]+=d/2;r[23]+=d-d/2;}
+            if(bad==2)r[2]=0; /* missing edge/bar */
+            if(bad==3)r[1]=2100; /* white gap below floor */
+            if(bad==4){ /* a narrow payload bar becomes a THIRD wide black */
+                unsigned i=10;while(patterns[c]&(1u<<(8-i%10)))i+=2;
+                r[i]+=n*2;
+            }
+            begin();w.motion=true;unsigned position=0;w.sample[0]=190;w.position[0]=0;w.count=1;
+            for(unsigned i=0;i<29;i++){
+                unsigned j=reverse?28-i:i,counts=(r[j]+500)/1000;
+                for(unsigned k=0;k<counts;k++){
+                    assert(w.count<BARCODE_WAVE_SAMPLES);position++;
+                    w.position[w.count]=(int16_t)position;w.sample[w.count++]=(uint16_t)(0x2000u|(i%2?190:2300));
+                }
+            }
+            w.position[w.count]=(int16_t)(++position);w.sample[w.count++]=0x2000u|190;
+            char letter=0;bool ok=barcode_waveform_decode(&w,&letter);
+            if(!bad && BARCODE_WAVE_RECOVERY_OPTICS){
+                if(!ok || letter!='A'+(int)c){
+                    fprintf(stderr,"short-bar fixture c=%c reverse=%u size=%u got=%c geometry=%x extrema=%u reason=%u bad_run=%u width=%u\n",'A'+c,reverse,size,letter?letter:'-',w.geometry_mask,w.profile[5].extrema,w.profile[5].reason,w.profile[5].bad_run,w.profile[5].bad_width);
+                    for(unsigned i=0;i<29;i++)fprintf(stderr,"%u%s",w.profile[5].runs[i],i==28?"\n":",");
+                }
+                assert(ok && letter=='A'+(int)c);recovered++;
+            }
+            else assert(!ok);
+        }
+    }
+    printf("PASS short optical bar: %u recovered A-Z/orientation/size frames; multiple tiny bars, missing bar, tiny white gap and expanded interior rejected.\n",recovered);
+}
+static void rtos_bend_fixture(const char *path)
+{
+    begin();FILE *f=fopen(path,"rb");assert(f);uint16_t words[16384];
+    unsigned n=(unsigned)fread(words,2,16384,f);fclose(f);assert(n==8982);
+    uint32_t hash=2166136261u;
+    for(unsigned i=0;i<n;i++){hash=(hash^(words[i]&255u))*16777619u;hash=(hash^(words[i]>>8u))*16777619u;}
+    assert(hash==0x9b9bfd4au);w.motion=true;w.count=n/2;
+    for(unsigned i=0;i<w.count;i++){w.sample[i]=words[2*i];w.position[i]=(int16_t)words[2*i+1];}
+    char letter=0;bool ok=barcode_waveform_decode(&w,&letter);
+    if(BARCODE_WAVE_RECOVERY_OPTICS){assert(ok && letter=='Z' && (w.coherent_mask&0x38u)==0x38u);}
+    else assert(!ok);
+    /* Feed the same retained ADC/time/projected positions through streaming
+     * framing, with its documented leading white duration. No expected letter
+     * enters the decoder. This is a captured-input replay, not a new run. */
+    begin();w.motion=true;
+    for(unsigned i=0;i<271;i++){clock_us+=2000;w.sensor_x=(float)((int)i-271);char c=0;assert(!barcode_waveform_update(&w,166,clock_us,&c));}
+    for(unsigned i=0;i<n/2;i++){
+        uint16_t value=words[2*i];clock_us+=(uint32_t)(value>>12)*1000u;
+        w.sensor_x=(float)(int16_t)words[2*i+1];char c=0;
+        if(barcode_waveform_update(&w,value&4095u,clock_us,&c)){assert(c=='Z');reads++;}
+    }
+    if(BARCODE_WAVE_RECOVERY_OPTICS)assert(reads==1);else assert(!reads);
+    printf("PASS physical RTOS bend input: FNV %08x, batch and captured-cadence replay, recovery mode=%u, reads=%u.\n",hash,BARCODE_WAVE_RECOVERY_OPTICS,reads);
+}
 int main(int argc,char **argv)
 {
     geometry_model_matrix();long_bar_recross();
-    assert(argc==3);recorded_half_z(argv[1]);new_bend_fixture(argv[2]);
+    assert(argc==4);recorded_half_z(argv[1]);new_bend_fixture(argv[2]);short_optical_bar();rtos_bend_fixture(argv[3]);
     spatial_sequence();curved_matrix();spatial_matrix();matrix();rejection_and_recovery();noisy_corpus();prefix_and_export();
     for(unsigned i=0;i<sizeof(recorded)/sizeof(recorded[0]);i++)for(unsigned reverse=0;reverse<2;reverse++){
         begin();samples(190,600000);

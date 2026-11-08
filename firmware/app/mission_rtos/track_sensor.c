@@ -19,10 +19,40 @@ static track_ir_t latest;
 static track_diagnostics_t diagnostics;
 static repeating_timer_t timer;
 static barcode_signal_t filter;
-static barcode_waveform_t waveform; /* exact v5.63 decoder and geometry */
+static barcode_waveform_t waveform; /* v5.63 base; RTOS opts into recovery optics */
 static unsigned divider;
 static uint16_t sealed,stop_discarded;
 static uint32_t recoveries,stop_us;
+/* Retain the FIRST substantial failed optical capture as well as the running
+ * decoder's usual latest snapshot. Full 8192-reading bound = 32 KiB of words.
+ * This lets the next run expose the interrupted full A instead of replacing
+ * its raw evidence with the later bend. No truncation or ISR copy. */
+#define FIRST_FAILURE_WORDS (2u*BARCODE_WAVE_SAMPLES)
+static scan_snapshot_t first_failure;
+static barcode_wave_profile_t first_profiles[6];
+static uint16_t first_words[FIRST_FAILURE_WORDS];
+static void retain_first_failure(void)
+{
+    const barcode_wave_snapshot_t *s=&waveform.saved;
+    if(first_failure.count || !s->count || s->count>FIRST_FAILURE_WORDS ||
+       s->reason==WAVE_ACCEPTED || s->duration_us<1000000u || s->signal_range<100u)return;
+    memcpy(first_words,s->sample,s->count*sizeof(uint16_t));
+    memcpy(first_profiles,s->profile,sizeof first_profiles);
+    first_failure=(scan_snapshot_t){.start_us=s->start_us,.leading_us=s->leading_us,.white_us=s->white_us,
+        .duration_us=s->duration_us,.checksum=s->checksum,.count=s->count,.paper=s->paper,
+        .signal_range=s->signal_range,.reason=s->reason,.coherent_mask=s->coherent_mask,
+        .geometry_mask=s->geometry_mask,.letter=s->letter,.motion=s->motion};
+}
+static void select_first_failure(void)
+{
+    if(!first_failure.count)return;
+    barcode_wave_snapshot_t *s=&waveform.saved;const scan_snapshot_t *f=&first_failure;
+    s->start_us=f->start_us;s->leading_us=f->leading_us;s->white_us=f->white_us;
+    s->duration_us=f->duration_us;s->checksum=f->checksum;s->count=f->count;s->paper=f->paper;
+    s->signal_range=f->signal_range;s->reason=f->reason;s->coherent_mask=f->coherent_mask;
+    s->geometry_mask=f->geometry_mask;s->letter=f->letter;s->motion=f->motion;
+    memcpy(s->sample,first_words,s->count*sizeof(uint16_t));memcpy(s->profile,first_profiles,sizeof first_profiles);
+}
 
 static void put32(uint8_t *p,uint32_t n)
 { for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(n>>(8u*i)); }
@@ -66,6 +96,7 @@ bool track_sensor_init(void)
     enabled=false;requested=active=0;head=tail=event_head=event_tail=0;divider=0;
     latest=(track_ir_t){0};diagnostics=(track_diagnostics_t){0};filter=(barcode_signal_t){0};
     sealed=stop_discarded=0;recoveries=stop_us=0;
+    first_failure=(scan_snapshot_t){0};
     adc_init();adc_gpio_init(26);adc_gpio_init(28);adc_gpio_init(27);
     latest.ready=add_repeating_timer_us(-(int64_t)TRACK_SAMPLE_US,sample,NULL,&timer);
     return latest.ready;
@@ -134,6 +165,7 @@ void track_service(void)
          * A new Motion request may preempt this work; do not seal that run. */
         if(active && active==token && sealed!=token){
             barcode_waveform_save_partial(&waveform);
+            retain_first_failure();select_first_failure();
             irq=save_and_disable_interrupts();
             if(requested==token && !enabled)sealed=token;
             restore_interrupts(irq);
@@ -141,7 +173,7 @@ void track_service(void)
         return;
     }
     if(active!=token){
-        barcode_waveform_begin(&waveform);active=token;
+        barcode_waveform_begin(&waveform);first_failure=(scan_snapshot_t){0};active=token;
         irq=save_and_disable_interrupts();
         if(current(token))diagnostics.ack=token;
         restore_interrupts(irq);
@@ -155,6 +187,7 @@ void track_service(void)
         if(!found)break;
         char letter=0;uint32_t start=time_us_32();
         bool read=barcode_waveform_update_motion(&waveform,(uint16_t)(p[12]|((uint16_t)p[13]<<8u)),get32(p),get32(p+4),get32(p+8),&letter);
+        retain_first_failure();
         uint32_t duration=time_us_32()-start;
         irq=save_and_disable_interrupts();
         if(current(token)){
