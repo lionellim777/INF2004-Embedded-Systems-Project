@@ -56,7 +56,7 @@ target_include_directories(mtkernel PRIVATE "${CMAKE_BINARY_DIR}/generated"
 set(BASELINE "${CMAKE_CURRENT_LIST_DIR}/../robot_firmware")
 add_executable(robocar_rtos_motion main.c board.c safety_gate.c motion_record.c motion_runtime.c
     binary_protocol.c network_service.c
-    track_sensor.c track_runtime.c
+    track_sensor.c track_runtime.c scan_diagnostic.c
     "${BASELINE}/course_control.c" "${BASELINE}/barcode_waveform.c" "${BASELINE}/barcode_decoder.c"
     port/mtk_bridge.c "${BASELINE}/encoders.c" "${BASELINE}/motion_control.c")
 target_include_directories(robocar_rtos_motion PRIVATE "${CMAKE_CURRENT_LIST_DIR}"

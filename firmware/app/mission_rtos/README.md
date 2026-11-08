@@ -1,4 +1,4 @@
-# µT-Kernel track integration v0.4
+# µT-Kernel track integration v0.4.1
 
 This separate Pico W target starts the real µT-Kernel scheduler and uses the
 existing quadrature encoder driver and calibrated motion controller. It is a
@@ -6,7 +6,10 @@ first combined line-following/barcode/motion/MQTT build. Terrain and obstacle
 manoeuvres are not connected yet; the complete autonomous mission is pending.
 The v5.63 target and accepted UF2 remain unchanged.
 
-Use the [v0.4 first track instructions](../../../docs/testing/rtos-v0_4-first-track-check.md).
+Use the [v0.4.1 diagnostic track instructions](../../../docs/testing/rtos-v0_4_1-scan-diagnostics.md).
+The first moving v0.4 run decoded A/A but missed Z; it reported two rejected
+captures, 33 recoveries and zero scanner faults. v0.4.1 adds stopped waveform
+and per-attempt downloads, without changing the validated decoder/controller.
 The [v0.4 build/test report](../../../docs/testing/rtos-v0_4-track-integration.json)
 separates host pipeline tests, stationary Pico checks and pending moving-course
 acceptance. Track mode is selected at normal boot; GP20 alone starts motion.
@@ -119,8 +122,8 @@ python3 tools/test_rtos_motion.py
 The build helper accepts `PICO_SDK_PATH`, `PICO_TOOLCHAIN_PATH`, `MTK_BSP_PATH`,
 `ROBOT_CMAKE`, `ROBOT_NINJA` and `ROBOT_PICOTOOL_DIR` overrides. Its default
 picotool directory is the one already used by the calibration build.
-Default build output is `build/rtos-motion-v0_4/robocar_rtos_motion_v0_4.uf2`; network
-setup builds separately under `build/rtos-network-v0_4/` using a private settings
+Default build output is `build/rtos-motion-v0_4_1/robocar_rtos_motion_v0_4_1.uf2`; network
+setup builds separately under `build/rtos-network-v0_4_1/` using a private settings
 header supplied by `RTOS_NETWORK_SETTINGS_FILE`. Nothing is flashed
 by these commands. Build/host evidence is in
 [the v0.2 report](../../../docs/testing/rtos-motion-v0_2.json).
@@ -143,6 +146,7 @@ environment (already prepared on this workstation):
 ```sh
 python3 -m venv build/dependencies/rtos-tools-venv
 build/dependencies/rtos-tools-venv/bin/python -m pip install -r tools/requirements-rtos-tools.txt
+python3 tools/test_rtos_track.py
 build/dependencies/rtos-tools-venv/bin/python tools/test_rtos_network.py
 build/dependencies/rtos-tools-venv/bin/python tools/test_rtos_bench.py
 ```
@@ -156,7 +160,7 @@ hardware test.
 ## Earlier USB bench acceptance
 
 The v0.2 USB and v0.3 networking checks are complete within their recorded scopes.
-Current moving-track acceptance uses the v0.4 guide above. Keep v5.63 available.
+Current moving-track acceptance uses the v0.4.1 guide above. Keep v5.63 available.
 The steps below describe the original USB check; do not repeat them solely
 because the software version changed. Follow the network checklist next.
 
@@ -281,7 +285,7 @@ default has empty credentials and does not attempt association.
 
 The simpler operator route is now `sh tools/run_rtos_network.sh`. It prompts
 locally for Wi-Fi settings, generates password-protected robot/observer accounts
-with topic permissions, builds the actual configured v0.4 image and runs one
+with topic permissions, builds the actual configured v0.4.1 image and runs one
 console for USB and MQTT evidence. `m` sends MQTT STOP and `b` restarts only its
 own broker; it never sends START. Both source code and existing shared formats
 use the updated receiver, which also accepts legacy bench records. Credentials and configured UF2s
@@ -296,7 +300,7 @@ broker is loopback-only and is not the robot's LAN broker.
 ## Remaining integration
 
 The existing validated barcode implementation is linked unchanged, with
-independent acquisition and decoding. Physical v0.4 track acceptance and
+independent acquisition and decoding. Full physical RTOS AAZ acceptance and
 loaded control timing remain pending. The A–D-only formatter remains in Justin's
 unmodified branch; this target uses the new A–Z codec.
 Terrain, obstacle manoeuvres and barcode-command execution remain with their

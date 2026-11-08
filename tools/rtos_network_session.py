@@ -33,6 +33,8 @@ WIFI_LINKS = {-3:'authentication failed',-2:'Wi-Fi name not found',-1:'connectio
 
 class Telemetry:
     def __init__(self, path):
+        from rtos_scan_capture import ScanCapture
+        self.scan=ScanCapture(Path(path).parent)
         self.stream=Path(path).open('x',buffering=1)
         self.lock=threading.Lock()
         self.summary=dict(packets=0,decode_errors=0,valid_motion_packets=0,boot_ids=[],
@@ -60,7 +62,7 @@ class Telemetry:
             self.event('rejected',topic=topic,error=str(error),payload_hex=payload.hex())
             return
         self.event('packet',topic=topic,payload_hex=payload.hex(),retained=bool(retained),**value)
-        message=None;delay=None;controller_message=None
+        message=None;delay=None;controller_message=None;scan_messages=[]
         with self.lock:
             self.summary['packets']+=1
             if value['type']=='motion':
@@ -90,6 +92,11 @@ class Telemetry:
             elif value['type']=='status':
                 if value['boot_id'] not in self.summary['boot_ids']: self.summary['boot_ids'].append(value['boot_id'])
                 self.summary['last_status']=value
+                self.scan.boot_id(value['boot_id'])
+            elif value['type']=='scan_diag':
+                scan_messages=self.scan.accept(value)
+                if value['record']=='state':self.summary['last_scan_state']=value
+                self.summary['scan_runs']=self.scan.summary()
             elif value['type']=='line':self.summary['last_line']=value
             elif value['type']=='barcode' and value['valid']:
                 previous=self.summary.get('last_barcode')
@@ -106,8 +113,11 @@ class Telemetry:
         if delay is not None:self.event('motion_delivery_delay',**delay)
         if message: print(message,flush=True)
         if controller_message:print(controller_message,flush=True)
+        for text in scan_messages:print(text,flush=True)
 
     def save(self,path):
+        with self.lock:
+            self.scan.save();self.summary['scan_runs']=self.scan.summary()
         with self.lock:
             Path(path).write_text(json.dumps(self.summary,indent=2)+'\n')
             self.stream.close()
@@ -248,7 +258,7 @@ class USB:
 
     def command(self,key):
         if self.device is None:raise ValueError('USB not connected')
-        if key!='x' and self.capture.summary.get('firmware_version') not in ('0.3','0.4'):
+        if key!='x' and self.capture.summary.get('firmware_version') not in ('0.3','0.4','0.4.1'):
             raise ValueError('Flash the configured RTOS firmware before selecting a test')
         self.device.write(self.capture.command(key))
 
@@ -298,7 +308,8 @@ async def run(settings,image,folder,flash_hint=True):
         print('\nKeep the car stopped. Raise both powered wheels for bench tests; use the prepared track for t.')
         if flash_hint:print('Flash this file using BOOTSEL, then reconnect normally:',image)
         else:print('Reusing the configured RTOS image. No flashing requested; waiting for the Pico.')
-        print('t=track scan (v0.4 default) | f=30cm bench | x=USB stop | m=MQTT stop | b=restart broker | q=save/exit')
+        print('t=track scan (RTOS default) | f=30cm bench | x=USB stop | m=MQTT stop | b=restart broker | q=save/exit')
+        print('After a track run, keep the car powered until Scan diagnostics saved appears. q also waits for the download.')
         print('Type a command letter, then press Enter.')
         print('There is no remote START. GP20 starts and stops physically. Logs:',logs,flush=True)
         if flash_hint and sys.platform=='darwin':subprocess.Popen(['open','-R',str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -343,6 +354,15 @@ async def run(settings,image,folder,flash_hint=True):
             except Exception as error:print('Broker restart failed:',type(error).__name__,flush=True)
         for _ in range(10):
             usb.poll();await asyncio.sleep(0.03)
+        with telemetry.lock:pending=telemetry.scan.pending()
+        if pending and link.client.is_connected():
+            print('Waiting up to 45 seconds for the stopped scan diagnostic download. Keep the car powered.',flush=True)
+            until=time.monotonic()+45
+            while time.monotonic()<until:
+                with telemetry.lock:pending=telemetry.scan.pending()
+                if not pending:break
+                usb.poll();await asyncio.sleep(.03)
+            if pending:print('Scan download is incomplete; available diagnostics will still be saved.',flush=True)
         usb.close();capture.close()
         await link.close()
         telemetry.save(logs/'mqtt-summary.json')

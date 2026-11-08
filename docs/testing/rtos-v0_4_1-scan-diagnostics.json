@@ -1,0 +1,149 @@
+{
+  "version": "0.4.1",
+  "recorded_utc": "2026-11-08T15:31:33.872464+00:00",
+  "branch": "yixuan/rtos-track-integration",
+  "purpose": "Expose exact scan attempts and stopped waveform over authenticated binary MQTT; diagnose missing bend Z without guessing a controller retune.",
+  "firmware": {
+    "private_configured_file": "build/rtos-network-v0_4_1/robocar_rtos_network_v0_4_1.uf2",
+    "credentials_embedded": true,
+    "sha256": "0681a92b92ab1e1d602ea8998229cde3ea4c5e015eea06e88624fac8d5bb46f8",
+    "uf2_bytes": 881664,
+    "uf2_blocks": 1722,
+    "uf2_compared_to_linked_binary": true,
+    "text_bytes": 440600,
+    "data_bytes": 0,
+    "bss_bytes": 172204,
+    "static_bss_increase_over_v0_4_bytes": 24,
+    "runtime_stack_watermarks_measured": false
+  },
+  "scope": {
+    "validated_v5_63_decoder_and_controller_sources_unchanged": true,
+    "main_and_teammate_branches_untouched": true,
+    "motion_still_requires_fresh_GP20": true,
+    "obstacle_hump_and_barcode_execution_not_integrated": true
+  },
+  "tests": {
+    "sanitized_actual_pipeline": "PASS: A/A/Z during recovery, stop-partial preservation, old-run isolation, all profiles and raw-word checksum",
+    "codec_and_receiver": "PASS: 16384 words, 256 chunks, integer extremes, overflow/truncation rejection, duplicate/reordered recovery, missing/corrupt detection",
+    "production_network_service": "PASS: QoS1 ACK ordering, retry/backpressure, stale-run ACK isolation, reconnect replay",
+    "local_broker": {
+      "production_service_sdk_mock": "PASS",
+      "independent_binary_decode": "PASS",
+      "local_broker_binary_roundtrip_packets": 390,
+      "hardware_network_tested": false,
+      "local_broker_restart_cycles": 1,
+      "packet_sizes": {
+        "motion": [
+          13
+        ],
+        "line": [
+          9
+        ],
+        "barcode": [
+          5
+        ],
+        "status": [
+          10
+        ],
+        "link": [
+          1
+        ],
+        "command_result": [
+          1
+        ],
+        "scan_diag": [
+          4,
+          31,
+          46,
+          81,
+          101,
+          133,
+          153
+        ]
+      }
+    },
+    "auth_and_console": "PASS: role ACL permits scan_diag, wrong passwords and spoofing rejected; restart/cancel cleanup; legacy plus v0.4.1 selection gates",
+    "protected_motor_regression": "PASS: board/runtime safety and 5005 codec cases",
+    "stored_export_replay": "PASS: synthetic Z accepted and stopped-partial has too few extrema; batch replay is not moving physical acceptance",
+    "quit_during_diagnostic_download": "PASS: real console and authenticated broker; quit after STOP ACK waits for delayed A/A/Z waveform, all chunks, checksum verification and saved text export"
+  },
+  "stationary_hardware": {
+    "evidence": "serial-output/rtos-v0_4_1-stationary-20261108-232702/stationary-check.json",
+    "result": {
+      "checked_utc": "2026-11-08T15:27:02.102632+00:00",
+      "physical_motors_started": false,
+      "physical_track_tested": false,
+      "headless_mqtt_motion_line_diagnostic_passed": true,
+      "usb_identity_and_stopped_passed": true,
+      "mqtt_stop_ack_passed": true,
+      "scan_state": {
+        "type": "scan_diag",
+        "run": 0,
+        "record": "state",
+        "captured_ms": 48507,
+        "samples": 0,
+        "frames": 0,
+        "rejected": 0,
+        "decode_max_us": 0,
+        "adc_max_us": 127,
+        "reads": 0,
+        "queue_peak": 0,
+        "faults": 0,
+        "enabled": false,
+        "recording": false,
+        "sealed": false,
+        "attempts": 0,
+        "ready": false,
+        "attempt_overflow": 0,
+        "recoveries": 0,
+        "stop_us": 0,
+        "stop_discarded_samples": 0
+      },
+      "motion": {
+        "type": "motion",
+        "captured_ms": 48731,
+        "left_counts": 0,
+        "right_counts": 0,
+        "left_mm_s": 0,
+        "right_mm_s": 0,
+        "kind": 0,
+        "phase": 0,
+        "fault": 0,
+        "stop_reason": 0,
+        "valid": true,
+        "stop_latched": true
+      },
+      "line": {
+        "type": "line",
+        "captured_ms": 49131,
+        "raw_adc": [
+          182,
+          191,
+          281
+        ],
+        "pattern": 0,
+        "valid": true
+      }
+    },
+    "exact_reuse_console": {
+      "evidence": "serial-output/rtos-network-20261108-232920",
+      "valid_motion_packets": 67,
+      "stop_acks": 1,
+      "decode_errors": 0
+    }
+  },
+  "first_v0_4_run": {
+    "session": "serial-output/rtos-network-20261108-231026",
+    "reads": [
+      "A",
+      "A"
+    ],
+    "Z_confirmed": false,
+    "rejected": 2,
+    "recoveries": 33,
+    "capture_faults": 0,
+    "reason_not_established": true
+  },
+  "physical_v0_4_1_track_tested": false,
+  "remaining_acceptance": "One new A/A/Z run; preserve power until the stopped waveform checksum is verified. A physical Z fix is not claimed."
+}

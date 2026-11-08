@@ -105,6 +105,19 @@ static void frame(unsigned pattern,unsigned narrow,bool recovery)
         if(symbol<2){samples(191,narrow);element++;}
     }
 }
+static void diagnostic_export(const char *label)
+{
+    uint16_t run=track_scan_run();uint8_t b[SCAN_PACKET_BYTES];
+    size_t n=track_scan_state(b);assert(n);
+    printf("SCAN_FIXTURE %s ",label);for(size_t j=0;j<n;j++)printf("%02x",b[j]);puts("");
+    unsigned count=0;
+    while((n=track_scan_export(run,count,b))!=0){
+        printf("SCAN_FIXTURE %s ",label);for(size_t j=0;j<n;j++)printf("%02x",b[j]);puts("");
+        count++;assert(count<300);
+    }
+    assert(count>8);
+    assert(!track_scan_export((uint16_t)(run+1u),0,b));
+}
 static void pipeline(void)
 {
     begin_test();start();samples(191,600000);
@@ -116,11 +129,13 @@ static void pipeline(void)
     if(read_count!=3 || reads[2]!='Z')fprintf(stderr,"pipeline reads=%u status=%s phase=%d faults=%u\n",read_count,runtime.track.status,runtime.motion.phase,latest().fault);
     assert(read_count==3 && reads[2]=='Z' && armed());
     assert(runtime.track.reads==3);
+    uint8_t pending[SCAN_PACKET_BYTES];assert(!track_scan_export(track_scan_run(),0,pending));
     samples(191,65000000);motion_record_t r=latest();
     assert(r.valid && r.kind==7 && r.left_counts>32767 && r.right_counts>32767);
     printf("TRACK_FIXTURE ");uint8_t b[13];board_read(b);for(unsigned i=0;i<13;i++)printf("%02x",b[i]);puts("");
     button=true;advance(5000);stopped();button=false;advance(200000);stopped();
     board_stop(STOP_BUTTON);advance(10000);stopped();
+    diagnostic_export("AAZ");
     puts("PASS actual track pipeline: full A, half A and half Z through line recovery; extended travel; raw GP20 stop; no restart on release");
 }
 static void failures(void)
@@ -128,8 +143,11 @@ static void failures(void)
     begin_test();start();samples(191,600000);samples(2200,80000);samples(191,80000);
     button=true;advance(5000);stopped();button=false;advance(100000);stopped();
     assert(read_count==0);
+    diagnostic_export("stopped-partial");
+    uint16_t old_run=track_scan_run();
     start();samples(191,600000);frame(0x0d0,80000,false);samples(191,900000);
     assert(read_count==1 && reads[0]=='Z');
+    uint8_t old[SCAN_PACKET_BYTES];assert(!track_scan_export(old_run,0,old));
     board_stop(STOP_BUTTON);advance(10000);stopped();
     begin_test();start();adc_live=false;advance(20000);stopped();
     assert(latest().fault==MOTION_TRACK_FAULT);
@@ -171,4 +189,33 @@ static void held_boot(void)
     start();board_stop(STOP_BUTTON);advance(10000);stopped();
     puts("PASS autonomous track selection: held boot/release cannot start; fresh GP20 gesture required");
 }
-int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();return 0;}
+static void emit_packet(const char *label,const uint8_t *bytes,size_t n)
+{ assert(n && n<=SCAN_PACKET_BYTES);printf("SCAN_FIXTURE %s ",label);for(size_t i=0;i<n;i++)printf("%02x",bytes[i]);puts(""); }
+static void diagnostic_boundaries(void)
+{
+    uint8_t b[SCAN_PACKET_BYTES];uint16_t words[SCAN_CHUNK_WORDS];uint32_t hash=2166136261u;
+    for(unsigned i=0;i<16384;i++){
+        uint16_t v=(uint16_t)(i*13u+17u);hash=(hash^(v&255u))*16777619u;hash=(hash^(v>>8u))*16777619u;
+    }
+    scan_snapshot_t s={.count=16384,.motion=true,.start_us=UINT32_MAX,.duration_us=UINT32_MAX,
+        .leading_us=UINT32_MAX,.white_us=UINT32_MAX,.checksum=hash,.paper=4095,.signal_range=4095,
+        .reason=WAVE_FRAME_LIMIT,.coherent_mask=63,.geometry_mask=63};
+    emit_packet("max-wave",b,scan_snapshot_encode(UINT16_MAX,&s,b));
+    barcode_wave_profile_t p={.extrema=95,.windows=33,.best_window=32,.bad_run=28,
+        .reason=WAVE_MOTION,.bad_width=UINT32_MAX,.code39={.patterns={511,511,511},.width_reason={7,7,7},.guards=3,.separators=3,.reversed=1,.score=11}};
+    for(unsigned i=0;i<29;i++)p.runs[i]=UINT32_MAX;
+    for(unsigned i=0;i<6;i++)emit_packet("max-wave",b,scan_profile_encode(UINT16_MAX,i,&p,b));
+    for(unsigned chunk=0;chunk<256;chunk++){
+        for(unsigned i=0;i<SCAN_CHUNK_WORDS;i++)words[i]=(uint16_t)((chunk*SCAN_CHUNK_WORDS+i)*13u+17u);
+        emit_packet("max-wave",b,scan_words_encode(UINT16_MAX,chunk,words,SCAN_CHUNK_WORDS,b));
+    }
+    emit_packet("max-wave",b,scan_done_encode(UINT16_MAX,0,true,b));
+    scan_state_t state={.run=UINT16_MAX,.ms=UINT32_MAX,.samples=UINT32_MAX,.frames=UINT32_MAX,.rejected=UINT32_MAX,
+        .decode_us=UINT32_MAX,.adc_us=UINT32_MAX,.attempt_overflow=UINT32_MAX,.recoveries=UINT32_MAX,
+        .stop_us=UINT32_MAX,.events=UINT16_MAX,.queue_peak=511,.stop_discarded=511,.faults=7,.attempts=32,.sealed=true,.ready=true};
+    assert(scan_state_encode(&state,b));state.queue_peak=512;assert(!scan_state_encode(&state,b));
+    p.code39.patterns[0]=512;assert(!scan_profile_encode(1,0,&p,b));
+    assert(!scan_words_encode(1,256,words,64,b));assert(!scan_words_encode(1,0,words,65,b));
+    puts("PASS scan codec bounds: maximum 16384-word waveform, all 256 chunks, integer extremes and rejected overflow");
+}
+int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();diagnostic_boundaries();return 0;}

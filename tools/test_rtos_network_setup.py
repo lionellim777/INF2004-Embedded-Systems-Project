@@ -183,6 +183,14 @@ async def authenticated_roundtrip(settings, folder):
             if received:break
             await asyncio.sleep(.01)
         assert received==[(PREFIX+'motion',payload)]
+        # The real role ACL must permit the new binary diagnostic topic.
+        diagnostic=bytes.fromhex('05010000') # run 1, no attempts/snapshot
+        info=robot.publish(PREFIX+'scan_diag',diagnostic,qos=1)
+        await asyncio.to_thread(info.wait_for_publish,3)
+        for _ in range(100):
+            if len(received)>=2:break
+            await asyncio.sleep(.01)
+        assert received==[(PREFIX+'motion',payload),(PREFIX+'scan_diag',diagnostic)]
         info=observer.publish(PREFIX+'command/stop',b'',qos=1)
         await asyncio.to_thread(info.wait_for_publish,3)
         for _ in range(100):
@@ -192,11 +200,67 @@ async def authenticated_roundtrip(settings, folder):
         # Operator credentials cannot forge robot telemetry.
         observer.publish(PREFIX+'motion',b'forged',qos=0)
         await asyncio.sleep(.2)
-        assert received==[(PREFIX+'motion',payload)]
+        assert received==[(PREFIX+'motion',payload),(PREFIX+'scan_diag',diagnostic)]
     finally:
         for c in clients:c.disconnect()
         for c in clients:await asyncio.to_thread(c.loop_stop)
         await broker.shutdown()
+
+
+async def console_quit_drains_scan(settings,folder):
+    """Quit after stop must retain a download arriving after the STOP ACK."""
+    import rtos_network_session as session
+    import paho.mqtt.client as mqtt
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
+    local=dict(settings,broker_ip='127.0.0.1',port=port)
+    fixture=json.loads((Path(__file__).resolve().parents[1]/'build/rtos-scan-fixtures.json').read_text())['AAZ']
+    robot=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,client_id='diagnostic-fixture')
+    robot.username_pw_set(settings['robot_user'],settings['robot_password'])
+    robot.on_connect=lambda c,*args:c.subscribe(PREFIX+'command/#',qos=1)
+    robot.on_message=lambda c,u,m:c.publish(PREFIX+'command_result',b'\x07',qos=1) if m.topic.endswith('/stop') else None
+    class USBFixture:
+        def __init__(self,capture):pass
+        def poll(self):pass
+        def command(self,key):assert key=='x'
+        def close(self):pass
+    original=(session.ROOT,session.USB,sys.stdin)
+    read_fd,write_fd=os.pipe();reader=os.fdopen(read_fd);task=None;started=False
+    try:
+        session.ROOT=Path(folder)/'console-drain';session.USB=USBFixture;sys.stdin=reader
+        task=asyncio.create_task(session.run(local,Path(folder)/'fixture.uf2',folder,flash_hint=False))
+        for _ in range(100):
+            if list(session.ROOT.glob('serial-output/*/broker.log')):break
+            await asyncio.sleep(.03)
+        robot.connect_async('127.0.0.1',port);robot.loop_start();started=True
+        for _ in range(200):
+            if robot.is_connected():break
+            await asyncio.sleep(.03)
+        assert robot.is_connected()
+        await asyncio.sleep(.2)
+        async def send(payload,topic='scan_diag'):
+            info=robot.publish(PREFIX+topic,payload,qos=1)
+            await asyncio.to_thread(info.wait_for_publish,3)
+        await send(bytes(4)+(123).to_bytes(4,'little')+bytes([7,16]),'status')
+        await send(bytes.fromhex(fixture[0]))
+        await asyncio.sleep(.1);os.write(write_fd,b'q\n')
+        # This delay exceeds the ordinary final USB polling window.
+        await asyncio.sleep(1)
+        for packet in fixture[1:]:await send(bytes.fromhex(packet))
+        await asyncio.wait_for(task,8)
+        logs=list(session.ROOT.glob('serial-output/*'));assert len(logs)==1
+        summary=json.loads((logs[0]/'mqtt-summary.json').read_text())
+        assert summary['mqtt_stop_acks']==1 and summary['decode_errors']==0
+        assert summary['scan_runs']['123-1']['complete'] and summary['scan_runs']['123-1']['checksum_verified']
+        assert (logs[0]/'scan-123-1-waveform.txt').exists()
+    finally:
+        robot.disconnect()
+        if started:await asyncio.to_thread(robot.loop_stop)
+        if task is not None and not task.done():
+            task.cancel()
+            try:await task
+            except asyncio.CancelledError:pass
+        session.ROOT,session.USB,sys.stdin=original;reader.close();os.close(write_fd)
 
 
 def main():
@@ -229,6 +293,8 @@ def main():
         print('PASS actual operator console: two bounded restarts with live binary traffic, LWT and idle TCP peer; robot/observer reconnect; cancellation, cleanup and parent-EOF exit')
         asyncio.run(console_quit_during_restart(settings,folder))
         print('PASS actual console b/q input: pending restart cancelled, USB STOP requested, four capture files saved, no broker left listening')
+        asyncio.run(console_quit_drains_scan(settings,folder))
+        print('PASS actual console q download: stopped AAZ export delivered after STOP ACK, waited for all chunks, checksum verified and waveform saved')
 
 
 if __name__=='__main__':main()

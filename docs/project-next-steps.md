@@ -36,8 +36,13 @@ Implementation update, 8 November: v0.4 now links that core on
 `yixuan/rtos-track-integration`. The exact v5.63 course/waveform sources are
 unchanged. The host ADC-to-PWM pipeline tests and stationary Pico boot/network
 check pass; the [first combined moving-track check](testing/rtos-v0_4-first-track-check.md)
-is next. Treat the AAZ software simulation as software evidence, not a moving
-hardware result. No teammate terrain/obstacle branch has been merged.
+confirmed A/A but missed Z in the first moving run. Retained counters showed
+2 rejected captures, 33 recoveries and no scanner faults; aggregate counters
+cannot explain the Z miss. v0.4.1 adds [wireless attempt/waveform diagnostics](testing/rtos-v0_4_1-scan-diagnostics.md)
+without retuning the controller/decoder. Its host tests and stopped Pico check
+pass. The next one-run capture must identify the missed-Z cause before a fix
+is claimed. Treat software simulations as software evidence, not moving
+hardware results. No teammate terrain/obstacle branch has been merged.
 
 Prioritize a first integrated core during Week 11, then add the owners' ready
 navigation/terrain/obstacle modules and reserve Week 12 for course regressions,

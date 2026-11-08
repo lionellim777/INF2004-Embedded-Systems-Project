@@ -21,6 +21,8 @@ static repeating_timer_t timer;
 static barcode_signal_t filter;
 static barcode_waveform_t waveform; /* exact v5.63 decoder and geometry */
 static unsigned divider;
+static uint16_t sealed,stop_discarded;
+static uint32_t recoveries,stop_us;
 
 static void put32(uint8_t *p,uint32_t n)
 { for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(n>>(8u*i)); }
@@ -63,6 +65,7 @@ bool track_sensor_init(void)
 {
     enabled=false;requested=active=0;head=tail=event_head=event_tail=0;divider=0;
     latest=(track_ir_t){0};diagnostics=(track_diagnostics_t){0};filter=(barcode_signal_t){0};
+    sealed=stop_discarded=0;recoveries=stop_us=0;
     adc_init();adc_gpio_init(26);adc_gpio_init(28);adc_gpio_init(27);
     latest.ready=add_repeating_timer_us(-(int64_t)TRACK_SAMPLE_US,sample,NULL,&timer);
     return latest.ready;
@@ -76,12 +79,15 @@ void track_request(uint16_t token)
     uint32_t irq=save_and_disable_interrupts();
     requested=token;enabled=true;head=tail=event_head=event_tail=0;divider=0;
     diagnostics=(track_diagnostics_t){0};
+    sealed=stop_discarded=0;recoveries=stop_us=0;
     restore_interrupts(irq);
     (void)network_barcode((uint32_t)(time_us_64()/1000u),0,false,false);
 }
 void track_stop(void)
 {
-    uint32_t irq=save_and_disable_interrupts();enabled=false;head=tail=event_head=event_tail=0;
+    uint32_t irq=save_and_disable_interrupts();
+    if(enabled){stop_us=time_us_32();stop_discarded=(uint16_t)((head+QUEUE_SIZE-tail)%QUEUE_SIZE);}
+    enabled=false;head=tail=event_head=event_tail=0;
     restore_interrupts(irq);
 }
 bool track_ready(uint16_t token)
@@ -122,7 +128,18 @@ void track_service(void)
     uint32_t irq=save_and_disable_interrupts();
     uint16_t token=requested;bool running=enabled;
     restore_interrupts(irq);
-    if(!running)return;
+    if(!running){
+        /* Decoder-owned work only. Motors are already stopped. Preserve an
+         * interrupted frame as diagnostics, never promote it to a read.
+         * A new Motion request may preempt this work; do not seal that run. */
+        if(active && active==token && sealed!=token){
+            barcode_waveform_save_partial(&waveform);
+            irq=save_and_disable_interrupts();
+            if(requested==token && !enabled)sealed=token;
+            restore_interrupts(irq);
+        }
+        return;
+    }
     if(active!=token){
         barcode_waveform_begin(&waveform);active=token;
         irq=save_and_disable_interrupts();
@@ -160,4 +177,58 @@ void track_service(void)
         }
         restore_interrupts(irq);
     }
+}
+void track_recoveries(uint32_t count)
+{
+    uint32_t irq=save_and_disable_interrupts();recoveries=count;restore_interrupts(irq);
+}
+uint16_t track_scan_run(void)
+{
+    uint32_t irq=save_and_disable_interrupts();uint16_t run=requested;restore_interrupts(irq);return run;
+}
+size_t track_scan_state(uint8_t out[SCAN_PACKET_BYTES])
+{
+    uint32_t irq=save_and_disable_interrupts();bool ready=active==requested && requested!=0;
+    scan_state_t s={.run=requested,.ms=(uint32_t)(time_us_64()/1000u),
+        .samples=diagnostics.samples,.frames=diagnostics.frames,.rejected=diagnostics.rejected,
+        .decode_us=diagnostics.decode_max_us,.adc_us=diagnostics.adc_max_us,
+        .events=diagnostics.events,.queue_peak=diagnostics.queue_peak,.faults=diagnostics.faults,
+        .enabled=enabled,.recording=diagnostics.recording,.sealed=ready && sealed==requested,
+        .ready=ready,.attempts=ready?(uint8_t)waveform.attempt_count:0,
+        .attempt_overflow=ready?waveform.attempt_overflow:0,.recoveries=recoveries,
+        .stop_us=stop_us,.stop_discarded=stop_discarded};
+    restore_interrupts(irq);return scan_state_encode(&s,out);
+}
+size_t track_scan_export(uint16_t run,unsigned index,uint8_t out[SCAN_PACKET_BYTES])
+{
+    union { barcode_wave_attempt_t attempt;barcode_wave_profile_t profile;uint16_t words[SCAN_CHUNK_WORDS]; } copy;
+    scan_snapshot_t meta={0};unsigned kind=SCAN_DONE,item=0,count=0,attempts=0;bool snapshot=false;
+    uint32_t irq=save_and_disable_interrupts();
+    if(!run || requested!=run || enabled || sealed!=run){restore_interrupts(irq);return 0;}
+    attempts=waveform.attempt_count;snapshot=waveform.saved.count!=0;
+    if(index<attempts){kind=SCAN_ATTEMPT;item=index;copy.attempt=waveform.attempts[item];}
+    else {
+        index-=attempts;const barcode_wave_snapshot_t *s=&waveform.saved;
+        if(snapshot && index==0){
+            kind=SCAN_SNAPSHOT;
+            meta=(scan_snapshot_t){.start_us=s->start_us,.leading_us=s->leading_us,.white_us=s->white_us,
+                .duration_us=s->duration_us,.checksum=s->checksum,.count=s->count,.paper=s->paper,
+                .signal_range=s->signal_range,.reason=s->reason,.coherent_mask=s->coherent_mask,
+                .geometry_mask=s->geometry_mask,.letter=s->letter,.motion=s->motion};
+        }else if(snapshot && index<=6u){kind=SCAN_PROFILE;item=index-1u;copy.profile=s->profile[item];}
+        else {
+            unsigned chunks=(s->count+SCAN_CHUNK_WORDS-1u)/SCAN_CHUNK_WORDS;
+            if(snapshot && index-7u<chunks){
+                kind=SCAN_WORDS;item=index-7u;count=s->count-item*SCAN_CHUNK_WORDS;
+                if(count>SCAN_CHUNK_WORDS)count=SCAN_CHUNK_WORDS;
+                memcpy(copy.words,s->sample+item*SCAN_CHUNK_WORDS,count*sizeof(uint16_t));
+            }else if(index!=(snapshot?chunks+7u:0u)){restore_interrupts(irq);return 0;}
+        }
+    }
+    restore_interrupts(irq);
+    if(kind==SCAN_ATTEMPT)return scan_attempt_encode(run,item,&copy.attempt,out);
+    if(kind==SCAN_SNAPSHOT)return scan_snapshot_encode(run,&meta,out);
+    if(kind==SCAN_PROFILE)return scan_profile_encode(run,item,&copy.profile,out);
+    if(kind==SCAN_WORDS)return scan_words_encode(run,item,copy.words,count,out);
+    return scan_done_encode(run,attempts,snapshot,out);
 }

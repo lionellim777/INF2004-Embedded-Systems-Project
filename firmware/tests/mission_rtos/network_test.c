@@ -11,9 +11,20 @@ static int link=CYW43_LINK_UP;
 static bool client_connected=true;
 static err_t publication_error, subscription_error;
 static unsigned stops, transmitted;
+static uint16_t mock_scan_run=1;
+static mqtt_request_cb_t pending_ack;static void *pending_context;
+static bool mock_scan_stopped;
 static int init_result,pm_result;
 static unsigned sta_calls,pm_calls;
-static struct { char topic[128]; uint8_t bytes[16]; size_t length; } sent[128];
+static struct { char topic[128]; uint8_t bytes[SCAN_PACKET_BYTES]; size_t length; } sent[256];
+uint16_t track_scan_run(void){return mock_scan_run;}
+size_t track_scan_state(uint8_t out[SCAN_PACKET_BYTES])
+{ scan_state_t s={.run=mock_scan_run,.ms=1234,.ready=true,.sealed=mock_scan_stopped,.recoveries=33};return scan_state_encode(&s,out); }
+size_t track_scan_export(uint16_t run,unsigned index,uint8_t out[SCAN_PACKET_BYTES])
+{
+ if(!mock_scan_stopped || run!=mock_scan_run || index>0)return 0;
+ return scan_done_encode(run,0,false,out);
+}
 uint32_t save_and_disable_interrupts(void) { return 0; }
 void restore_interrupts(uint32_t s) { (void)s; }
 int cyw43_arch_init(void) { return init_result; }
@@ -24,7 +35,7 @@ void cyw43_arch_poll(void) {}
 int cyw43_arch_wifi_connect_async(const char *s,const char *p,uint32_t auth) { (void)s;(void)p;(void)auth;return 0; }
 int cyw43_tcpip_link_status(cyw43_t *c,int itf) { (void)c;(void)itf;return link; }
 mqtt_client_t *mqtt_client_new(void) { return &fake_client; }
-void mqtt_disconnect(mqtt_client_t *c) { (void)c;client_connected=false; }
+void mqtt_disconnect(mqtt_client_t *c) { (void)c;client_connected=false;if(pending_ack){mqtt_request_cb_t cb=pending_ack;pending_ack=NULL;cb(pending_context,ERR_ARG);} }
 bool mqtt_client_is_connected(mqtt_client_t *c) { (void)c;return client_connected; }
 void mqtt_set_inpub_callback(mqtt_client_t *c,void (*a)(void *,const char *,u32_t),void (*b)(void *,const u8_t *,u16_t,u8_t),void *ctx)
 { (void)c;(void)a;(void)b;(void)ctx; }
@@ -38,10 +49,12 @@ err_t mqtt_subscribe(mqtt_client_t *c,const char *t,uint8_t qos,mqtt_request_cb_
 { (void)c;(void)t;assert(qos==1);cb(ctx,subscription_error);return subscription_error; }
 err_t mqtt_publish(mqtt_client_t *c,const char *t,const void *p,u16_t n,u8_t qos,u8_t retain,mqtt_request_cb_t cb,void *ctx)
 {
- (void)c;(void)retain;(void)cb;(void)ctx;assert(qos==0);assert(n<=16);
+ (void)c;(void)retain;assert(qos<=1);assert(n<=SCAN_PACKET_BYTES);
  if (publication_error) return publication_error;
- assert(transmitted<128);snprintf(sent[transmitted].topic,128,"%s",t);
- memcpy(sent[transmitted].bytes,p,n);sent[transmitted].length=n;++transmitted;return ERR_OK;
+ assert(transmitted<256);snprintf(sent[transmitted].topic,128,"%s",t);
+ memcpy(sent[transmitted].bytes,p,n);sent[transmitted].length=n;++transmitted;
+ if(qos){assert(cb && !pending_ack);pending_ack=cb;pending_context=ctx;}
+ return ERR_OK;
 }
 int ipaddr_aton(const char *s,ip_addr_t *a) { (void)s;a->addr=1;return 1; }
 uint32_t get_rand_32(void) { return 1; }
@@ -119,6 +132,22 @@ int main(void)
   flags=INITIALIZED;state(NETWORK_JOINING,20000);link=diagnostic;
   step(20001);assert(network_wifi_link()==diagnostic);
  }
+ subscription_error=ERR_OK;online(30000);mock_scan_stopped=true;step(31000);assert(scan_pending && scan_index==0 && pending_ack);
+ unsigned queued=transmitted;step(31005);assert(transmitted==queued && scan_index==0);
+ pending_ack=NULL;scan_ack(NULL,ERR_ARG);assert(!scan_pending && scan_index==0);
+ step(31010);assert(pending_ack && scan_index==0);
+ pending_ack=NULL;scan_ack(NULL,ERR_OK);assert(!scan_pending && scan_index==1);
+ step(31015);assert(scan_index==1);
+ /* A new run while an old ACK is outstanding cannot skip its first record. */
+ mock_scan_run=2;step(31020);assert(scan_pending && scan_index==0);
+ mock_scan_run=3;step(31025);assert(scan_run==3 && scan_index==0);
+ pending_ack=NULL;scan_ack(NULL,ERR_OK);assert(scan_index==0);
+ publication_error=ERR_ARG;step(31030);assert(!scan_pending && scan_index==0);
+ publication_error=ERR_OK;step(31035);assert(scan_pending);
+ client_connected=false;step(31040);assert(!scan_pending && scan_index==0);
+ online(32000);step(33000);assert(scan_pending && scan_index==0);
+ pending_ack=NULL;scan_ack(NULL,ERR_OK);assert(scan_index==1);
+ puts("PASS scan diagnostic network: QoS1 ACK ordering, backpressure retry, old-run ACK isolation and reconnect replay");
  puts("PASS actual MQTT service: explicit byte lengths, Z preservation, STOP-only commands, no start topic, period changes, backpressure, reconnect, subscription failure, clock wrap, signed Wi-Fi diagnostics");
  for(unsigned i=0;i<transmitted;++i) {
   printf("PACKET %s ",sent[i].topic);

@@ -2,6 +2,7 @@
 #define RTOS_TRACK_SENSOR_H
 #include <stdbool.h>
 #include <stdint.h>
+#include "scan_diagnostic.h"
 
 /* One ADC IRQ producer, one decoder-task consumer. IRQ code never logs,
  * decodes, waits on Wi-Fi or calls the kernel. Tokens isolate stopped runs. */
@@ -27,4 +28,10 @@ bool track_event_take(uint16_t token,track_event_t *out);
 void track_diagnostics(track_diagnostics_t *out);
 /* Decoder task only; bounded queue drain. Motion may preempt any decode. */
 void track_service(void);
+void track_recoveries(uint32_t count);
+uint16_t track_scan_run(void);
+size_t track_scan_state(uint8_t out[SCAN_PACKET_BYTES]);
+/* Only sealed/stopped captures can be exported. Copy native data under a
+ * short IRQ lock, serialize outside it. Run token prevents mixed captures. */
+size_t track_scan_export(uint16_t run,unsigned index,uint8_t out[SCAN_PACKET_BYTES]);
 #endif

@@ -14,6 +14,32 @@
 #include "lwip/apps/mqtt.h"
 #include "lwip/ip_addr.h"
 #include <string.h>
+static mqtt_client_t *client;
+#ifdef RTOS_TRACK
+#include "track_sensor.h"
+static const char scan_topic[]=RTOS_TOPIC_PREFIX "scan_diag";
+static uint16_t scan_run,scan_flight_run;
+static unsigned scan_index;
+static bool scan_pending;
+static void scan_ack(void *context,err_t error)
+{
+    (void)context;
+    if(scan_pending && error==ERR_OK && scan_flight_run==scan_run)scan_index++;
+    scan_pending=false;
+}
+static void scan_export(void)
+{
+    uint16_t run=track_scan_run();
+    if(run!=scan_run){scan_run=run;scan_index=0;}
+    if(scan_pending)return;
+    uint8_t bytes[SCAN_PACKET_BYTES];size_t length=track_scan_export(run,scan_index,bytes);
+    if(!length)return;
+    scan_flight_run=run;scan_pending=true;
+    /* One QoS1 request in flight. Advance only on PUBACK; reconnect starts a
+     * replay. This low-priority task does no waveform work while driving. */
+    if(mqtt_publish(client,scan_topic,bytes,(u16_t)length,1,0,scan_ack,NULL)!=ERR_OK)scan_pending=false;
+}
+#endif
 
 enum { INITIALIZED=1u, CONNECTED=2u, FAILED=4u, FORCE_STATUS=8u,
        SUB_SHIFT=4u, SUB_MASK=48u, RESULT_PENDING=64u, RETRY_SHIFT=7u, RETRY_MASK=896u,
@@ -31,7 +57,6 @@ static volatile int8_t wifi_pm_result=INT8_MIN; /* not attempted, then SDK resul
 static uint32_t state_ms, status_ms, motion_ms, online_ms, boot_id;
 static uint8_t barcode_latest[BARCODE_RECORD_BYTES],line_latest[LINE_RECORD_BYTES], result;
 static binary_command_frame_t command_frame;
-static mqtt_client_t *client;
 static struct mqtt_connect_client_info_t info;
 static ip_addr_t address;
 static const char motion_topic[]=RTOS_TOPIC_PREFIX "motion";
@@ -85,6 +110,9 @@ static void fail(uint32_t now,uint8_t code)
     error_code(code); /* cancellation callbacks must not replace the root cause */
     command_frame.state=0;
     state(NETWORK_RETRYING,now);
+#ifdef RTOS_TRACK
+    scan_pending=false;scan_index=0;
+#endif
 }
 static void connection(mqtt_client_t *c,void *context,mqtt_connection_status_t result_code)
 {
@@ -182,6 +210,9 @@ static void step(uint32_t now)
             state(NETWORK_ONLINE,now); online_ms=now; status_ms=now; motion_ms=now;
             flags|=FORCE_STATUS;
             error_code(0);
+#ifdef RTOS_TRACK
+            scan_index=0;scan_pending=false;
+#endif
         } else if ((uint32_t)(now-state_ms)>=10000u) fail(now,10);
     } else if (current==NETWORK_ONLINE) {
         if (!mqtt_client_is_connected(client)) { fail(now,11); return; }
@@ -199,6 +230,10 @@ static void step(uint32_t now)
                 flags&=(uint16_t)~FORCE_STATUS; status_ms=now;
             }
             (void)publish(barcode_topic,barcode,sizeof barcode,0);
+#ifdef RTOS_TRACK
+            uint8_t scan[SCAN_PACKET_BYTES];size_t scan_length=track_scan_state(scan);
+            if(scan_length)(void)publish(scan_topic,scan,scan_length,0);
+#endif
         }
         if (flags&RESULT_PENDING)
             if (publish(result_topic,&result,1,0)) flags&=(uint16_t)~RESULT_PENDING;
@@ -208,6 +243,9 @@ static void step(uint32_t now)
             uint8_t line[LINE_RECORD_BYTES];read_line(line);
             (void)publish(line_topic,line,sizeof line,0);
         }
+#ifdef RTOS_TRACK
+        scan_export();
+#endif
     } else if (current==NETWORK_RETRYING) {
         unsigned shift=(flags&RETRY_MASK)>>RETRY_SHIFT;
         uint32_t delay=1000u<<shift; if (delay>30000u) delay=30000u;

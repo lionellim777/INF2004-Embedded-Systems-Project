@@ -56,6 +56,7 @@ line_check_output_t track_runtime_step(track_runtime_t *t,encoder_sample_t enc,u
     int32_t levels[3]={level(ir.raw[0],191,3164),level(ir.raw[1],178,2908),level(ir.raw[2],141,842)};
     course_center_level(&t->course,levels[1]);course_right_level(&t->course,levels[2]);
     line_check_output_t out=course_step(&t->course,ir_roles(levels),enc,now);
+    track_recoveries(t->course.recoveries);
     t->status=out.state;return out;
 }
 void track_runtime_end(void) { track_stop(); }

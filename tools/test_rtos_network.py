@@ -88,10 +88,10 @@ def main():
             file=temp/path;file.parent.mkdir(parents=True,exist_ok=True)
             file.write_text('#include "network_test_sdk.h"\n')
         (temp/"network_settings.h").write_text((APP/"network_settings.example.h").read_text())
-        subprocess.run([shutil.which("clang"),"-std=c11","-g","-O1","-Wall","-Wextra","-Werror",
+        subprocess.run([shutil.which("clang"),"-std=c11","-g","-O1","-Wall","-Wextra","-Werror","-DRTOS_TRACK=1",
                         "-fsanitize=address,undefined","-fno-omit-frame-pointer",
-                        "-I",str(APP),"-I",str(TEST),"-I",str(temp),str(TEST/"network_test.c"),
-                        str(APP/"binary_protocol.c"),str(APP/"motion_record.c"),"-o",str(temp/"test")],check=True)
+                        "-I",str(APP),"-I",str(ROOT/'firmware/app/robot_firmware'),"-I",str(TEST),"-I",str(temp),str(TEST/"network_test.c"),
+                        str(APP/"binary_protocol.c"),str(APP/"motion_record.c"),str(APP/'scan_diagnostic.c'),"-o",str(temp/"test")],check=True)
         output=subprocess.check_output([str(temp/"test")],text=True)
         print("\n".join(line for line in output.splitlines() if line.startswith("PASS")))
         packets=[]
@@ -102,6 +102,10 @@ def main():
         assert any(decode(t,p).get("barcode")=="Z" for t,p in packets)
         assert any(len(p)==13 and b"\0" in p for t,p in packets)
         assert any(decode(t,p).get('raw_adc')==[191,2908,141] for t,p in packets)
+        fixtures=ROOT/'build/rtos-scan-fixtures.json'
+        if not fixtures.exists():raise RuntimeError('Run tools/test_rtos_track.py first for actual scan export fixtures')
+        for label in ('AAZ','stopped-partial','max-wave'):
+            packets.extend(('inf2004/aai10/robot1/v1/scan_diag',bytes.fromhex(h)) for h in json.loads(fixtures.read_text())[label])
         for topic,data in [("inf2004/aai10/robot1/v1/barcode",b"\0"*4+b"\xff"),
                            ("inf2004/aai10/robot1/v1/status",b"\xff"*10),
                            ("inf2004/aai10/robot1/v1/motion",b"\0")]:
@@ -113,7 +117,7 @@ def main():
                     local_broker_binary_roundtrip_packets=count,hardware_network_tested=False,
                     local_broker_restart_cycles=1,
                     packet_sizes={kind:sorted({len(p) for t,p in packets if t.endswith('/'+kind)})
-                                  for kind in ["motion","line","barcode","status","link","command_result"]})
+                                  for kind in ["motion","line","barcode","status","link","command_result","scan_diag"]})
         (ROOT/"build/rtos-network-tests.json").write_text(json.dumps(result,indent=2)+"\n")
         print(f"PASS local MQTT broker: {count} binary packets retained byte-for-byte, including Z and zero bytes")
 

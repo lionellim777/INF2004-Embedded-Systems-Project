@@ -15,6 +15,9 @@ def decode(topic, payload):
     if "/v1/" not in topic:
         raise ValueError("Unknown schema version")
     kind = topic.rsplit("/", 1)[-1]
+    if kind=='scan_diag':
+        from rtos_scan_capture import decode_scan
+        return decode_scan(payload)
     if kind == "motion":
         return dict(type=kind, **decode_motion(payload))
     if kind=='line':

@@ -76,7 +76,7 @@ def broker_config(settings, folder):
                 # amqtt0.11.3 Config calls the subscribe ACL 'acl'.
                 "amqtt.plugins.topic_checking.TopicAccessControlListPlugin": {
                     "acl": {robot: [prefix+"command/#"], operator: [prefix+"+"]},
-                    "publish_acl": {robot: [prefix+name for name in ("motion","line","barcode","status","link","command_result")],
+                    "publish_acl": {robot: [prefix+name for name in ("motion","line","barcode","status","link","command_result","scan_diag")],
                                     operator: [prefix+"command/#"]}}}}
 
 
@@ -99,9 +99,9 @@ def prepare(folder=PRIVATE):
     write_settings(settings, folder)
     print("Local settings saved. Passwords are not printed or added to git.")
     print("Building the configured Wi-Fi firmware; this may take a moment...")
-    env = dict(os.environ, ROBOT_BUILD_DIR=str(ROOT/"build/rtos-network-v0_4"),
+    env = dict(os.environ, ROBOT_BUILD_DIR=str(ROOT/"build/rtos-network-v0_4_1"),
                ROBOT_NETWORK_SETTINGS=str(folder/"network_settings.h"),
-               ROBOT_OUTPUT_NAME="robocar_rtos_network_v0_4.uf2")
+               ROBOT_OUTPUT_NAME="robocar_rtos_network_v0_4_1.uf2")
     log = folder / "build.log"
     with log.open("w") as output:
         os.chmod(log, 0o600)
@@ -109,12 +109,12 @@ def prepare(folder=PRIVATE):
                                 env=env, stdout=output, stderr=subprocess.STDOUT)
     if result.returncode:
         raise RuntimeError(f"Build failed; private build log: {log}")
-    image = ROOT / "build/rtos-network-v0_4/robocar_rtos_network_v0_4.uf2"
+    image = ROOT / "build/rtos-network-v0_4_1/robocar_rtos_network_v0_4_1.uf2"
     private_write(folder / "firmware-info.json", json.dumps(dict(file=str(image),
         sha256=hashlib.sha256(image.read_bytes()).hexdigest(),broker_ip=settings["broker_ip"],
         settings_sha256=hashlib.sha256(json.dumps(settings,sort_keys=True).encode()).hexdigest(),
         port=settings["port"],network_configured=True,credentials_embedded=True,
-        firmware_version='0.4',track_integration=True,requires_usb_logger=False,
+        firmware_version='0.4.1',track_integration=True,scan_diagnostics=True,requires_usb_logger=False,
         default_selection='track_scan'), indent=2)+'\n')
     print("Firmware ready:", image)
     return settings, image

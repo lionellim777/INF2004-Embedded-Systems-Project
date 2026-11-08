@@ -31,7 +31,7 @@ class Capture:
         self.raw.write(line + "\n")
         info = re.search(r"\[RTOS_INFO\] version=(\S+)", line)
         if info:
-            self.ready = info[1] in ("0.2", "0.3", "0.4")
+            self.ready = info[1] in ("0.2", "0.3", "0.4", "0.4.1")
             self.summary["firmware_version"] = info[1]
         match = re.search(r"\[MOTION_V1\] ([0-9a-fA-F]+) gap_us=(\d+)", line)
         if match:
@@ -79,8 +79,8 @@ class Capture:
             raise ValueError("Use f, l, r, u, x or q")
         if not self.ready:
             raise ValueError("Waiting for supported RTOS identity; no commands sent")
-        if key=='t' and self.summary.get('firmware_version')!='0.4':
-            raise ValueError('Track mode requires the configured v0.4 firmware')
+        if key=='t' and self.summary.get('firmware_version') not in ('0.4','0.4.1'):
+            raise ValueError('Track mode requires the configured v0.4 or newer track firmware')
         if key in "flrut" and self.latest and not self.latest["stop_latched"]:
             raise ValueError("Stop the current test before choosing another")
         self.summary["commands_requested"].append(key)

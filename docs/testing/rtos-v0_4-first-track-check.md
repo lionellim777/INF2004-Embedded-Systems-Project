@@ -1,5 +1,8 @@
 # v0.4 first combined RTOS track check
 
+Historical initial checklist. The first run decoded A/A but missed Z. Use the
+[v0.4.1 diagnostic run instructions](rtos-v0_4_1-scan-diagnostics.md) next.
+
 This build combines the unmodified v5.63 centre/right line controller and grey
 waveform decoder with real encoder data, binary MQTT and protected motor output.
 Terrain/hump and obstacle manoeuvring are not included. Y/Z actions remain

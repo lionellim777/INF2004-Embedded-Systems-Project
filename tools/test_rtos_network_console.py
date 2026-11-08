@@ -107,6 +107,8 @@ def main():
         else:raise AssertionError('Track mode accepted on old firmware')
         capture.line('[RTOS_INFO] version=0.4 network_state=1 network_error=0 uptime_ms=3')
         usb.command('t');assert writes[-1]==b't'
+        capture.line('[RTOS_INFO] version=0.4.1 network_state=1 network_error=0 uptime_ms=4')
+        usb.command('t');assert writes[-1]==b't'
         for key in ['start','go','s']:
             try:usb.command(key)
             except ValueError:pass
