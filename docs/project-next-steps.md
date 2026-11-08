@@ -1,4 +1,4 @@
-# Remaining project work —8 November2026
+# Remaining project work —9 November2026
 
 Baseline: v5.63. Barcode decoder implementation is complete and physically
 validated on the current full-A / half-A / right-bend half-Z setup: two AAZ
@@ -24,36 +24,33 @@ final upload cutoff and any later LMS changes have not been checked. Confirm
 that the Week 10 hurdle has already been completed; completion is not evidenced
 by a functioning robot alone.
 
-The next implementation milestone is a lean RTOS mission target that combines
-existing line following, the validated v5.63 barcode acquisition/decoder,
-real motion snapshots, binary MQTT and protected stop handling. The first
-physical acceptance should exercise the known full-A / half-A / bend half-Z
-track with networking active. It can be prepared before the terrain/obstacle
-owners finish their algorithms; their interfaces and motor ownership must be
-agreed before connecting them. Keep the accepted v5.63 build available.
+The combined RTOS core is now implemented on `yixuan/rtos-track-integration`.
+RTOS v0.4.2 at `916c0dc` has [one verified physical A/A/Z pass](testing/rtos-v0_4_2-track-acceptance.json):
+full A at 42.872s, half A at 52.858s and bend Z at 65.448s, with no scanner or
+controller fault. The waveform download is complete and checksum-verified.
+During the Z capture, the recovery counter rose from 11 to 16 in observed
+states. Both A captures had no observed line recovery. This establishes one
+combined line/barcode/motion/MQTT run, not repeatability or full-A recovery
+acceptance. The Z read used the existing geometry path; the new short-black
+path is separately verified by replaying the prior failed capture.
 
-Implementation update, 8 November: v0.4 now links that core on
-`yixuan/rtos-track-integration`. The exact v5.63 course/waveform sources are
-unchanged. The host ADC-to-PWM pipeline tests and stationary Pico boot/network
-check pass; the [first combined moving-track check](testing/rtos-v0_4-first-track-check.md)
-confirmed A/A but missed Z in the first moving run. Retained counters showed
-2 rejected captures, 33 recoveries and no scanner faults; aggregate counters
-cannot explain the Z miss. v0.4.1 adds [wireless attempt/waveform diagnostics](testing/rtos-v0_4_1-scan-diagnostics.md)
-without retuning the controller/decoder. Its host tests and stopped Pico check
-pass. The next one-run capture must identify the missed-Z cause before a fix
-is claimed. Treat software simulations as software evidence, not moving
-hardware results. No teammate terrain/obstacle branch has been merged.
+The next software work is runtime timing/stack/stop evidence and the remaining
+application representation review. [Current ARM/linker/payload measurements](testing/representation/20261109-rtos-v0_4_2-after.json)
+are recorded: BSS205868, a same-semantics sample queue reduction of1024bytes,
+and real binary A–Z transport. The temporary first-failure cache consumes32KiB
+plus metadata; remove or reduce it after repeatability/full-A recovery checks.
+Static SRAM remainder is not measured runtime heap or stack headroom. Network
+arrival gaps reached2.22s in this pass, so delivery timing and local controller
+deadlines must be measured separately.
 
-The next v0.4.1 run confirmed half A only. Its complete bend-Z waveform exposes
-a short-black interval floor rejecting a frame the existing bias-compensated
-validator can read. [v0.4.2](testing/rtos-v0_4_2-barcode-recovery.md) opts the RTOS
-target into bounded two-profile strict validation for one short black interval;
-the saved bend Z passes both batch and captured-cadence replay. Full A had an
-extra optical transition pair; its raw waveform must be retained to diagnose
-that separately. v0.4.2 preserves the first failed capture. Physical acceptance
-is pending; this is not a claim of a completed RTOS AAZ regression.
+Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while
+members finish their portions. It is a proposal, not a team agreement. No
+teammate module is merged, and no changes are needed to their algorithms now.
+Keep the accepted v5.63 release and first-passing v0.4.2 image/source intact.
+The car can remain powered off during this preparation. Later, repeat the
+unchanged A/A/Z build and explicitly cover full A during recovery.
 
-Prioritize a first integrated core during Week 11, then add the owners' ready
+The first integrated core is demonstrated. Next add the owners' ready
 navigation/terrain/obstacle modules and reserve Week 12 for course regressions,
 minimum-bit measurements and assessment evidence. These are planning targets,
 not promised delivery dates; Week 12 also contains the individual assessments.
@@ -77,15 +74,15 @@ mission/Buddy requirements were checked against the user-supplied
 | Barcode-driven navigation/junctions | A-Z decoder, encoder turns, configurable Y/Z actions; standalone calibration | Agree final command mapping and execute left/right/straight/U-turns and required junction choices on the actual course. Current AAZ acceptance used Straight actions; A events were unmapped. |
 | Hump/peak measurement | Main counts humps and highest pitch; `origin/buddy4-terrain` adds height-validity/data/estimation support | Integrate appropriate height/motion producer, validate actual humps and highest peak in the required units while driving. Pitch angle is not physical height. |
 | MQTT and planned µT-Kernel integration | `origin/wifi-buddy-1` contains task/bridge API, telemetry schema and recorded standalone MQTT/heartbeat/command/reconnect observations | Connect real robot producers, preserve motor/sensor deadlines during transmission/reconnect, and verify the combined RTOS robot on hardware. Do not reimplement existing Buddy1 work blindly. |
-| RTOS motion and binary MQTT foundation | [Separate µT-Kernel target](../firmware/app/mission_rtos/README.md); [v0.2 USB bench accepted](testing/rtos-v0_2-usb-acceptance.json). [v0.3 user network bench complete](testing/rtos-v0_3-user-network-bench-acceptance.json); [live broker recovery accepted](testing/rtos-v0_3-broker-restart-recovery.json) without a Pico reset or cleared stop latch | Integrate real line/barcode and the other mission producers; confirm physical stops, control timing and stack margins under load. Whole-application packing remains pending. |
-| Minimum-bit representation | [Initial target inventory and measured baseline](representation-audit.md):658 direct fields across59 types; actual RAM and synthetic serialized-message sizes | Complete range/lifetime/ownership decisions throughout application data; implement safe packing and binary MQTT; measure after-change RAM/messages and verify functionality/timing. The current Wi-Fi serializer changes Z to `?`. |
+| RTOS motion and binary MQTT foundation | [Separate µT-Kernel target](../firmware/app/mission_rtos/README.md); [v0.2 USB bench accepted](testing/rtos-v0_2-usb-acceptance.json). [v0.3 user network bench complete](testing/rtos-v0_3-user-network-bench-acceptance.json); [live broker recovery accepted](testing/rtos-v0_3-broker-restart-recovery.json) without a Pico reset or cleared stop latch | Real line/barcode/motion are integrated and one A/A/Z pass is verified. Measure loaded stop/control timing and stack margins; add other producers through reviewed adapters. Whole-application packing remains pending. |
+| Minimum-bit representation | [Initial target inventory and measured baseline](representation-audit.md):658 direct fields across59 types; actual RAM and synthetic serialized-message sizes | Complete range/lifetime/ownership decisions throughout application data; implement safe packing and binary MQTT; measure after-change RAM/messages and verify functionality/timing. The legacy Buddy1 JSON serializer changes Z to `?`; the current RTOS binary codec carries A–Z correctly. |
 | One mission and memory/data integration | Calibration-mode controller, separate barcode and avoidance modes; packed-data work on Buddy branches | One automatically coordinated run for following, decoding/actions, terrain, avoidance/rejoin and telemetry. Barcode acquisition is currently disabled in obstacle mode. Reconcile peripheral ownership, timebases, task/core use and data formats. |
 | Final acceptance/demo evidence | Versioned builds, host checks and individual hardware records | Repeated whole-course tests, communications loss/recovery and fault handling; record final firmware, configuration, video/logs and required report/demo evidence. |
 
 Current allocation: hump work is with the terrain member, barcode-command
 execution is with another member, and obstacle integration is on hold pending
-Lionel's reply. Keep v5.63 barcode logic unchanged. The work available now is
-representation/RTOS preparation and the shared communication/motion interfaces;
+Lionel's reply. Preserve the accepted v5.63 release and the passing v0.4.2 core. The work available now is
+runtime timing/stack measurements, representation coverage and the shared communication/motion interfaces;
 final physical mission acceptance waits for the real producers. Follow the
 [audit and integration sequence](representation-audit.md#next-implementation-sequence).
 
@@ -109,6 +106,7 @@ The supplied Week1 lecture transcript explicitly requires µT-Kernel on Pico.
 Whether the newer supplied SMP port/configuration is mandatory still needs
 confirmation against the current module instructions. Change Requirement1
 explicitly requires compact binary MQTT and application-wide minimum-bit
-representations, with measured Week13 evidence. The existing JSON interface
-does not satisfy that binary-payload requirement. This review checks supplied
+representations, with measured Week13 evidence. The legacy JSON interface
+does not satisfy that binary-payload requirement; the separate RTOS target now
+implements binary transport, with whole-application minimum-bit coverage still open. This review checks supplied
 course files and fetched code, not the live LMS or teammates' unpushed work.

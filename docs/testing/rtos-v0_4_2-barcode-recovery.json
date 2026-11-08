@@ -130,5 +130,6 @@
     "One new A/A/Z physical pass and saved diagnostics.",
     "Full A extra-transition cause still requires the newly retained raw waveform if failure repeats.",
     "Measure loaded timing/stack and remove extra debug cache before final mission memory optimization."
-  ]
+  ],
+  "later_physical_acceptance_report": "rtos-v0_4_2-track-acceptance.json"
 }

@@ -2,7 +2,17 @@
 
 Recorded 7 November 2026. Status: **before-change measurements complete for the
 scope below; change-requirement compliance and RTOS integration remain open**.
-The validated v5.63 firmware and decoder have not been modified or flashed.
+The validated v5.63 firmware and decoder have not been modified or flashed. This paragraph
+records the 7 November baseline, not current integration status.
+
+Update, 9 November: the [RTOS after measurements](testing/representation/20261109-rtos-v0_4_2-after.json)
+record actual v0.4.2 ARM layouts, linker allocations and real binary payloads.
+[One physical A/A/Z pass](testing/rtos-v0_4_2-track-acceptance.json) now verifies
+real line/barcode/motion/MQTT under the kernel. The same-semantics sample queue
+uses7168bytes versus8192bytes, saving1024bytes. Whole-image RAM changes reflect
+different features, including a temporary32KiB first-failure diagnostic cache;
+they do not establish whole-application minimum-bit compliance. Runtime stack
+and loaded stop/control timing remain open.
 
 ## Evidence and scope
 

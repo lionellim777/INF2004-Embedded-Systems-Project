@@ -1,5 +1,11 @@
 # µT-Kernel track integration v0.4.2
 
+One [physical RTOS A/A/Z pass is verified](../../../docs/testing/rtos-v0_4_2-track-acceptance.json),
+including Z during continued line recovery. Preserve this image/source while
+preparing timing/stack measurements and the [module handoff draft](../../../docs/rtos-module-handoff.md).
+Repeatability and full A during recovery remain open; no new flash is required
+to record this acceptance.
+
 This separate Pico W target starts the real µT-Kernel scheduler and uses the
 existing quadrature encoder driver and calibrated motion controller. It is a
 first combined line-following/barcode/motion/MQTT build. Terrain and obstacle
