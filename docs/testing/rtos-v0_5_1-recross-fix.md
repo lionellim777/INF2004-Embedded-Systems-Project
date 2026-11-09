@@ -1,9 +1,10 @@
 # v0.5.1: use the latest crossing during barcode recovery
 
 Branch `yixuan/rtos-barcode-recross`, based on the verified v0.5 runtime branch.
-The candidate is built and software-tested; installation and a new physical
-full-A recovery pass remain pending. The installed v0.5, first-passing v0.4.2
-and accepted v5.63 images are preserved. See the
+The candidate is built, software-tested and installed with flash readback
+verification. [Stationary USB/MQTT checks pass](rtos-v0_5_1-stationary-acceptance.json);
+a new physical full-A recovery pass remains pending. The previous v0.5,
+first-passing v0.4.2 and accepted v5.63 images are preserved. See the
 [candidate build/replay report](rtos-v0_5_1-recross-fix.json).
 
 ## What the loaded v0.5 run establishes
@@ -71,13 +72,14 @@ as a zero-time duplicate ADC callback. Sampling-gap rejection remains intact.
 
 ## Next physical action
 
-The previous capture is saved, so its power can now be removed. With the car
-stopped, motor battery disconnected and both powered wheels raised, connect
-the Pico directly to the Mac by micro-USB normally. No BOOTSEL or GP20 press.
-Install/verify v0.5.1 over USB and check idle state, fault0 and all stack rows
-before updating private installed-image metadata. No motor start is sent.
+Installation/check completed on9 November, source`924eefe`, session
+`rtos-v0_5_1-stationary-20261109-103906`. Flash readback passed. USB and MQTT
+identified v0.5.1, all four task observations arrived with intact low markers,
+and the controller remained idle/stop-latched/fault0. Idle MQTT STOP was
+acknowledged. Private installed-image metadata now identifies the checked
+image; the earlier v0.5 image and metadata are backed up. No motor start was sent.
 
-After that check, repeat the [wireless track procedure](rtos-v0_5-track-check.md)
+Next repeat the [wireless track procedure](rtos-v0_5-track-check.md)
 using v0.5.1. No Mac cable is attached during travel. One physical run is enough
 for the next analysis. Full-A recovery acceptance and course repeatability
 remain open until actual runs establish them. Teammate terrain, obstacle and

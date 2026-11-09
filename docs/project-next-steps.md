@@ -69,8 +69,9 @@ motor-service age10426us. The failed full-A waveform is retained and its
 first-crossing spatial reconstruction fault is reproduced. The
 [v0.5.1 latest-crossing candidate](testing/rtos-v0_5_1-recross-fix.md) now decodes
 that saved input in batch/streaming replay; older bend inputs and negative
-regressions also pass. Next install/check the candidate stationary, then
-repeat the wireless A/A/Z pass. Armed network-loss timing and repeated course
+regressions also pass. [v0.5.1 is installed and stationary checks pass](testing/rtos-v0_5_1-stationary-acceptance.json),
+with idle/latched/fault0, all four stack records and idle STOP acknowledgement.
+Next repeat the wireless A/A/Z pass. Armed network-loss timing and repeated course
 acceptance remain open. The v0.4.2 rollback image is preserved.
 
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while

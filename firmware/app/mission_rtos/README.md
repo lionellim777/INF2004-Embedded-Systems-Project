@@ -1,7 +1,8 @@
 # µT-Kernel barcode recross candidate v0.5.1
 
 v0.5.1 is [built and software-tested](../../../docs/testing/rtos-v0_5_1-recross-fix.md)
-on `yixuan/rtos-barcode-recross`; installation is pending. It selects the latest
+on `yixuan/rtos-barcode-recross`; [installation and stationary USB/MQTT checks pass](../../../docs/testing/rtos-v0_5_1-stationary-acceptance.json).
+It selects the latest
 crossing of rescanned coordinates. The saved v0.5 full-A recovery failure now
 decodes A without changing Code39 validators. Legacy/default behavior remains
 unchanged. The candidate adds1024B scratch space, with the same task stacks.

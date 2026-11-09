@@ -3,7 +3,7 @@
   "branch": "yixuan/rtos-barcode-recross",
   "base_commit": "a7cdba2",
   "recorded_utc": "2026-11-09T02:34:04.985683+00:00",
-  "status": "Built and software-validated; not installed or physically accepted yet",
+  "status": "Installed and stationary USB/MQTT verified; new physical track acceptance pending",
   "image": {
     "private_path": "build/rtos-network-v0_5_1/robocar_rtos_network_v0_5_1.uf2",
     "sha256": "b7836015b55e8636b6f154a3139b693851651b810b654da642c85b5a62e2624d",
@@ -65,7 +65,7 @@
   ],
   "limits": [
     "Saved-input replay and host simulations do not establish new physical full-A recovery acceptance.",
-    "Current installed firmware remains v0.5 until a verified stationary USB flash.",
+    "v0.5.1 is now verified installed; moving hardware acceptance remains pending.",
     "Steering, sensor calibration, motor guard and task stacks are unchanged. Teammate modules remain outside this target."
   ],
   "source_sha256": {
@@ -73,5 +73,7 @@
     "firmware/app/robot_firmware/barcode_waveform.h": "8cecdf768bf7c8edbaecc8833d873f22233e7cebff0ec956c8437c915a9fa128",
     "firmware/app/mission_rtos/version.h": "267bf75c84491abf90597679a176cf285de1a034ee00e85fdac3ed71df63c8ff",
     "firmware/app/mission_rtos/CMakeLists.txt": "a9ec1c8d802af6b669bcd120d26f3ab9d8adc7f85ae76147bb3df2a1aee117f3"
-  }
+  },
+  "implementation_commit": "924eefe",
+  "stationary_acceptance": "rtos-v0_5_1-stationary-acceptance.json"
 }
