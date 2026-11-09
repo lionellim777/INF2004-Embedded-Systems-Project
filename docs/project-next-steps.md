@@ -51,9 +51,15 @@ burst. The paced fix at `c34205a` now sends all four tasks over USB and MQTT.
 [v0.5 stationary observations are verified](testing/rtos-v0_5-stationary-acceptance.json):
 all low-stack markers intact, controller stopped/no fault, and idle STOP
 acknowledged. Static BSS206308 adds440bytes over v0.4.2 with unchanged stack
-requests/pool. The measured idle Motion gap includes a138.6ms startup interval;
-armed timing and moving stops are untested. The next step is a raised-wheel
-physical GP20 abort, then loaded A/A/Z. The v0.4.2 rollback image is preserved.
+requests/pool. The measured idle Motion gap includes a138.6ms startup interval.
+The [first raised-wheel GP20 abort now passes](testing/rtos-v0_5-gp20-stop-acceptance.json).
+The user reports prompt stopping; USB/MQTT agree on an aborted, latched,
+fault-free state. Armed Motion entry gap peaked at10023us, service age10140us,
+and guard spacing5011us. Both PWM-off writes followed the guard observation
+by6us; this excludes button-edge detection and mechanical braking. All four
+stack markers remained intact. Moving USB/MQTT aborts are next, followed by
+loaded A/A/Z timing and Decoder stack observations. The v0.4.2 rollback image
+is preserved.
 
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while
 members finish their portions. It is a proposal, not a team agreement. No

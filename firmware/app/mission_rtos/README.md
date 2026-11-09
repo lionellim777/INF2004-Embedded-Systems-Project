@@ -3,8 +3,10 @@
 v0.5 implements task stack observations, moving/idle timing and stop-source
 measurements. See the [implementation and first hardware check](../../../docs/testing/rtos-v0_5-runtime-evidence.md).
 It is installed and [stationary USB/MQTT stack observations are verified](../../../docs/testing/rtos-v0_5-stationary-acceptance.json).
-Moving stop/timing and loaded Decoder stack checks are next. The first-passing
-v0.4.2 image is preserved.
+The [first raised-wheel GP20 moving abort passes](../../../docs/testing/rtos-v0_5-gp20-stop-acceptance.json),
+with fault-free latched stopping and a10023us armed Motion entry-gap maximum.
+Moving USB/MQTT aborts and loaded Decoder stack checks are next. The
+first-passing v0.4.2 image is preserved.
 
 One [physical RTOS A/A/Z pass is verified](../../../docs/testing/rtos-v0_4_2-track-acceptance.json),
 including Z during continued line recovery. Preserve this image/source while
@@ -119,7 +121,8 @@ adapters must preserve that restriction.
 
 The kernel has a 32 KiB pool, with three requested 4 KiB stacks and one 8 KiB decoder stack
 allocated by the kernel. Do not add those stacks to the pool twice. Main also
-reserves a 4 KiB startup/IRQ stack. Runtime stack and allocation margins are
+reserves a 4 KiB startup/IRQ stack. v0.5 observes application task stack markers;
+loaded Decoder paths, startup-stack use and runtime free-pool margins remain
 unmeasured. Task creation or hardware-timer failure permanently disables arming
 until reset. Service epochs cover 1..65535 without recycling; exhaustion
 requires reset, rather than accepting an old token.

@@ -94,7 +94,8 @@ cover v0.5 identity, saved observations and reconnection namespaces.
 The ARM build uses `-Wall -Wextra -Werror -fstack-usage`. UF2 reconstruction is
 compared to the linked binary. Compiler `.su` values describe individual frames,
 not full call chains or runtime watermarks. See the JSON report for hashes and
-resource figures. Firmware timing and task startup still need the Pico check.
+resource figures. Task startup and idle observations have passed the Pico check;
+loaded track timing remains pending.
 
 ## Initial no-track check (completed)
 
@@ -122,3 +123,39 @@ has been started by the agent. First select `f`, start through a GP20 press/rele
 and press GP20 again promptly while the wheels move. Check that release does
 not restart them, wait five seconds for paced rows, then q/Enter. Keep both
 powered wheels raised throughout.
+
+## First moving GP20 check (completed)
+
+[Saved acceptance evidence](rtos-v0_5-gp20-stop-acceptance.json) covers session
+`rtos-network-20261109-100143`. The user reports prompt wheel stopping. USB and
+MQTT agree on guard-origin user stop, aborted/latched state and fault0. The
+guard observation to both PWM-off writes took6us. Armed Motion entry gap
+peaked at10023us, motor-service age10140us and guard spacing5011us. These are
+observations from one short raised-wheel run, not worst-case bounds or
+mechanical braking measurements. All four low-stack markers remained intact;
+74 subsequent MQTT motion records stayed aborted/latched, with unchanged
+encoder counts across14690ms of captured device time. Decoder was idle in
+this bench mode. The exit MQTT STOP acknowledged an already-stopped robot.
+
+## Next raised-wheel checks (same image; no track or reflash)
+
+Keep USB and normal motor power connected, with both powered wheels raised.
+Run `sh tools/run_rtos_network.sh --reuse` and wait for USB identity and valid
+MQTT motion data. Enter each command letter followed by Enter.
+
+1. **USB abort:** select `f`, start with a GP20 press/release, then promptly
+   enter `x` while the wheels move. Expect `aborted`, stop latched and fault0.
+   Check the wheels stay stopped; wait five seconds for runtime rows.
+2. **MQTT abort:** select `f` again, start with GP20, then promptly enter `m`
+   while moving. Expect a STOP acknowledgement and the same stopped state.
+   Check the wheels stay stopped; wait five seconds.
+3. **Stopped reconnection:** while stopped, enter `b`. Wait for broker restart,
+   Pico online and valid motion data to return. Do not press GP20 during this
+   check; the stop latch must remain set. Wait five seconds, then enter `q` to
+   save and exit.
+
+If either move completes before its command arrives, record completion rather
+than a demonstrated moving abort. GP20 remains the physical stop throughout.
+Stop the checks on a fault or failed physical stop and retain that session.
+The broker restart here covers stopped reconnection, not armed network-loss
+timing. A subsequent A/A/Z track pass will exercise the real Decoder paths.
