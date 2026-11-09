@@ -1,9 +1,11 @@
 # v0.5 runtime measurement candidate
 
 Branch `yixuan/rtos-runtime-evidence`. Implementation and software checks are
-complete. **Not flashed; no physical v0.5 measurements yet.** The user deferred
-connection until tomorrow. Installed-image metadata and the first-passing
-private UF2 backup still identify v0.4.2. No teammate module, scanner algorithm,
+complete. **Installed and stationary observations verified on 9 November**;
+see [the real USB/MQTT measurements and limitations](rtos-v0_5-stationary-acceptance.json).
+The first hardware check exposed a burst exceeding the four lwIP request handles.
+Paced/retried publication fixed it; all four task records now arrive. The
+first-passing v0.4.2 private backup is preserved. No teammate module, scanner algorithm,
 steering calibration or motor-service threshold changed in this candidate.
 
 ## Implemented
@@ -52,8 +54,10 @@ unexecuted paths remain unmeasured. No stack was downsized.
 
 ## Binary fields and representations
 
-Topic `inf2004/aai10/robot1/v1/runtime_diag`, repeated with status approximately
-once a second at QoS0. Robot ACL permits publication; observer credentials cannot
+Topic `inf2004/aai10/robot1/v1/runtime_diag`, paced at one row per minimum250ms,
+round-robin across summary and four tasks at QoS0. A blocked row retries without
+advancing; motion/status traffic has priority. Even QoS0 needs a request handle,
+so these rows must not form a status burst. Robot ACL permits publication; observer credentials cannot
 forge telemetry. USB emits `[RUNTIME_V1] <hex>`. Existing schemas stay unchanged.
 Fields are LSB-first with zero padding. Common header: kind8/run16/capture-ms32.
 
@@ -92,7 +96,7 @@ compared to the linked binary. Compiler `.su` values describe individual frames,
 not full call chains or runtime watermarks. See the JSON report for hashes and
 resource figures. Firmware timing and task startup still need the Pico check.
 
-## Tomorrow: no-track first check
+## Initial no-track check (completed)
 
 1. Connect the Pico to the Mac normally by USB, with battery disconnected and
    both powered wheels raised. No BOOTSEL or GP20 press.
@@ -105,7 +109,16 @@ resource figures. Firmware timing and task startup still need the Pico check.
    stopped. Verify data and idle MQTT STOP acknowledgement; save real results.
 5. Update installed-image metadata only after successful installation/check.
 
-Later checks use normal motor power with raised wheels for GP20/USB/MQTT abort,
+The real idle observations show 548/224/1256/1120 bytes of watermark use for
+Motion/Decoder/Network/Observer, with all low markers intact. These include the
+unpainted128-byte context allowance and are not loaded stack limits. A138633us
+lifetime Motion gap occurred during stopped startup. Armed maxima are zero
+because no run occurred, not proof of zero latency.
+
+Next checks use normal motor power with raised wheels for GP20/USB/MQTT abort,
 then a real A/A/Z pass for loaded Decoder observations. A bounded move completing
-before a STOP arrives is completion, not a demonstrated moving abort. No physical
-step is requested tonight; the candidate is not installed by preparing it.
+before a STOP arrives is completion, not a demonstrated moving abort. No motor run
+has been started by the agent. First select `f`, start through a GP20 press/release
+and press GP20 again promptly while the wheels move. Check that release does
+not restart them, wait five seconds for paced rows, then q/Enter. Keep both
+powered wheels raised throughout.

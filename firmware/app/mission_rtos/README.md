@@ -2,7 +2,9 @@
 
 v0.5 implements task stack observations, moving/idle timing and stop-source
 measurements. See the [implementation and first hardware check](../../../docs/testing/rtos-v0_5-runtime-evidence.md).
-It is not flashed yet; the installed/first-passing v0.4.2 image is preserved.
+It is installed and [stationary USB/MQTT stack observations are verified](../../../docs/testing/rtos-v0_5-stationary-acceptance.json).
+Moving stop/timing and loaded Decoder stack checks are next. The first-passing
+v0.4.2 image is preserved.
 
 One [physical RTOS A/A/Z pass is verified](../../../docs/testing/rtos-v0_4_2-track-acceptance.json),
 including Z during continued line recovery. Preserve this image/source while

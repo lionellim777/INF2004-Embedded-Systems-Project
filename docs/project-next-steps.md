@@ -46,9 +46,14 @@ deadlines must be measured separately.
 Implementation update: the [v0.5 runtime measurement candidate](testing/rtos-v0_5-runtime-evidence.md)
 is now built and software-tested on `yixuan/rtos-runtime-evidence`. Task stack
 observations, armed/idle timing, stop sources and USB/MQTT records are implemented.
-Static BSS206304 adds436bytes over v0.4.2 with unchanged stack requests/pool.
-The candidate is not flashed; the user deferred physical connection until the
-next day. The installed v0.4.2 image and its private first-AAZ backup are intact.
+The first hardware check found MQTT request-slot starvation in a measurement
+burst. The paced fix at `c34205a` now sends all four tasks over USB and MQTT.
+[v0.5 stationary observations are verified](testing/rtos-v0_5-stationary-acceptance.json):
+all low-stack markers intact, controller stopped/no fault, and idle STOP
+acknowledged. Static BSS206308 adds440bytes over v0.4.2 with unchanged stack
+requests/pool. The measured idle Motion gap includes a138.6ms startup interval;
+armed timing and moving stops are untested. The next step is a raised-wheel
+physical GP20 abort, then loaded A/A/Z. The v0.4.2 rollback image is preserved.
 
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while
 members finish their portions. It is a proposal, not a team agreement. No

@@ -3,7 +3,7 @@
   "recorded_utc": "2026-11-08T16:33:31.641227+00:00",
   "branch": "yixuan/rtos-runtime-evidence",
   "base_commit": "d4f8eff",
-  "status": "Built and software-tested; NOT installed, no physical runtime measurements yet. User deferred USB connection until tomorrow.",
+  "status": "Historical pre-installation software report. Subsequent hardware verification and pacing fix are recorded in rtos-v0_5-stationary-acceptance.json.",
   "candidate": {
     "file": "build/rtos-network-v0_5/robocar_rtos_network_v0_5.uf2",
     "credentials_embedded": true,
@@ -1153,5 +1153,6 @@
     "Verify current broker address, install candidate, and read genuine idle task stack/timing observations.",
     "Later validate loaded motor stop/decoder timing and stack margins; no observed worst-case or mechanical braking claim.",
     "Continue whole-application range/ownership and minimum-bit review; this candidate is not completion of that requirement."
-  ]
+  ],
+  "later_hardware_report": "rtos-v0_5-stationary-acceptance.json"
 }
