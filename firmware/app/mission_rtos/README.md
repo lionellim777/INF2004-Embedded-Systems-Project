@@ -5,8 +5,9 @@ measurements. See the [implementation and first hardware check](../../../docs/te
 It is installed and [stationary USB/MQTT stack observations are verified](../../../docs/testing/rtos-v0_5-stationary-acceptance.json).
 The [first raised-wheel GP20 moving abort passes](../../../docs/testing/rtos-v0_5-gp20-stop-acceptance.json),
 with fault-free latched stopping and a10023us armed Motion entry-gap maximum.
-Moving USB/MQTT aborts and loaded Decoder stack checks are next. The
-first-passing v0.4.2 image is preserved.
+[Moving USB/MQTT aborts and stopped broker reconnection also pass](../../../docs/testing/rtos-v0_5-remote-stop-acceptance.json).
+The next step is the [loaded A/A/Z timing and Decoder stack check](../../../docs/testing/rtos-v0_5-track-check.md).
+The first-passing v0.4.2 image is preserved.
 
 One [physical RTOS A/A/Z pass is verified](../../../docs/testing/rtos-v0_4_2-track-acceptance.json),
 including Z during continued line recovery. Preserve this image/source while

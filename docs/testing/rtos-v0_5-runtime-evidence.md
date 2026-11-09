@@ -137,7 +137,20 @@ mechanical braking measurements. All four low-stack markers remained intact;
 encoder counts across14690ms of captured device time. Decoder was idle in
 this bench mode. The exit MQTT STOP acknowledged an already-stopped robot.
 
-## Next raised-wheel checks (same image; no track or reflash)
+## USB/MQTT raised-wheel checks (completed)
+
+[Saved acceptance evidence](rtos-v0_5-remote-stop-acceptance.json) covers session
+`rtos-network-20261109-101245`. Runs2 and3 were active before their USB `x`
+and MQTT `m` stops; both aborted/latched with fault0. Each stop API entry to
+both PWM-off writes took11us, excluding command transport and host delay.
+Armed Motion entry-gap maxima were10025us and10048us; motor-service ages
+were10140us and10177us. All four tasks had intact low markers and matching
+armed measurements over USB/MQTT. The broker restart while stopped recovered
+telemetry with the same Pico boot ID, unchanged encoder counts and the latch
+retained. This does not exercise armed network loss or loaded decoding.
+
+The next physical step is the [same-image loaded A/A/Z track check](rtos-v0_5-track-check.md).
+The completed bench procedure is retained below for reproducibility.
 
 Keep USB and normal motor power connected, with both powered wheels raised.
 Run `sh tools/run_rtos_network.sh --reuse` and wait for USB identity and valid

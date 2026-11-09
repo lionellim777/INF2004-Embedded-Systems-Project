@@ -57,9 +57,14 @@ The user reports prompt stopping; USB/MQTT agree on an aborted, latched,
 fault-free state. Armed Motion entry gap peaked at10023us, service age10140us,
 and guard spacing5011us. Both PWM-off writes followed the guard observation
 by6us; this excludes button-edge detection and mechanical braking. All four
-stack markers remained intact. Moving USB/MQTT aborts are next, followed by
-loaded A/A/Z timing and Decoder stack observations. The v0.4.2 rollback image
-is preserved.
+stack markers remained intact. [Moving USB/MQTT aborts and stopped broker
+reconnection now also pass](testing/rtos-v0_5-remote-stop-acceptance.json):
+both runs aborted/latched with fault0, Motion entry gaps peaked at10025/10048us,
+service ages10140/10177us, and all four low-stack markers stayed intact. The
+broker recovered without resetting the Pico or clearing the stop latch.
+The next step is [one loaded A/A/Z pass](testing/rtos-v0_5-track-check.md) for
+real Decoder stack/timing observations. Armed network-loss timing and repeated
+course acceptance remain open. The v0.4.2 rollback image is preserved.
 
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while
 members finish their portions. It is a proposal, not a team agreement. No
