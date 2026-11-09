@@ -3,7 +3,7 @@
   "branch": "yixuan/rtos-barcode-recross",
   "base_commit": "a7cdba2",
   "recorded_utc": "2026-11-09T02:34:04.985683+00:00",
-  "status": "Installed and stationary USB/MQTT verified; new physical track acceptance pending",
+  "status": "Installed; one physical AAZ pass accepted; live wireless power-handoff acceptance remains open",
   "image": {
     "private_path": "build/rtos-network-v0_5_1/robocar_rtos_network_v0_5_1.uf2",
     "sha256": "b7836015b55e8636b6f154a3139b693851651b810b654da642c85b5a62e2624d",
@@ -64,8 +64,8 @@
     "build/rtos-v0_5_1-setup-tests.log"
   ],
   "limits": [
-    "Saved-input replay and host simulations do not establish new physical full-A recovery acceptance.",
-    "v0.5.1 is now verified installed; moving hardware acceptance remains pending.",
+    "One physical AAZ pass now has all three retained attempts accepted; repeatability remains unverified.",
+    "Live telemetry was absent during the course and recovered on USB reconnection. A stationary standalone-power boot check remains pending.",
     "Steering, sensor calibration, motor guard and task stacks are unchanged. Teammate modules remain outside this target."
   ],
   "source_sha256": {
@@ -75,5 +75,6 @@
     "firmware/app/mission_rtos/CMakeLists.txt": "a9ec1c8d802af6b669bcd120d26f3ab9d8adc7f85ae76147bb3df2a1aee117f3"
   },
   "implementation_commit": "924eefe",
-  "stationary_acceptance": "rtos-v0_5_1-stationary-acceptance.json"
+  "stationary_acceptance": "rtos-v0_5_1-stationary-acceptance.json",
+  "physical_track_acceptance": "rtos-v0_5_1-track-acceptance.json"
 }

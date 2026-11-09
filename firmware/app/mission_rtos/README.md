@@ -7,10 +7,19 @@ crossing of rescanned coordinates. The saved v0.5 full-A recovery failure now
 decodes A without changing Code39 validators. Legacy/default behavior remains
 unchanged. The candidate adds1024B scratch space, with the same task stacks.
 
+The [first physical v0.5.1 A/A/Z run passes](../../../docs/testing/rtos-v0_5_1-track-acceptance.json):
+all three retained attempts accepted, zero rejected captures and zero scanner
+faults. Full A includes9deg yaw/11mm lateral travel and Z19deg/62mm. Live
+telemetry was absent during the course and recovered on USB reconnection;
+wireless power-handoff acceptance remains open. Next use the
+[direct standalone-power startup](../../../docs/testing/rtos-wireless-start.md)
+and verify it stationary before driving. No USB selection is required after
+a fresh power-on. The console now prints live/waiting/silence status.
+
 The [loaded v0.5 run](../../../docs/testing/rtos-v0_5-loaded-track-observations.json)
 decoded half A and bend Z, but missed full A during recovery. Armed motor
 service age stayed below10.5ms and all four low-stack markers were intact.
-That run is partial acceptance; v0.5.1 needs a new physical track check.
+That earlier run is partial acceptance; the later v0.5.1 result is linked above.
 
 v0.5 implements task stack observations, moving/idle timing and stop-source
 measurements. See the [implementation and first hardware check](../../../docs/testing/rtos-v0_5-runtime-evidence.md).

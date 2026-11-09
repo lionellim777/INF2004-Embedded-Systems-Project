@@ -46,6 +46,10 @@ class Telemetry:
         self.last_valid_motion_at=None
         self.last_source_ms=None
         self.recovery_pending=False
+        self.started_at=time.monotonic()
+        self.waiting_reported=False
+        self.motion_silent=False
+        self.last_health_at=None
 
     def interruption(self,reason):
         with self.lock:self.recovery_pending=True
@@ -55,6 +59,33 @@ class Telemetry:
         with self.lock:
             self.stream.write(json.dumps(dict(received_utc=datetime.now(timezone.utc).isoformat(),
                 event=event_type,**values))+'\n')
+
+    def poll(self,now=None):
+        """Report delivery health without treating quiet output as a live link."""
+        now=time.monotonic() if now is None else now
+        message=None;event=None
+        with self.lock:
+            if self.last_valid_motion_at is None:
+                if now-self.started_at>=10 and not self.waiting_reported:
+                    self.waiting_reported=True
+                    message='Wi-Fi check: no Pico motion data yet. Keep the car stopped until fresh telemetry arrives.'
+                    event=('motion_waiting',{})
+            elif now-self.last_valid_motion_at>=5:
+                if not self.motion_silent:
+                    self.motion_silent=True
+                    self.summary['motion_silence_events']=self.summary.get('motion_silence_events',0)+1
+                    seconds=round(now-self.last_valid_motion_at,1)
+                    message=f'Wi-Fi telemetry paused: no fresh motion data for {seconds}s. Keep the car stopped; check Pico power/Wi-Fi. USB can recover retained scan diagnostics.'
+                    event=('motion_silence',dict(seconds=seconds))
+            elif self.last_health_at is None or now-self.last_health_at>=10:
+                self.last_health_at=now
+                motion=self.summary['last_motion'];scan=self.summary.get('last_scan_state',{})
+                message=(f"Wi-Fi live: controller {PHASES[motion['phase']]} | fault {motion['fault']} | "
+                         f"barcode reads {scan.get('reads',0)} | samples {scan.get('samples',0)} | "
+                         f"line recoveries {scan.get('recoveries',0)}")
+                event=('motion_health',dict(phase=motion['phase'],captured_ms=motion['captured_ms']))
+        if event:self.event(event[0],**event[1])
+        if message:print(message,flush=True)
 
     def packet(self, topic, payload, retained=False):
         try:
@@ -87,6 +118,12 @@ class Telemetry:
                         if self.summary['motion_delay_events']==1:
                             message='MQTT: delayed telemetry detected; timing details are being logged.'
                     self.recovery_pending=False
+                    if self.motion_silent:
+                        self.motion_silent=False
+                        self.last_health_at=None
+                        self.summary['motion_silence_recoveries']=self.summary.get('motion_silence_recoveries',0)+1
+                        if message is None or message.startswith('MQTT: delayed telemetry'):
+                            message='MQTT: fresh motion telemetry received again after the pause.'
                     self.last_valid_motion_at=now
                     self.last_source_ms=value['captured_ms']
                 if value['fault'] not in self.summary['fault_codes']: self.summary['fault_codes'].append(value['fault'])
@@ -260,7 +297,7 @@ class USB:
                         self.last_network=key
         except (OSError,serial.SerialException,ValueError):
             self.device.close();self.device=None;self.capture.ready=False
-            print('USB disconnected; waiting for the flashed Pico to return.',flush=True)
+            print('USB disconnected. Track logging uses Wi-Fi; wait for a fresh Wi-Fi live message before starting.',flush=True)
 
     def command(self,key):
         if self.device is None:raise ValueError('USB not connected')
@@ -321,6 +358,7 @@ async def run(settings,image,folder,flash_hint=True):
         if flash_hint and sys.platform=='darwin':subprocess.Popen(['open','-R',str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         while True:
             usb.poll()
+            telemetry.poll()
             line=commands.readline()
             if line is not None:
                 if not line:break

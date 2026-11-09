@@ -71,7 +71,15 @@ first-crossing spatial reconstruction fault is reproduced. The
 that saved input in batch/streaming replay; older bend inputs and negative
 regressions also pass. [v0.5.1 is installed and stationary checks pass](testing/rtos-v0_5_1-stationary-acceptance.json),
 with idle/latched/fault0, all four stack records and idle STOP acknowledgement.
-Next repeat the wireless A/A/Z pass. Armed network-loss timing and repeated course
+The [first v0.5.1 physical A/A/Z pass](testing/rtos-v0_5_1-track-acceptance.json)
+now has three accepted attempts, no rejected captures and no scanner faults.
+Full A includes9deg yaw/11mm lateral travel; Z19deg/62mm. However, live telemetry
+stopped at the USB power handoff and the results were recovered only after
+USB reconnection. The new boot ID establishes a handoff restart; its precise
+wireless failure mechanism remains unresolved. Next verify a
+[fresh standalone-power wireless boot](testing/rtos-wireless-start.md) while
+stopped, avoiding the unnecessary USB selection/handoff. The helper now prints
+live status and missing-data warnings. Armed network-loss timing and repeated course
 acceptance remain open. The v0.4.2 rollback image is preserved.
 
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while

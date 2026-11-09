@@ -88,6 +88,30 @@ def reuse_address_guard():
     print('PASS reuse guard: missing IP distinguished from genuine change; both addresses and reflash shown; matching image/settings start without flashing')
 
 
+def telemetry_health():
+    with tempfile.TemporaryDirectory(prefix='rtos-health-') as name:
+        folder=Path(name);t=Telemetry(folder/'mqtt.jsonl');t.started_at=0
+        payload=bytes.fromhex('00000000000000000000000001')
+        output=io.StringIO()
+        with contextlib.redirect_stdout(output):
+            t.poll(9);assert output.getvalue()==''
+            t.poll(10);t.poll(20)
+            with patch('rtos_network_session.time.monotonic',return_value=21):t.packet(PREFIX+'motion',payload)
+            t.poll(21);t.poll(22);t.poll(26);t.poll(40)
+            with patch('rtos_network_session.time.monotonic',return_value=41):t.packet(PREFIX+'motion',payload)
+            t.poll(41)
+        text=output.getvalue()
+        assert text.count('no Pico motion data yet')==1
+        assert text.count('Wi-Fi telemetry paused')==1
+        assert text.count('Wi-Fi live:')==2
+        assert text.count('fresh motion telemetry received again')==1
+        assert t.summary['motion_silence_events']==t.summary['motion_silence_recoveries']==1
+        assert t.summary['reconnections_confirmed']==0,'Silence is not proof of a reconnect'
+        t.save(folder/'summary.json')
+        assert any(json.loads(l)['event']=='motion_silence' for l in (folder/'mqtt.jsonl').read_text().splitlines())
+    print('PASS telemetry health: waiting, periodic live data, one silence warning/recovery, no false reconnect claim or motor command')
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix='rtos-console-') as name:
         folder=Path(name)
@@ -152,6 +176,7 @@ def main():
     print('PASS network console: v0.3/v0.4 selection gates, no START, exact empty MQTT STOP, telemetry/ack logs, no password in evidence')
     reuse_address_guard()
     delays_and_command_input()
+    telemetry_health()
 
 
 if __name__=='__main__':main()
