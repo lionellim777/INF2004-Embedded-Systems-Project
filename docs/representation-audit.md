@@ -14,6 +14,17 @@ different features, including a temporary32KiB first-failure diagnostic cache;
 they do not establish whole-application minimum-bit compliance. Runtime stack
 and loaded stop/control timing remain open.
 
+Latest update,9 November: [v0.5.1 ARM layout/linker and actual wire measurements](testing/representation/20261109-rtos-v0_5_1-after.json)
+are now recorded alongside [a real wireless A/A/Z run](testing/rtos-v0_5_1-wireless-track-acceptance.json).
+Loaded task watermarks, active service spacing and GP20/USB/MQTT stop paths
+now have observed evidence. BSS207332B includes the existing32KiB kernel pool
+and temporary32KiB first-failure raw cache; the74620B waveform object already
+includes its33668B saved snapshot. Do not add those nested allocations twice.
+The next independent code work is application range/access review and a lean
+diagnostic profile. Whole-application minimum-bit compliance, free-pool/heap
+measurement and worst-case timing remain open. This update supersedes the
+older "unmeasured" statements only for the observations linked here.
+
 ## Evidence and scope
 
 Change Requirement 1 requires minimum-bit application representations throughout

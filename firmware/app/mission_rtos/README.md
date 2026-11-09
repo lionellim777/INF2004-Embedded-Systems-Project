@@ -1,5 +1,12 @@
 # µT-Kernel barcode recross candidate v0.5.1
 
+[The latest physical run passes all three reads live over Wi-Fi](../../../docs/testing/rtos-v0_5_1-wireless-track-acceptance.json),
+with no Mac USB connection, fault0 and a checksum-verified capture. Full A
+accepted during observed recovery0→1 and Z14→20. Together with the preceding
+retained A/A/Z pass this is6/6 targets over two current-track runs. No new
+hardware action is needed for the next representation/interface work. This
+does not establish whole-mission or all-course reliability.
+
 v0.5.1 is [built and software-tested](../../../docs/testing/rtos-v0_5_1-recross-fix.md)
 on `yixuan/rtos-barcode-recross`; [installation and stationary USB/MQTT checks pass](../../../docs/testing/rtos-v0_5_1-stationary-acceptance.json).
 It selects the latest

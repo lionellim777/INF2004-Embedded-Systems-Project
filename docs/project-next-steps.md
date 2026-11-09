@@ -1,5 +1,28 @@
 # Remaining project work —9 November2026
 
+Current accepted RTOS core: v0.5.1, implementation`924eefe`, branch
+`yixuan/rtos-barcode-recross`. [Two physical A/A/Z runs now have6/6 target
+reads](testing/rtos-v0_5_1-wireless-track-acceptance.json); the latest has all
+three real events received live over Wi-Fi with no Mac USB connection. Full A
+was accepted while the observed recovery counter rose0→1; bend Z14→20.
+ADC/queue/controller fault bits are zero, all four task low-stack markers are
+intact, and armed motor-service age peaked at10445us against the40ms limit.
+This establishes the current tested core, not the complete mission or all-track
+reliability. The first run's USB-handoff failure remains recorded; direct
+standalone-power startup is the demonstrated procedure. A5.93s telemetry pause
+in the latest session occurred while idle before motion; transport is not a
+hard-real-time channel.
+
+No further USB connection or track run is needed for the next software work.
+The [current ARM layouts/linker/payload evidence](testing/representation/20261109-rtos-v0_5_1-after.json)
+has been refreshed. Next: finish application-owned range/lifetime/access
+decisions, prepare a lean diagnostic-memory profile without changing the
+accepted scanner, and finalize module adapters when owners provide their
+interfaces. Preserve this diagnostic source/image while making a lean profile.
+Then integrate ready teammate modules one at a time and perform full-mission
+acceptance. No project-completion percentage is inferred from these subsystem
+passes.
+
 Baseline: v5.63. Barcode decoder implementation is complete and physically
 validated on the current full-A / half-A / right-bend half-Z setup: two AAZ
 runs,6/6 target reads. Preserve its source and UF2 as the regression baseline.
@@ -82,8 +105,9 @@ while stopped, with no Mac USB connection, fresh data, fault0, the stop latch
 set and all four task stack observations intact. Use the
 [direct-power startup procedure](testing/rtos-wireless-start.md), avoiding the
 unnecessary USB selection/handoff. Next use the already-live session for one
-uninterrupted wireless A/A/Z run. The helper now prints live status and missing-data
-warnings. Armed network-loss timing and repeated course
+wireless A/A/Z run. That [run now passes](testing/rtos-v0_5_1-wireless-track-acceptance.json),
+including the first directly observed full-A recovery increment during capture.
+The helper prints live status and missing-data warnings. Armed network-loss timing and repeated whole-course
 acceptance remain open. The v0.4.2 rollback image is preserved.
 
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while
@@ -99,7 +123,8 @@ minimum-bit measurements and assessment evidence. These are planning targets,
 not promised delivery dates; Week 12 also contains the individual assessments.
 Avoid optional network/UI tuning once it no longer blocks the mission.
 
-Remote branches were refreshed on 8 November. Jinghai has pushed command
+Remote branches were refreshed on9 November; the relevant heads are unchanged
+from the previous review. Jinghai has pushed command
 configuration work at `b471ee2` (7 November). Lionel's latest pushed obstacle
 commit remains `6b60479` (4 November), and terrain remains `4e9ba35`
 (26 October). Those dates do not establish the state of unpushed teammate work.
@@ -117,7 +142,7 @@ mission/Buddy requirements were checked against the user-supplied
 | Barcode-driven navigation/junctions | A-Z decoder, encoder turns, configurable Y/Z actions; standalone calibration | Agree final command mapping and execute left/right/straight/U-turns and required junction choices on the actual course. Current AAZ acceptance used Straight actions; A events were unmapped. |
 | Hump/peak measurement | Main counts humps and highest pitch; `origin/buddy4-terrain` adds height-validity/data/estimation support | Integrate appropriate height/motion producer, validate actual humps and highest peak in the required units while driving. Pitch angle is not physical height. |
 | MQTT and planned µT-Kernel integration | `origin/wifi-buddy-1` contains task/bridge API, telemetry schema and recorded standalone MQTT/heartbeat/command/reconnect observations | Connect real robot producers, preserve motor/sensor deadlines during transmission/reconnect, and verify the combined RTOS robot on hardware. Do not reimplement existing Buddy1 work blindly. |
-| RTOS motion and binary MQTT foundation | [Separate µT-Kernel target](../firmware/app/mission_rtos/README.md); [v0.2 USB bench accepted](testing/rtos-v0_2-usb-acceptance.json). [v0.3 user network bench complete](testing/rtos-v0_3-user-network-bench-acceptance.json); [live broker recovery accepted](testing/rtos-v0_3-broker-restart-recovery.json) without a Pico reset or cleared stop latch | Real line/barcode/motion are integrated and one A/A/Z pass is verified. Measure loaded stop/control timing and stack margins; add other producers through reviewed adapters. Whole-application packing remains pending. |
+| RTOS motion and binary MQTT foundation | [v0.5.1 core and live wireless A/A/Z accepted](testing/rtos-v0_5_1-wireless-track-acceptance.json), plus GP20/USB/MQTT moving aborts and stopped broker recovery; loaded task stack and motor-service observations saved | Add remaining real producers through reviewed adapters. Extend network-loss/fault and official-course tests; task watermarks are not worst-case guarantees. Whole-application packing remains pending. |
 | Minimum-bit representation | [Initial target inventory and measured baseline](representation-audit.md):658 direct fields across59 types; actual RAM and synthetic serialized-message sizes | Complete range/lifetime/ownership decisions throughout application data; implement safe packing and binary MQTT; measure after-change RAM/messages and verify functionality/timing. The legacy Buddy1 JSON serializer changes Z to `?`; the current RTOS binary codec carries A–Z correctly. |
 | One mission and memory/data integration | Calibration-mode controller, separate barcode and avoidance modes; packed-data work on Buddy branches | One automatically coordinated run for following, decoding/actions, terrain, avoidance/rejoin and telemetry. Barcode acquisition is currently disabled in obstacle mode. Reconcile peripheral ownership, timebases, task/core use and data formats. |
 | Final acceptance/demo evidence | Versioned builds, host checks and individual hardware records | Repeated whole-course tests, communications loss/recovery and fault handling; record final firmware, configuration, video/logs and required report/demo evidence. |
@@ -125,7 +150,7 @@ mission/Buddy requirements were checked against the user-supplied
 Current allocation: hump work is with the terrain member, barcode-command
 execution is with another member, and obstacle integration is on hold pending
 Lionel's reply. Preserve the accepted v5.63 release and the passing v0.4.2 core. The work available now is
-runtime timing/stack measurements, representation coverage and the shared communication/motion interfaces;
+representation coverage, a lean diagnostic profile and the shared communication/motion interfaces;
 final physical mission acceptance waits for the real producers. Follow the
 [audit and integration sequence](representation-audit.md#next-implementation-sequence).
 

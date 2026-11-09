@@ -1,8 +1,10 @@
 # RTOS module handoff draft
 
-Status: integration proposal, not an agreed team API. The current baseline is
-RTOS v0.4.2 at `916c0dc`, with one verified physical A/A/Z pass. Preserve that
-build while measuring the foundation and preparing adapters. Do not replace
+Status: integration proposal, not an agreed team API. The current tested core is
+RTOS v0.5.1 at `924eefe`, branch`yixuan/rtos-barcode-recross`, with two physical
+A/A/Z passes (6/6), including one [live wireless run with full-A and Z recovery observations](testing/rtos-v0_5_1-wireless-track-acceptance.json).
+v0.4.2 and v5.63 remain preserved rollback baselines. No teammate branch has
+been merged. Preserve the working core while preparing adapters. Do not replace
 working scanning with an entire divergent teammate branch.
 
 ## Ownership
@@ -62,13 +64,15 @@ Navigation and obstacle drive proposals need the arbitration policy first.
   `testing/representation/20261109-rtos-v0_4_2-after.json`). The 1024-byte queue
   reduction is a same-semantics measurement; total-image BSS differences are
   not an equivalent-feature packing comparison.
-- Prepare low-overhead runtime stack/headroom, Motion-service and stop-delay
-  measurements in a separate candidate. Keep the accepted v0.4.2 image intact.
-  Distinguish detection, PWM disable and physical braking time.
+- Runtime task stack watermarks, armed Motion/service timing and stop-source
+  measurements now have real v0.5.1 course and earlier raised-wheel acceptance.
+  Extend them when new producers are connected; retain the accepted image.
+  Detection-to-PWM observations do not measure mechanical braking or free heap.
 - Continue the range/ownership review for application state and work buffers.
   Compact MQTT alone does not complete Change Requirement 1.
-- Later, repeat the same physical A/A/Z test and explicitly cover full A during
-  recovery. The first pass already contains Z during ongoing recovery, but
-  both A captures were straight with no observed recovery.
+- Full A during an observed recovery increment is now accepted (0→1); Z14→20
+  within its capture also accepted in the wireless run. Repeat the same course
+  after each adapter changes scheduling or drive ownership; final official
+  course reliability remains a separate acceptance item.
 
 The car can remain powered off while these software/evidence tasks are prepared.
