@@ -11,6 +11,8 @@ static int link=CYW43_LINK_UP;
 static bool client_connected=true;
 static err_t publication_error, subscription_error;
 static unsigned stops, transmitted;
+static bool limited_requests;
+static unsigned request_budget;
 static uint16_t mock_scan_run=1;
 static mqtt_request_cb_t pending_ack;static void *pending_context;
 static bool mock_scan_stopped;
@@ -58,6 +60,7 @@ err_t mqtt_publish(mqtt_client_t *c,const char *t,const void *p,u16_t n,u8_t qos
 {
  (void)c;(void)retain;assert(qos<=1);assert(n<=SCAN_PACKET_BYTES);
  if (publication_error) return publication_error;
+ if(limited_requests){if(!request_budget)return ERR_ARG;request_budget--;}
  assert(transmitted<256);snprintf(sent[transmitted].topic,128,"%s",t);
  memcpy(sent[transmitted].bytes,p,n);sent[transmitted].length=n;++transmitted;
  if(qos){assert(cb && !pending_ack);pending_ack=cb;pending_context=ctx;}
@@ -156,6 +159,18 @@ int main(void)
  online(32000);step(33000);assert(scan_pending && scan_index==0);
  pending_ack=NULL;scan_ack(NULL,ERR_OK);assert(scan_index==1);
  puts("PASS scan diagnostic network: QoS1 ACK ordering, backpressure retry, old-run ACK isolation and reconnect replay");
+ mock_scan_stopped=false;online(40000);limited_requests=true;request_budget=4;step(40005);
+ assert(runtime_slot==0 && request_budget==0); /* status consumes all four */
+ unsigned before_slot=runtime_slot;step(40010);assert(runtime_slot==before_slot);
+ unsigned seen=0;
+ for(unsigned tick=1;tick<=12;tick++){
+  request_budget=4;unsigned first=transmitted;step(40005+tick*250u);
+  for(unsigned i=first;i<transmitted;i++)if(strstr(sent[i].topic,"/runtime_diag")){
+   unsigned row=sent[i].bytes[0]?1u+(sent[i].bytes[7]&3u):0u;seen|=1u<<row;
+  }
+ }
+ assert(seen==31u);limited_requests=false;
+ puts("PASS four-handle MQTT budget: blocked runtime row retained; paced summary and all four tasks eventually delivered after motion/status traffic");
  puts("PASS actual MQTT service: explicit byte lengths, Z preservation, STOP-only commands, no start topic, period changes, backpressure, reconnect, subscription failure, clock wrap, signed Wi-Fi diagnostics");
  for(unsigned i=0;i<transmitted;++i) {
   printf("PACKET %s ",sent[i].topic);

@@ -17,6 +17,8 @@
 #ifdef RTOS_RUNTIME_EVIDENCE
 #include "runtime_report.h"
 static const char runtime_topic[]=RTOS_TOPIC_PREFIX "runtime_diag";
+static uint32_t runtime_ms;
+static uint8_t runtime_slot;
 #endif
 static mqtt_client_t *client;
 #ifdef RTOS_TRACK
@@ -169,6 +171,19 @@ static bool publish(const char *topic,const uint8_t *bytes,size_t length,uint8_t
      * lwIP copies the supplied bytes into its MQTT output ring before return. */
     return length<=UINT16_MAX && mqtt_publish(client,topic,bytes,(u16_t)length,0,retain,NULL,NULL)==ERR_OK;
 }
+#ifdef RTOS_RUNTIME_EVIDENCE
+static void runtime_publish(uint32_t now)
+{
+    /* lwIP allocates one of its four request handles even for QoS0. Sending
+     * five records in the status burst starves every record after summary.
+     * Pace one row and retry that row on backpressure, after motion traffic. */
+    if((uint32_t)(now-runtime_ms)<250u)return;
+    uint8_t bytes[RUNTIME_PACKET_BYTES];size_t length=runtime_report_packet(runtime_slot,now,bytes);
+    if(length && publish(runtime_topic,bytes,length,0)){
+        runtime_ms=now;runtime_slot=(uint8_t)((runtime_slot+1u)%(RUNTIME_TASKS+1u));
+    }
+}
+#endif
 static void join(uint32_t now)
 {
     if (cyw43_arch_wifi_connect_async(RTOS_WIFI_SSID,RTOS_WIFI_PASSWORD,CYW43_AUTH_WPA2_AES_PSK)==0)
@@ -214,6 +229,9 @@ static void step(uint32_t now)
             state(NETWORK_ONLINE,now); online_ms=now; status_ms=now; motion_ms=now;
             flags|=FORCE_STATUS;
             error_code(0);
+#ifdef RTOS_RUNTIME_EVIDENCE
+            runtime_slot=0;runtime_ms=now-250u;
+#endif
 #ifdef RTOS_TRACK
             scan_index=0;scan_pending=false;
 #endif
@@ -234,12 +252,6 @@ static void step(uint32_t now)
                 flags&=(uint16_t)~FORCE_STATUS; status_ms=now;
             }
             (void)publish(barcode_topic,barcode,sizeof barcode,0);
-#ifdef RTOS_RUNTIME_EVIDENCE
-            for(unsigned slot=0;slot<=RUNTIME_TASKS;slot++){
-                uint8_t bytes[RUNTIME_PACKET_BYTES];size_t length=runtime_report_packet(slot,now,bytes);
-                if(length)(void)publish(runtime_topic,bytes,length,0);
-            }
-#endif
 #ifdef RTOS_TRACK
             uint8_t scan[SCAN_PACKET_BYTES];size_t scan_length=track_scan_state(scan);
             if(scan_length)(void)publish(scan_topic,scan,scan_length,0);
@@ -253,6 +265,9 @@ static void step(uint32_t now)
             uint8_t line[LINE_RECORD_BYTES];read_line(line);
             (void)publish(line_topic,line,sizeof line,0);
         }
+#ifdef RTOS_RUNTIME_EVIDENCE
+        runtime_publish(now);
+#endif
 #ifdef RTOS_TRACK
         scan_export();
 #endif
