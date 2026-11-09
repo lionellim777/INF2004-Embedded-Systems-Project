@@ -226,4 +226,15 @@ static void diagnostic_boundaries(void)
     assert(!scan_words_encode(1,256,words,64,b));assert(!scan_words_encode(1,0,words,65,b));
     puts("PASS scan codec bounds: maximum 16384-word waveform, all 256 chunks, integer extremes and rejected overflow");
 }
-int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();first_failure_evidence();diagnostic_boundaries();return 0;}
+static void adc_range_rejection(void)
+{
+#ifdef RTOS_COMPACT_ADC_STATE
+    for(unsigned channel=0;channel<3;channel++){
+        begin_test();start();raw[channel]=4096;advance(10000);stopped();
+        bool on;uint8_t reason;board_gate_snapshot(&on,&reason);
+        assert(!on && reason==STOP_RANGE && !read_count);
+    }
+    puts("PASS compact ADC: each out-of-range channel disables PWM through the existing range-stop gate; no truncated sample or barcode");
+#endif
+}
+int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();first_failure_evidence();diagnostic_boundaries();adc_range_rejection();return 0;}

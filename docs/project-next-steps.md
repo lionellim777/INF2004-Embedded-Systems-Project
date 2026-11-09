@@ -14,6 +14,13 @@ in the latest session occurred while idle before motion; transport is not a
 hard-real-time channel.
 
 No further USB connection or track run is needed for the next software work.
+The [incremental minimum-bit conversion](minimum-bit-conversion.md) has started
+on `yixuan/rtos-minimum-bit-state`. Stage1 is an opt-in compact ADC/filter
+candidate with output equivalence tests; the installed v0.5.1 image and default
+build remain the reference. Do not defer representation review until every
+teammate algorithm is finished. Agree their data contracts now, and review
+each implementation as it arrives. Tribunal1 proposals are checked/corrected
+in the implementation record; the submitted report is preserved.
 The [current ARM layouts/linker/payload evidence](testing/representation/20261109-rtos-v0_5_1-after.json)
 has been refreshed. Next: finish application-owned range/lifetime/access
 decisions, prepare a lean diagnostic-memory profile without changing the

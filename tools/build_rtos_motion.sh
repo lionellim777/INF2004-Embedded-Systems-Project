@@ -17,6 +17,7 @@ ROBOT_OUTPUT_NAME="${ROBOT_OUTPUT_NAME:-robocar_rtos_motion_v0_5_1.uf2}"
     -Dpicotool_DIR="${ROBOT_PICOTOOL_DIR:-$ROBOT_ROOT/build/encoder-inspection/_deps/picotool}" \
     -DCMAKE_MAKE_PROGRAM="$ROBOT_NINJA" \
     -DRTOS_NETWORK_SETTINGS_FILE="${ROBOT_NETWORK_SETTINGS:-}" \
+    -DRTOS_COMPACT_ADC_STATE="${ROBOT_COMPACT_ADC_STATE:-OFF}" \
     '-DCMAKE_C_FLAGS=-mcpu=cortex-m0plus -mthumb'
 "$ROBOT_CMAKE" --build "$ROBOT_BUILD_DIR" --parallel 8
 cp "$ROBOT_BUILD_DIR/robocar_rtos_motion.uf2" "$ROBOT_BUILD_DIR/$ROBOT_OUTPUT_NAME"

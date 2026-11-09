@@ -1,5 +1,9 @@
 #include "track_sensor.h"
 #include "barcode_signal.h"
+#ifdef RTOS_COMPACT_ADC_STATE
+#include "adc12_filter.h"
+#include "board.h"
+#endif
 #include "barcode_waveform.h"
 #include "encoders.h"
 #include "network_service.h"
@@ -18,7 +22,11 @@ static bool enabled;
 static track_ir_t latest;
 static track_diagnostics_t diagnostics;
 static repeating_timer_t timer;
+#ifdef RTOS_COMPACT_ADC_STATE
+static adc12_filter_t filter;
+#else
 static barcode_signal_t filter;
+#endif
 static barcode_waveform_t waveform; /* v5.63 base; RTOS opts into recovery optics */
 static unsigned divider;
 static uint16_t sealed,stop_discarded;
@@ -58,6 +66,19 @@ static void put32(uint8_t *p,uint32_t n)
 { for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(n>>(8u*i)); }
 static uint32_t get32(const uint8_t *p)
 { return (uint32_t)p[0]|((uint32_t)p[1]<<8u)|((uint32_t)p[2]<<16u)|((uint32_t)p[3]<<24u); }
+#ifdef RTOS_COMPACT_ADC_STATE
+static bool adc_mean(unsigned input,uint16_t *out)
+{
+    adc_select_input(input);busy_wait_us_32(5);
+    uint16_t total=0; /* Eight ADC12 values sum to0..32760. */
+    for(unsigned i=0;i<8;i++){
+        uint16_t raw=adc_read();
+        if(raw>4095u)return false;
+        total=(uint16_t)(total+raw);
+    }
+    *out=(uint16_t)(total/8u);return true;
+}
+#else
 static uint16_t adc_mean(unsigned input)
 {
     adc_select_input(input);busy_wait_us_32(5);
@@ -65,14 +86,28 @@ static uint16_t adc_mean(unsigned input)
     for(unsigned i=0;i<8;i++)total+=adc_read();
     return (uint16_t)(total/8u);
 }
+#endif
 static bool sample(repeating_timer_t *unused)
 {
     (void)unused;
     uint32_t now=time_us_32();
     /* GP26 barcode, GP28 centre, GP27 right: same order as v5.63. */
+#ifdef RTOS_COMPACT_ADC_STATE
+    /* Invalid ADC values never truncate into plausible black/white samples.
+     * The existing board stop gate is IRQ-safe and owns all PWM writes. */
+    if(!adc_mean(0,&latest.raw[0]) || !adc_mean(2,&latest.raw[1]) || !adc_mean(1,&latest.raw[2])){
+        board_stop(STOP_RANGE);return true;
+    }
+#else
     latest.raw[0]=adc_mean(0);latest.raw[1]=adc_mean(2);latest.raw[2]=adc_mean(1);
+#endif
     latest.us=now;
+#ifdef RTOS_COMPACT_ADC_STATE
+    uint16_t grey;
+    if(!adc12_filter_update(&filter,latest.raw[0],&grey)){board_stop(STOP_RANGE);return true;}
+#else
     uint16_t grey=barcode_signal_update(&filter,latest.raw[0]);
+#endif
     if(enabled && ++divider==4u){
         divider=0;
         uint16_t next=(uint16_t)((head+1u)%QUEUE_SIZE);
@@ -94,7 +129,8 @@ static bool sample(repeating_timer_t *unused)
 bool track_sensor_init(void)
 {
     enabled=false;requested=active=0;head=tail=event_head=event_tail=0;divider=0;
-    latest=(track_ir_t){0};diagnostics=(track_diagnostics_t){0};filter=(barcode_signal_t){0};
+    latest=(track_ir_t){0};diagnostics=(track_diagnostics_t){0};
+    memset(&filter,0,sizeof filter);
     sealed=stop_discarded=0;recoveries=stop_us=0;
     first_failure=(scan_snapshot_t){0};
     adc_init();adc_gpio_init(26);adc_gpio_init(28);adc_gpio_init(27);

@@ -17,6 +17,7 @@ endif()
 set(MTK "${MTK_BSP_PATH}")
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated")
 set(RTOS_NETWORK_SETTINGS_FILE "" CACHE FILEPATH "Private network settings header")
+option(RTOS_COMPACT_ADC_STATE "Opt-in minimum-bit ADC/filter candidate; not the accepted default" OFF)
 if(RTOS_NETWORK_SETTINGS_FILE)
     configure_file("${RTOS_NETWORK_SETTINGS_FILE}" "${CMAKE_BINARY_DIR}/generated/network_settings.h" COPYONLY)
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/network_settings.local.h")
@@ -66,6 +67,9 @@ target_include_directories(robocar_rtos_motion PRIVATE "${CMAKE_CURRENT_LIST_DIR
 target_compile_definitions(robocar_rtos_motion PRIVATE _PICO_RP2040_
     RTOS_TRACK=1 RTOS_RUNTIME_EVIDENCE=1 BARCODE_WAVE_RECOVERY_OPTICS=1 BARCODE_WAVE_LAST_PASS=1 ROBOCAR_CENTER_LINE=1 PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
 target_compile_options(robocar_rtos_motion PRIVATE -Wall -Wextra -Werror -fstack-usage)
+if(RTOS_COMPACT_ADC_STATE)
+    target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_COMPACT_ADC_STATE=1 RTOS_FIRMWARE_VERSION="0.6-dev1")
+endif()
 target_link_libraries(robocar_rtos_motion PRIVATE mtkernel pico_stdlib
     hardware_adc hardware_clocks hardware_exception hardware_pwm pico_rand pico_cyw43_arch_lwip_poll pico_lwip_mqtt m)
 pico_enable_stdio_usb(robocar_rtos_motion 1)

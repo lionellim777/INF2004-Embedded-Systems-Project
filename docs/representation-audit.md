@@ -1,5 +1,11 @@
 # Minimum bit representation baseline and integration plan
 
+Current conversion approach: [incremental work and Tribunal1 decision handling](minimum-bit-conversion.md).
+Stage1 on `yixuan/rtos-minimum-bit-state` introduces an opt-in21-byte ADC filter
+with unchanged valid-input outputs and per-channel range-stop checks. The
+accepted v0.5.1 build stays installed. This begins conversion; it does not
+establish whole-application compliance or candidate hardware timing.
+
 Recorded 7 November 2026. Status: **before-change measurements complete for the
 scope below; change-requirement compliance and RTOS integration remain open**.
 The validated v5.63 firmware and decoder have not been modified or flashed. This paragraph
