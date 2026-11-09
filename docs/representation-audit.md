@@ -5,6 +5,12 @@ Stage1 on `yixuan/rtos-minimum-bit-state` introduces an opt-in21-byte ADC filter
 with unchanged valid-input outputs and per-channel range-stop checks. The
 accepted v0.5.1 build stays installed. This begins conversion; it does not
 establish whole-application compliance or candidate hardware timing.
+Stage2 adds a packed centre baseline and acquisition coordination, with56B
+total object savings versus the accepted core. The [current measured report](testing/representation/20261109-rtos-minimum-bit-stage2.json)
+separates that from the optional33664B first-failure cache omission. The
+[current47-type declared-field checklist](testing/representation/20261109-rtos-stage2-fields.csv)
+leaves unproven ranges/access/precision open rather than inferring compliance
+from native C types. Hardware timing for these candidates remains pending.
 
 Recorded 7 November 2026. Status: **before-change measurements complete for the
 scope below; change-requirement compliance and RTOS integration remain open**.

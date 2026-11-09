@@ -21,6 +21,16 @@ build remain the reference. Do not defer representation review until every
 teammate algorithm is finished. Agree their data contracts now, and review
 each implementation as it arrives. Tribunal1 proposals are checked/corrected
 in the implementation record; the submitted report is preserved.
+Stage2 now packs the bounded centre baseline and capture coordination as well
+as the ADC filter, saving56B across these objects with full-diagnostic exports
+unchanged. An optional lean profile frees a further33664B by omitting duplicate
+first-failure raw evidence; that is separately classified as a diagnostic
+feature choice. Both candidates are built/software-tested and uninstalled.
+The default binary remains byte-identical to v0.5.1. A47-type/554-field ARM
+declaration checklist now makes remaining range/access/precision review
+explicit; it does not establish full compliance. Next accept the candidate's
+hardware timing at an appropriate regression checkpoint and continue the
+unresolved-field and teammate-contract review. No teammate algorithm was changed.
 The [current ARM layouts/linker/payload evidence](testing/representation/20261109-rtos-v0_5_1-after.json)
 has been refreshed. Next: finish application-owned range/lifetime/access
 decisions, prepare a lean diagnostic-memory profile without changing the

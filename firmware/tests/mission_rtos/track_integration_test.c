@@ -195,7 +195,11 @@ static void first_failure_evidence(void)
     assert(!read_count);track_diagnostics_t d;track_diagnostics(&d);assert(d.rejected);
     frame(0x0d0,80000,false);samples(191,900000);assert(read_count==1 && reads[0]=='Z');
     board_stop(STOP_BUTTON);advance(100000);stopped();diagnostic_export("first-failure");
+#ifndef RTOS_NO_FIRST_FAILURE_CACHE
     puts("PASS first failed optical evidence survives a later accepted Z; no barcode guessing or change to motor start");
+#else
+    puts("PASS lean diagnostics retain first failed attempt summary and latest accepted Z waveform, without a duplicate raw cache");
+#endif
 }
 static void emit_packet(const char *label,const uint8_t *bytes,size_t n)
 { assert(n && n<=SCAN_PACKET_BYTES);printf("SCAN_FIXTURE %s ",label);for(size_t i=0;i<n;i++)printf("%02x",bytes[i]);puts(""); }
@@ -237,4 +241,15 @@ static void adc_range_rejection(void)
     puts("PASS compact ADC: each out-of-range channel disables PWM through the existing range-stop gate; no truncated sample or barcode");
 #endif
 }
-int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();first_failure_evidence();diagnostic_boundaries();adc_range_rejection();return 0;}
+static void event_ring_wrap(void)
+{
+    begin_test();start();samples(191,600000);
+    for(unsigned i=0;i<12;i++){
+        frame(i%2u?0x0d0:0x109,80000,false);samples(191,900000);
+        assert(read_count==i+1 && reads[i]==(i%2u?'Z':'A') && armed());
+    }
+    track_diagnostics_t d;track_diagnostics(&d);assert(!d.faults && d.events==12);
+    board_stop(STOP_BUTTON);advance(100000);stopped();diagnostic_export("events-wrap");
+    puts("PASS12 alternating A/Z reads across ADC/event ring wraps with concurrent simulated Motion consumption and stopped export");
+}
+int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();first_failure_evidence();diagnostic_boundaries();event_ring_wrap();adc_range_rejection();return 0;}

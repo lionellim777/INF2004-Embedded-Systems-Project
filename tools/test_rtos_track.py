@@ -12,6 +12,8 @@ with tempfile.TemporaryDirectory(prefix='rtos-track-') as name:
     sources += [BASE/n for n in ['motion_control.c','course_control.c','barcode_waveform.c','barcode_decoder.c']]
     command=[shutil.which('clang'),'-std=c11','-O1','-g','-Wall','-Wextra','-Werror','-DRTOS_TRACK=1','-DBARCODE_WAVE_RECOVERY_OPTICS=1','-DBARCODE_WAVE_LAST_PASS=1','-DROBOCAR_CENTER_LINE=1','-fsanitize=address,undefined','-fno-omit-frame-pointer']
     if os.environ.get('RTOS_TEST_COMPACT_ADC')=='1':command.append('-DRTOS_COMPACT_ADC_STATE=1')
+    if os.environ.get('RTOS_TEST_COMPACT_CORE')=='1':command+=['-DRTOS_COMPACT_CORE_STATE=1','-DCENTER_BASELINE_COMPACT=1']
+    if os.environ.get('RTOS_TEST_FIRST_FAILURE_CACHE')=='0':command.append('-DRTOS_NO_FIRST_FAILURE_CACHE=1')
     command += ['-I'+str(p) for p in [APP,BASE,TEST,folder]]
     command += [str(p) for p in sources]+[str(TEST/'track_integration_test.c'),'-o',str(folder/'test')]
     subprocess.run(command,check=True)
@@ -28,14 +30,19 @@ with tempfile.TemporaryDirectory(prefix='rtos-track-') as name:
         run=capture.runs[capture.latest];assert run['complete'] and run['checksum_verified'],label
         reasons=[v['reason'] for v in run['attempts'].values()]
         if label=='AAZ':assert [v['letter'] for v in run['attempts'].values() if v['reason']=='ACCEPTED']==['A','A','Z']
+        elif label=='events-wrap':assert [v['letter'] for v in run['attempts'].values() if v['reason']=='ACCEPTED']==['A','Z']*6
         elif label=='stopped-partial':assert 'STOPPED_PARTIAL' in reasons
         elif label=='first-failure':
-            assert run['snapshot']['reason']=='NO_VALID_FRAMED_WINDOW'
-            assert run['snapshot']['start_us']==run['attempts']['0']['start_us']
+            if os.environ.get('RTOS_TEST_FIRST_FAILURE_CACHE')=='0':
+                assert run['snapshot']['reason']=='ACCEPTED' and run['snapshot']['letter']=='Z'
+                assert run['attempts']['0']['reason']=='NO_VALID_FRAMED_WINDOW'
+            else:
+                assert run['snapshot']['reason']=='NO_VALID_FRAMED_WINDOW'
+                assert run['snapshot']['start_us']==run['attempts']['0']['start_us']
             assert any(a['letter']=='Z' for a in run['attempts'].values())
         else:assert len(run['words'])==16384 and len(run['chunks'])==256
         capture.save()
-    assert len(captures)==4
+    assert len(captures)==5
     (ROOT/'build/rtos-scan-fixtures.json').write_text(json.dumps(packets)+'\n')
     # Missing, duplicate, reordered and damaged chunks are not silently accepted.
     fixture=[decode_scan(bytes.fromhex(h)) for h in packets['AAZ']]

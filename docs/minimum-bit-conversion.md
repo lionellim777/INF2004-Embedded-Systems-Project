@@ -100,3 +100,89 @@ owner/domain matrix before touching motion deltas, timestamps or teammate
 measurements. The largest diagnostic allocations need a separate optional
 profile; removing debug data is a feature-budget change, not a bit-packing
 saving. Keep those comparisons separate in the final evidence.
+
+## Stage 2 prepared and software verified
+
+[Measured candidates and validation](testing/representation/20261109-rtos-minimum-bit-stage2.json)
+now include the stopped-line baseline and internal acquisition coordination.
+`RTOS_COMPACT_CORE_STATE` defaults OFF. Enabling it with the ADC option builds
+the full-diagnostic`0.6-dev2` candidate. Both options OFF, with the existing
+first-failure cache ON, still produces a binary byte-identical to the accepted
+v0.5.1. Neither candidate has been installed.
+
+| Stored data | Proven domain and representation | ARM bytes before → after |
+| --- | --- | ---: |
+| ADC filter |12 ADC12 values, sum16, next4, count4 |36 →21 |
+| Stopped-line baseline |31 clamped0..1000 levels x10 bits; count5; next5; unchanged full64-bit capture time |80 →48 |
+| Acquisition coordination |ADC head/tail9 each, event head/tail3 each, enabled1, divider2 |13 separate-object bytes →4 |
+
+The three object reductions total56 bytes; linked BSS is207276B versus207332B.
+The four-byte acquisition container has27 application bits and five padding
+bits. It uses internal target-verified C bitfields, never raw struct transport.
+All task updates remain under local IRQ exclusion, and the ADC IRQ cannot be
+preempted by a task. This proves the existing one-core ownership arrangement;
+it is not an SMP synchronization contract. The two-bit divider explicitly
+wraps0..3, rather than first storing4 and silently truncating it.
+
+The centre baseline preserves input clamping,31-entry median/IQR logic,10ms
+sampling spacing,100ms freshness and full64-bit time semantics. Its temporary
+sorted buffer also stores10-bit values.120601 queries match the actual accepted
+source at`a4e15b5`, including backward time and timestamps beyond32/48 bits.
+The four independent ADC/core option combinations pass the real mocked
+ADC/queue/decoder/course/PWM tests and produce identical diagnostic bytes.
+Twelve alternating A/Z reads exercise both queue and event-ring wraparound.
+
+Compiler frame reports show sample callback48→56 bytes, track begin136→136
+and decoder service96→96. These are individual frames, not whole task/IRQ stack
+bounds. Task stack requests, kernel pool and priorities are unchanged.
+Candidate hardware IRQ/service timing and course regressions remain pending.
+
+## Optional lean diagnostic profile
+
+`ROBOT_FIRST_FAILURE_CACHE=OFF`/`RTOS_FIRST_FAILURE_CACHE=OFF` builds
+`0.6-dev2-lean`. It omits only the duplicate first-failure raw cache:
+32768B words +864B profiles +32B metadata =33664B. It retains the same decoder,
+all attempt summaries and the latest frozen waveform. It therefore intentionally
+cannot retrieve the first failed raw waveform after a later accepted scan.
+
+| Profile | Linked BSS bytes | What changes |
+| --- | ---: | --- |
+| Accepted v0.5.1 |207332 |Physical reference with full diagnostics |
+| Packed ADC/core with full diagnostics |207276 |56B representation reduction |
+| Packed ADC/core with lean diagnostics |173612 |Additional33664B optional diagnostic-feature reduction |
+
+The last reduction is a memory/feature-budget choice, **not a minimum-bit
+packing saving**. The full-diagnostic candidate is the next hardware-check
+candidate. Keep the lean variant available for later integration RAM needs.
+Host tests verify the changed retention policy and that A/A/Z,12-event wrap,
+stopped partial and maximum-size exports otherwise match the full profile.
+
+## Current field inventory and remaining coverage
+
+The [current field checklist](testing/representation/20261109-rtos-stage2-fields.csv)
+and [ARM measurement/source manifest](testing/representation/20261109-rtos-stage2-inventory.json)
+cover47 selected declared application types and554 direct fields. This is a
+declaration inventory, not554 live independent allocations or a completion
+percentage. Containers/nested fields must not be summed. Included-but-unused
+types, private C-file state and automatic locals still need allocation review.
+Owner-review labels are suggestions, not team assignments or approval.
+
+Only explicit checked domains are marked software verified.412 declarations
+remain unresolved range/precision/lifetime/ownership items;95 Boolean and four
+enum declarations have a known domain but still need storage/access review.
+The four raw encoder counters keep their full modulo32 contract. A native
+type alone is not accepted as a justification for a field's width. Wider
+validation/staging values and arithmetic must be explained separately from
+the checked internal/wire representation.
+
+The auditor excludes private network settings and does not fetch, flash or run
+the robot. Reproduce it with:
+
+```sh
+build/dependencies/rtos-tools-venv/bin/python tools/audit_rtos_representation.py
+```
+
+Repeat runs match for fields and measurements. Source hashes and compiler
+sizes are saved. Normal network provisioning explicitly keeps the accepted
+options OFF/cache ON; candidate-aware console identity gates are prepared,
+with remote START still absent. Installed-image metadata remains v0.5.1.

@@ -301,7 +301,7 @@ class USB:
 
     def command(self,key):
         if self.device is None:raise ValueError('USB not connected')
-        if key!='x' and self.capture.summary.get('firmware_version') not in ('0.3','0.4','0.4.1','0.4.2','0.5','0.5.1'):
+        if key!='x' and self.capture.summary.get('firmware_version') not in ('0.3','0.4','0.4.1','0.4.2','0.5','0.5.1','0.6-dev1','0.6-dev2','0.6-dev2-lean'):
             raise ValueError('Flash the configured RTOS firmware before selecting a test')
         self.device.write(self.capture.command(key))
 

@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import warnings
+from unittest.mock import patch
 
 from rtos_network_setup import PREFIX, validate, write_settings, broker_config
 
@@ -270,6 +271,27 @@ async def console_quit_drains_scan(settings,folder):
         session.ROOT,session.USB,sys.stdin=original;reader.close();os.close(write_fd)
 
 
+def provisioning_preserves_default(settings,folder):
+    import rtos_network_setup as setup
+    calls=[]
+    def fake_build(command,**kwargs):
+        selected=kwargs['env'];calls.append(selected)
+        output=Path(selected['ROBOT_BUILD_DIR']);output.mkdir(parents=True,exist_ok=True)
+        (output/selected['ROBOT_OUTPUT_NAME']).write_bytes(b'provisioning-test-image')
+        return type('Result',(),{'returncode':0})()
+    with patch.object(setup,'ROOT',folder/'default-build-fixture'), \
+         patch.object(setup,'mac_wifi_ip',return_value=settings['broker_ip']), \
+         patch('builtins.input',side_effect=['','']), \
+         patch.object(setup.subprocess,'run',side_effect=fake_build), \
+         patch.dict(os.environ,{'ROBOT_COMPACT_ADC_STATE':'ON','ROBOT_COMPACT_CORE_STATE':'ON','ROBOT_FIRST_FAILURE_CACHE':'OFF'}):
+        setup.prepare(folder)
+    assert len(calls)==1
+    assert calls[0]['ROBOT_COMPACT_ADC_STATE']==calls[0]['ROBOT_COMPACT_CORE_STATE']=='OFF'
+    assert calls[0]['ROBOT_FIRST_FAILURE_CACHE']=='ON'
+    info=json.loads((folder/'firmware-info.json').read_text());assert info['firmware_version']=='0.5.1'
+    print('PASS default provisioning overrides inherited experimental flags; fixture build only, no real firmware or hardware touched')
+
+
 def main():
     logging.basicConfig(level=logging.CRITICAL)
     settings=dict(broker_ip='192.168.1.9',port=1883,ssid='test "WiFi" \\ 网络',wifi_password='fixture\\"password',
@@ -294,6 +316,7 @@ def main():
         actual=subprocess.check_output([str(folder/'probe')]).decode().splitlines()
         assert actual==[settings['ssid'],settings['wifi_password']]
         print('PASS local setup: private file modes, validated settings, UTF-8/quote/backslash C round trip')
+        provisioning_preserves_default(settings,folder)
         asyncio.run(authenticated_roundtrip(settings,folder))
         print('PASS real broker: anonymous/wrong-password denied, binary telemetry and empty STOP delivered, telemetry spoof blocked')
         asyncio.run(console_reconnect(settings,folder))

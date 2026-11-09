@@ -17,8 +17,28 @@
 /* us32 + raw encoder32x2 + ADC12: 108 bits in 14 bytes. Four zero pad bits.
  * Preserve raw encoder wrap and the validated 2ms waveform/filter precision. */
 static uint8_t queue[QUEUE_SIZE][14],events[EVENT_SIZE][5];
-static uint16_t head,tail,event_head,event_tail,requested,active;
+#ifdef RTOS_COMPACT_CORE_STATE
+#include "track_control.h"
+static track_control_t capture;
+#define CAP_HEAD capture.head
+#define CAP_TAIL capture.tail
+#define CAP_EVENT_HEAD capture.event_head
+#define CAP_EVENT_TAIL capture.event_tail
+#define CAP_ENABLED capture.enabled
+#define CAP_DIVIDER capture.divider
+#else
+static uint16_t head,tail,event_head,event_tail;
+#define CAP_HEAD head
+#define CAP_TAIL tail
+#define CAP_EVENT_HEAD event_head
+#define CAP_EVENT_TAIL event_tail
+#define CAP_ENABLED enabled
+#define CAP_DIVIDER divider
+#endif
+static uint16_t requested,active;
+#ifndef RTOS_COMPACT_CORE_STATE
 static bool enabled;
+#endif
 static track_ir_t latest;
 static track_diagnostics_t diagnostics;
 static repeating_timer_t timer;
@@ -28,7 +48,9 @@ static adc12_filter_t filter;
 static barcode_signal_t filter;
 #endif
 static barcode_waveform_t waveform; /* v5.63 base; RTOS opts into recovery optics */
+#ifndef RTOS_COMPACT_CORE_STATE
 static unsigned divider;
+#endif
 static uint16_t sealed,stop_discarded;
 static uint32_t recoveries,stop_us;
 /* Retain the FIRST substantial failed optical capture as well as the running
@@ -36,6 +58,7 @@ static uint32_t recoveries,stop_us;
  * This lets the next run expose the interrupted full A instead of replacing
  * its raw evidence with the later bend. No truncation or ISR copy. */
 #define FIRST_FAILURE_WORDS (2u*BARCODE_WAVE_SAMPLES)
+#ifndef RTOS_NO_FIRST_FAILURE_CACHE
 static scan_snapshot_t first_failure;
 static barcode_wave_profile_t first_profiles[6];
 static uint16_t first_words[FIRST_FAILURE_WORDS];
@@ -61,6 +84,14 @@ static void select_first_failure(void)
     s->geometry_mask=f->geometry_mask;s->letter=f->letter;s->motion=f->motion;
     memcpy(s->sample,first_words,s->count*sizeof(uint16_t));memcpy(s->profile,first_profiles,sizeof first_profiles);
 }
+static inline void reset_first_failure(void){first_failure=(scan_snapshot_t){0};}
+#else
+/* Lean profile keeps the same decoder, attempt ledger and latest frozen
+ * waveform; only the duplicate first-failure raw cache is omitted. */
+static inline void retain_first_failure(void){}
+static inline void select_first_failure(void){}
+static inline void reset_first_failure(void){}
+#endif
 
 static void put32(uint8_t *p,uint32_t n)
 { for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(n>>(8u*i)); }
@@ -108,16 +139,23 @@ static bool sample(repeating_timer_t *unused)
 #else
     uint16_t grey=barcode_signal_update(&filter,latest.raw[0]);
 #endif
-    if(enabled && ++divider==4u){
-        divider=0;
-        uint16_t next=(uint16_t)((head+1u)%QUEUE_SIZE);
-        if(next==tail)diagnostics.faults|=TRACK_QUEUE_FAULT;
+#ifdef RTOS_COMPACT_CORE_STATE
+    /* The two-bit divider stores only0..3; four is a transient arithmetic
+     * result, not a representable state. Disabled time does not advance it. */
+    if(CAP_ENABLED)CAP_DIVIDER=(CAP_DIVIDER+1u)&3u;
+    if(CAP_ENABLED && CAP_DIVIDER==0u){
+#else
+    if(CAP_ENABLED && ++CAP_DIVIDER==4u){
+#endif
+        CAP_DIVIDER=0;
+        uint16_t next=(uint16_t)((CAP_HEAD+1u)%QUEUE_SIZE);
+        if(next==CAP_TAIL)diagnostics.faults|=TRACK_QUEUE_FAULT;
         else {
-            encoder_sample_t e=encoders_snapshot();uint8_t *p=queue[head];
+            encoder_sample_t e=encoders_snapshot();uint8_t *p=queue[CAP_HEAD];
             put32(p,now);put32(p+4,e.left_raw);put32(p+8,e.right_raw);
             p[12]=(uint8_t)grey;p[13]=(uint8_t)(grey>>8u);
-            head=next;
-            unsigned depth=(head+QUEUE_SIZE-tail)%QUEUE_SIZE;
+            CAP_HEAD=next;
+            unsigned depth=(CAP_HEAD+QUEUE_SIZE-CAP_TAIL)%QUEUE_SIZE;
             if(depth>diagnostics.queue_peak)diagnostics.queue_peak=(uint16_t)depth;
             diagnostics.samples++;
         }
@@ -128,11 +166,14 @@ static bool sample(repeating_timer_t *unused)
 }
 bool track_sensor_init(void)
 {
-    enabled=false;requested=active=0;head=tail=event_head=event_tail=0;divider=0;
+#ifdef RTOS_COMPACT_CORE_STATE
+    memset(&capture,0,sizeof capture);
+#endif
+    CAP_ENABLED=false;requested=active=0;CAP_HEAD=CAP_TAIL=CAP_EVENT_HEAD=CAP_EVENT_TAIL=0;CAP_DIVIDER=0;
     latest=(track_ir_t){0};diagnostics=(track_diagnostics_t){0};
     memset(&filter,0,sizeof filter);
     sealed=stop_discarded=0;recoveries=stop_us=0;
-    first_failure=(scan_snapshot_t){0};
+    reset_first_failure();
     adc_init();adc_gpio_init(26);adc_gpio_init(28);adc_gpio_init(27);
     latest.ready=add_repeating_timer_us(-(int64_t)TRACK_SAMPLE_US,sample,NULL,&timer);
     return latest.ready;
@@ -144,7 +185,7 @@ void track_sensor_read(track_ir_t *out)
 void track_request(uint16_t token)
 {
     uint32_t irq=save_and_disable_interrupts();
-    requested=token;enabled=true;head=tail=event_head=event_tail=0;divider=0;
+    requested=token;CAP_ENABLED=true;CAP_HEAD=CAP_TAIL=CAP_EVENT_HEAD=CAP_EVENT_TAIL=0;CAP_DIVIDER=0;
     diagnostics=(track_diagnostics_t){0};
     sealed=stop_discarded=0;recoveries=stop_us=0;
     restore_interrupts(irq);
@@ -153,14 +194,14 @@ void track_request(uint16_t token)
 void track_stop(void)
 {
     uint32_t irq=save_and_disable_interrupts();
-    if(enabled){stop_us=time_us_32();stop_discarded=(uint16_t)((head+QUEUE_SIZE-tail)%QUEUE_SIZE);}
-    enabled=false;head=tail=event_head=event_tail=0;
+    if(CAP_ENABLED){stop_us=time_us_32();stop_discarded=(uint16_t)((CAP_HEAD+QUEUE_SIZE-CAP_TAIL)%QUEUE_SIZE);}
+    CAP_ENABLED=false;CAP_HEAD=CAP_TAIL=CAP_EVENT_HEAD=CAP_EVENT_TAIL=0;
     restore_interrupts(irq);
 }
 bool track_ready(uint16_t token)
 {
     uint32_t irq=save_and_disable_interrupts();
-    bool result=enabled && requested==token && diagnostics.ack==token;
+    bool result=CAP_ENABLED && requested==token && diagnostics.ack==token;
     restore_interrupts(irq);return result;
 }
 bool track_faulted(void)
@@ -170,7 +211,7 @@ bool track_faulted(void)
 }
 bool track_recording(void)
 {
-    uint32_t irq=save_and_disable_interrupts();bool result=enabled && diagnostics.recording;
+    uint32_t irq=save_and_disable_interrupts();bool result=CAP_ENABLED && diagnostics.recording;
     restore_interrupts(irq);return result;
 }
 void track_diagnostics(track_diagnostics_t *out)
@@ -180,20 +221,20 @@ void track_diagnostics(track_diagnostics_t *out)
 bool track_event_take(uint16_t token,track_event_t *out)
 {
     uint32_t irq=save_and_disable_interrupts();
-    bool found=enabled && requested==token && event_tail!=event_head;
+    bool found=CAP_ENABLED && requested==token && CAP_EVENT_TAIL!=CAP_EVENT_HEAD;
     if(found){
-        uint8_t *p=events[event_tail];
+        uint8_t *p=events[CAP_EVENT_TAIL];
         *out=(track_event_t){get32(p),(char)('A'-1+(p[4]&31u)),(p[4]&32u)!=0};
-        event_tail=(uint16_t)((event_tail+1u)%EVENT_SIZE);
+        CAP_EVENT_TAIL=(uint16_t)((CAP_EVENT_TAIL+1u)%EVENT_SIZE);
     }
     restore_interrupts(irq);return found;
 }
 static bool current(uint16_t token)
-{ return enabled && requested==token; }
+{ return CAP_ENABLED && requested==token; }
 void track_service(void)
 {
     uint32_t irq=save_and_disable_interrupts();
-    uint16_t token=requested;bool running=enabled;
+    uint16_t token=requested;bool running=CAP_ENABLED;
     restore_interrupts(irq);
     if(!running){
         /* Decoder-owned work only. Motors are already stopped. Preserve an
@@ -203,13 +244,13 @@ void track_service(void)
             barcode_waveform_save_partial(&waveform);
             retain_first_failure();select_first_failure();
             irq=save_and_disable_interrupts();
-            if(requested==token && !enabled)sealed=token;
+            if(requested==token && !CAP_ENABLED)sealed=token;
             restore_interrupts(irq);
         }
         return;
     }
     if(active!=token){
-        barcode_waveform_begin(&waveform);first_failure=(scan_snapshot_t){0};active=token;
+        barcode_waveform_begin(&waveform);reset_first_failure();active=token;
         irq=save_and_disable_interrupts();
         if(current(token))diagnostics.ack=token;
         restore_interrupts(irq);
@@ -217,8 +258,8 @@ void track_service(void)
     for(unsigned work=0;work<24;work++){
         uint8_t p[14];
         irq=save_and_disable_interrupts();
-        bool found=current(token) && tail!=head;
-        if(found){memcpy(p,queue[tail],sizeof p);tail=(uint16_t)((tail+1u)%QUEUE_SIZE);}
+        bool found=current(token) && CAP_TAIL!=CAP_HEAD;
+        if(found){memcpy(p,queue[CAP_TAIL],sizeof p);CAP_TAIL=(uint16_t)((CAP_TAIL+1u)%QUEUE_SIZE);}
         restore_interrupts(irq);
         if(!found)break;
         char letter=0;uint32_t start=time_us_32();
@@ -232,13 +273,13 @@ void track_service(void)
             diagnostics.recording=waveform.recording;
             if(waveform.timing_faults)diagnostics.faults|=TRACK_TIMING_FAULT;
             if(read){
-                uint16_t next=(uint16_t)((event_head+1u)%EVENT_SIZE);
-                if(next==event_tail)diagnostics.faults|=TRACK_EVENT_FAULT;
+                uint16_t next=(uint16_t)((CAP_EVENT_HEAD+1u)%EVENT_SIZE);
+                if(next==CAP_EVENT_TAIL)diagnostics.faults|=TRACK_EVENT_FAULT;
                 else if(letter>='A' && letter<='Z'){
                     bool crossing=latest.raw[1]>=861u && latest.raw[2]>=317u;
-                    put32(events[event_head],get32(p));
-                    events[event_head][4]=(uint8_t)(letter-'A'+1u)|(crossing?32u:0u);
-                    event_head=next;diagnostics.events++;
+                    put32(events[CAP_EVENT_HEAD],get32(p));
+                    events[CAP_EVENT_HEAD][4]=(uint8_t)(letter-'A'+1u)|(crossing?32u:0u);
+                    CAP_EVENT_HEAD=next;diagnostics.events++;
                     uint64_t now=time_us_64();uint32_t age=(uint32_t)now-get32(p);
                     (void)network_barcode((uint32_t)((now-age)/1000u),letter,true,false);
                 }
@@ -262,7 +303,7 @@ size_t track_scan_state(uint8_t out[SCAN_PACKET_BYTES])
         .samples=diagnostics.samples,.frames=diagnostics.frames,.rejected=diagnostics.rejected,
         .decode_us=diagnostics.decode_max_us,.adc_us=diagnostics.adc_max_us,
         .events=diagnostics.events,.queue_peak=diagnostics.queue_peak,.faults=diagnostics.faults,
-        .enabled=enabled,.recording=diagnostics.recording,.sealed=ready && sealed==requested,
+        .enabled=CAP_ENABLED,.recording=diagnostics.recording,.sealed=ready && sealed==requested,
         .ready=ready,.attempts=ready?(uint8_t)waveform.attempt_count:0,
         .attempt_overflow=ready?waveform.attempt_overflow:0,.recoveries=recoveries,
         .stop_us=stop_us,.stop_discarded=stop_discarded};
@@ -273,7 +314,7 @@ size_t track_scan_export(uint16_t run,unsigned index,uint8_t out[SCAN_PACKET_BYT
     union { barcode_wave_attempt_t attempt;barcode_wave_profile_t profile;uint16_t words[SCAN_CHUNK_WORDS]; } copy;
     scan_snapshot_t meta={0};unsigned kind=SCAN_DONE,item=0,count=0,attempts=0;bool snapshot=false;
     uint32_t irq=save_and_disable_interrupts();
-    if(!run || requested!=run || enabled || sealed!=run){restore_interrupts(irq);return 0;}
+    if(!run || requested!=run || CAP_ENABLED || sealed!=run){restore_interrupts(irq);return 0;}
     attempts=waveform.attempt_count;snapshot=waveform.saved.count!=0;
     if(index<attempts){kind=SCAN_ATTEMPT;item=index;copy.attempt=waveform.attempts[item];}
     else {

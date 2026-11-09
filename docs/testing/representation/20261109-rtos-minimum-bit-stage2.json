@@ -1,0 +1,144 @@
+{
+  "recorded_utc": "2026-11-09T03:51:23.597342+00:00",
+  "branch": "yixuan/rtos-minimum-bit-state",
+  "base_stage1_commit": "ef0c607",
+  "status": "Stage2 opt-in candidates built and software-validated; not installed",
+  "installed_version": "0.5.1",
+  "baseline": {
+    "text": 451248,
+    "bss": 207332
+  },
+  "ARM_layout_bytes": {
+    "0": {
+      "legacy_filter": 36,
+      "packed_filter": 21,
+      "baseline": 80,
+      "capture_control": 4,
+      "track_runtime": 1264,
+      "motion_runtime": 1464
+    },
+    "1": {
+      "legacy_filter": 36,
+      "packed_filter": 21,
+      "baseline": 48,
+      "capture_control": 4,
+      "track_runtime": 1232,
+      "motion_runtime": 1432
+    }
+  },
+  "packed_state_savings": {
+    "filter": 15,
+    "baseline": 32,
+    "capture_coordination": 9,
+    "total_object_bytes": 56,
+    "linked_bss_bytes": 56
+  },
+  "full_diagnostic_candidate": {
+    "text": 451768,
+    "data": 0,
+    "bss": 207276,
+    "sha256": "3e51b9d686d0bc26bb60fdb7fc2c64370daa2392629d1abccb1e371ab91356b2",
+    "private_path": "build/rtos-minbits-stage2-candidate/robocar_rtos_minbits_stage2_candidate.uf2",
+    "symbols": {
+      "runtime": 1432,
+      "queue": 7168,
+      "kernel_pool": 32768,
+      "waveform": 74620,
+      "first_words": 32768,
+      "first_profiles": 864,
+      "first_failure": 32,
+      "adc_filter": 21,
+      "capture_coordination": 4
+    },
+    "filter_attribution": "track_sensor.c.o; distinct from SDK filter symbol"
+  },
+  "lean_candidate": {
+    "text": 451272,
+    "data": 0,
+    "bss": 173612,
+    "sha256": "6ee8337418f3b461086f22e939ba92e716e5ec71b8a3ef4acd1c58f246e9df63",
+    "private_path": "build/rtos-minbits-stage2-lean/robocar_rtos_minbits_stage2_lean.uf2",
+    "symbols": {
+      "runtime": 1432,
+      "queue": 7168,
+      "kernel_pool": 32768,
+      "waveform": 74620,
+      "adc_filter": 21,
+      "capture_coordination": 4
+    },
+    "filter_attribution": "track_sensor.c.o; distinct from SDK filter symbol"
+  },
+  "lean_removed_cache": {
+    "first_words": 32768,
+    "first_profiles": 864,
+    "first_failure": 32
+  },
+  "lean_budget_saving_bytes": 33664,
+  "lean_saving_is_bit_packing": false,
+  "default_binary_identical_to_accepted_v0_5_1": true,
+  "UF2_binary_reconstructions_pass": true,
+  "verification": {
+    "ADC_updates_equal": 1102600,
+    "baseline_queries_equal_accepted_source": 120601,
+    "ADC_core_combinations": 4,
+    "exports_byte_identical_across_all_four": true,
+    "event_ring_wrap_reads": 12,
+    "lean_expected_first_failure_policy_verified": true,
+    "sanitizers": "ASan/UBSan",
+    "warning_as_error_ARM_build": true,
+    "candidate_console_identity_no_START": "PASS",
+    "normal_provisioning_forces_accepted_flags": "PASS fixture build with inherited experimental flags"
+  },
+  "header_inventory": {
+    "declared_types": 47,
+    "declared_fields": 554,
+    "status_counts": {
+      "CANDIDATE_SOFTWARE_VERIFIED": 11,
+      "CONTAINER_REVIEW_ALLOCATION": 28,
+      "REVIEW_REQUIRED": 412,
+      "DOMAIN_KNOWN_REVIEW_STORAGE": 95,
+      "ENUM_DOMAIN_REVIEW_STORAGE": 4,
+      "PRESERVED_COUNTER_CONTRACT": 4
+    },
+    "repeat_run_identical": true,
+    "whole_application_compliance": false
+  },
+  "logs": [
+    "build/rtos-minbits-stage2-tests.log",
+    "build/rtos-minbits-stage2-build.log",
+    "build/rtos-minbits-stage2-lean-build.log",
+    "build/rtos-minbits-stage2-default-build.log",
+    "build/rtos-minbits-stage2-console-tests.log",
+    "build/rtos-minbits-stage2-bench-tests.log",
+    "build/rtos-minbits-stage2-setup-tests.log"
+  ],
+  "source_sha256": {
+    "firmware/app/mission_rtos/track_sensor.c": "61c08bcb57f5c00649fdc5269e17478cf28c164f2e7ae1bf56cb590529fc7658",
+    "firmware/app/mission_rtos/track_control.h": "71b000befdabf48f18c8d43b95a0a51e3fa2cbab18a0ebe4ef548762eb5124fa",
+    "firmware/app/robot_firmware/center_baseline.h": "58669198bdd551a6180fe6f50c660c56fbb43c4136cddcbac7685552d74546e4",
+    "firmware/app/mission_rtos/CMakeLists.txt": "6e033ce07f8511943d525b0f93753aa8a96501e13798c42cc5fedcf3e8c4fe3e"
+  },
+  "limits": [
+    "Candidate hardware IRQ/control timing and course regressions remain pending.",
+    "Header inventory includes declarations/containers, not a verified list of live allocations; private C state and automatic locals still need review.",
+    "412 declared fields remain range/precision/lifetime/ownership review items; do not infer compliance from a C integer type.",
+    "Raw encoder32 and time32/64 semantics are preserved; no arbitrary short mission limit is imposed.",
+    "Lean diagnostics retain all attempt summaries and latest frozen waveform; duplicate first-failure raw evidence is intentionally absent.",
+    "Teammate algorithms and installed firmware were not changed or flashed."
+  ],
+  "compiler_frame_bytes": {
+    "sample_callback": {
+      "accepted": 48,
+      "candidate": 56
+    },
+    "track_begin": {
+      "accepted": 136,
+      "candidate": 136
+    },
+    "decoder_service": {
+      "accepted": 96,
+      "candidate": 96
+    },
+    "interpretation": "Individual compiler frames, not task/IRQ call-chain or runtime stack bounds"
+  }
+}
