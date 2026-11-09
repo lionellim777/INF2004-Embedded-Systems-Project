@@ -10,7 +10,12 @@ The previous USB-to-car-power handoff rebooted the Pico and lost live telemetry
 until USB was reconnected. Retained diagnostics subsequently confirmed A/A/Z
 with zero rejects/faults. Starting directly on the intended supply removes
 that handoff from the procedure; it is not proof that the underlying wireless
-problem is solved. A stationary cold-boot check is the next acceptance item.
+problem is solved. [One stationary cold-boot check now passes](rtos-v0_5_1-wireless-cold-start-acceptance.json):
+session `rtos-network-20261109-110042` has no USB log bytes, one new boot,
+idle/latched/fault0, fresh motion/scan data and all four observed task stacks
+with intact low markers. Regular live messages appear without a silence
+warning in the frozen acceptance interval. Next use this same live session for
+one uninterrupted wireless A/A/Z run; do not restart it or connect Mac USB.
 
 1. Stop the car and finish the previous helper with `q`/Enter. Confirm any
    preceding scan download is checksum-verified before switching power off.

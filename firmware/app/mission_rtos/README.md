@@ -13,8 +13,9 @@ faults. Full A includes9deg yaw/11mm lateral travel and Z19deg/62mm. Live
 telemetry was absent during the course and recovered on USB reconnection;
 wireless power-handoff acceptance remains open. Next use the
 [direct standalone-power startup](../../../docs/testing/rtos-wireless-start.md)
-and verify it stationary before driving. No USB selection is required after
-a fresh power-on. The console now prints live/waiting/silence status.
+whose [first stationary check now passes](../../../docs/testing/rtos-v0_5_1-wireless-cold-start-acceptance.json).
+Next repeat A/A/Z on that already-live wireless session. No USB selection is
+required after a fresh power-on. The console now prints live/waiting/silence status.
 
 The [loaded v0.5 run](../../../docs/testing/rtos-v0_5-loaded-track-observations.json)
 decoded half A and bend Z, but missed full A during recovery. Armed motor

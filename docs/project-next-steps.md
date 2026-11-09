@@ -76,10 +76,14 @@ now has three accepted attempts, no rejected captures and no scanner faults.
 Full A includes9deg yaw/11mm lateral travel; Z19deg/62mm. However, live telemetry
 stopped at the USB power handoff and the results were recovered only after
 USB reconnection. The new boot ID establishes a handoff restart; its precise
-wireless failure mechanism remains unresolved. Next verify a
-[fresh standalone-power wireless boot](testing/rtos-wireless-start.md) while
-stopped, avoiding the unnecessary USB selection/handoff. The helper now prints
-live status and missing-data warnings. Armed network-loss timing and repeated course
+wireless failure mechanism remains unresolved. A
+[fresh standalone-power wireless boot now passes](testing/rtos-v0_5_1-wireless-cold-start-acceptance.json)
+while stopped, with no Mac USB connection, fresh data, fault0, the stop latch
+set and all four task stack observations intact. Use the
+[direct-power startup procedure](testing/rtos-wireless-start.md), avoiding the
+unnecessary USB selection/handoff. Next use the already-live session for one
+uninterrupted wireless A/A/Z run. The helper now prints live status and missing-data
+warnings. Armed network-loss timing and repeated course
 acceptance remain open. The v0.4.2 rollback image is preserved.
 
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while
