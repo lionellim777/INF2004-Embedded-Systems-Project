@@ -62,9 +62,16 @@ reconnection now also pass](testing/rtos-v0_5-remote-stop-acceptance.json):
 both runs aborted/latched with fault0, Motion entry gaps peaked at10025/10048us,
 service ages10140/10177us, and all four low-stack markers stayed intact. The
 broker recovered without resetting the Pico or clearing the stop latch.
-The next step is [one loaded A/A/Z pass](testing/rtos-v0_5-track-check.md) for
-real Decoder stack/timing observations. Armed network-loss timing and repeated
-course acceptance remain open. The v0.4.2 rollback image is preserved.
+The [first loaded v0.5 pass](testing/rtos-v0_5-loaded-track-observations.json)
+decoded half A and bend Z but rejected full A during recovery. It established
+Decoder watermark1408B with intact low markers, armed Motion gap10079us and
+motor-service age10426us. The failed full-A waveform is retained and its
+first-crossing spatial reconstruction fault is reproduced. The
+[v0.5.1 latest-crossing candidate](testing/rtos-v0_5_1-recross-fix.md) now decodes
+that saved input in batch/streaming replay; older bend inputs and negative
+regressions also pass. Next install/check the candidate stationary, then
+repeat the wireless A/A/Z pass. Armed network-loss timing and repeated course
+acceptance remain open. The v0.4.2 rollback image is preserved.
 
 Use the [module handoff draft](rtos-module-handoff.md) to prepare adapters while
 members finish their portions. It is a proposal, not a team agreement. No

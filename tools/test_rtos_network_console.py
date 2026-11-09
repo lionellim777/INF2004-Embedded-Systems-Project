@@ -113,6 +113,8 @@ def main():
         usb.command('t');assert writes[-1]==b't'
         capture.line('[RTOS_INFO] version=0.5 network_state=1 network_error=0 uptime_ms=6')
         usb.command('t');assert writes[-1]==b't'
+        capture.line('[RTOS_INFO] version=0.5.1 network_state=1 network_error=0 uptime_ms=7')
+        usb.command('t');assert writes[-1]==b't'
         for key in ['start','go','s']:
             try:usb.command(key)
             except ValueError:pass

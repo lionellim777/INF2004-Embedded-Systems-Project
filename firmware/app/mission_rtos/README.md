@@ -1,4 +1,15 @@
-# µT-Kernel runtime evidence candidate v0.5
+# µT-Kernel barcode recross candidate v0.5.1
+
+v0.5.1 is [built and software-tested](../../../docs/testing/rtos-v0_5_1-recross-fix.md)
+on `yixuan/rtos-barcode-recross`; installation is pending. It selects the latest
+crossing of rescanned coordinates. The saved v0.5 full-A recovery failure now
+decodes A without changing Code39 validators. Legacy/default behavior remains
+unchanged. The candidate adds1024B scratch space, with the same task stacks.
+
+The [loaded v0.5 run](../../../docs/testing/rtos-v0_5-loaded-track-observations.json)
+decoded half A and bend Z, but missed full A during recovery. Armed motor
+service age stayed below10.5ms and all four low-stack markers were intact.
+That run is partial acceptance; v0.5.1 needs a new physical track check.
 
 v0.5 implements task stack observations, moving/idle timing and stop-source
 measurements. See the [implementation and first hardware check](../../../docs/testing/rtos-v0_5-runtime-evidence.md).
@@ -143,8 +154,8 @@ python3 tools/test_rtos_motion.py
 The build helper accepts `PICO_SDK_PATH`, `PICO_TOOLCHAIN_PATH`, `MTK_BSP_PATH`,
 `ROBOT_CMAKE`, `ROBOT_NINJA` and `ROBOT_PICOTOOL_DIR` overrides. Its default
 picotool directory is the one already used by the calibration build.
-Default build output is `build/rtos-motion-v0_5/robocar_rtos_motion_v0_5.uf2`; network
-setup builds separately under `build/rtos-network-v0_5/` using a private settings
+Default build output is `build/rtos-motion-v0_5_1/robocar_rtos_motion_v0_5_1.uf2`; network
+setup builds separately under `build/rtos-network-v0_5_1/` using a private settings
 header supplied by `RTOS_NETWORK_SETTINGS_FILE`. Nothing is flashed
 by these commands. Build/host evidence is in
 [the v0.2 report](../../../docs/testing/rtos-motion-v0_2.json).

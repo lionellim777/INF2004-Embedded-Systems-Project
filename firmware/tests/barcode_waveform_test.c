@@ -282,7 +282,8 @@ static void new_bend_fixture(const char *path)
     assert(hash==0x9a48ce7eu);w.motion=true;w.count=n/2;
     for(unsigned i=0;i<w.count;i++){w.sample[i]=words[2*i];w.position[i]=(int16_t)words[2*i+1];}
     char letter=0;assert(barcode_waveform_decode(&w,&letter) && letter=='Z');
-    assert((w.coherent_mask&0xcu)==0xcu);
+    /* Profile votes depend on which traversal supplied each observation. */
+    if(!BARCODE_WAVE_LAST_PASS)assert((w.coherent_mask&0xcu)==0xcu);
     /* The earlier half-A has a complete bounded-width A candidate. */
     uint32_t a[29]={19762,61431,72229,72455,70852,68604,20829,119475,26725,60867,71206,67327,21000,123666,25564,47770,26600,62891,66804,64133,26238,58806,71261,73630,67544,70343,9750,131311,15219};
     assert(!barcode_decode_code39_letter(a,&letter));
@@ -400,14 +401,15 @@ static void rtos_bend_fixture(const char *path)
     assert(hash==0x9b9bfd4au);w.motion=true;w.count=n/2;
     for(unsigned i=0;i<w.count;i++){w.sample[i]=words[2*i];w.position[i]=(int16_t)words[2*i+1];}
     char letter=0;bool ok=barcode_waveform_decode(&w,&letter);
-    if(BARCODE_WAVE_RECOVERY_OPTICS){assert(ok && letter=='Z' && (w.coherent_mask&0x38u)==0x38u);}
+    if(BARCODE_WAVE_RECOVERY_OPTICS){assert(ok && letter=='Z');if(!BARCODE_WAVE_LAST_PASS)assert((w.coherent_mask&0x38u)==0x38u);}
     else assert(!ok);
     /* Feed the same retained ADC/time/projected positions through streaming
      * framing, with its documented leading white duration. No expected letter
      * enters the decoder. This is a captured-input replay, not a new run. */
     begin();w.motion=true;
     for(unsigned i=0;i<271;i++){clock_us+=2000;w.sensor_x=(float)((int)i-271);char c=0;assert(!barcode_waveform_update(&w,166,clock_us,&c));}
-    for(unsigned i=0;i<n/2;i++){
+    assert((words[0]>>12)==0);w.previous=words[0]&4095u;
+    for(unsigned i=1;i<n/2;i++){
         uint16_t value=words[2*i];clock_us+=(uint32_t)(value>>12)*1000u;
         w.sensor_x=(float)(int16_t)words[2*i+1];char c=0;
         if(barcode_waveform_update(&w,value&4095u,clock_us,&c)){assert(c=='Z');reads++;}
@@ -415,10 +417,66 @@ static void rtos_bend_fixture(const char *path)
     if(BARCODE_WAVE_RECOVERY_OPTICS)assert(reads==1);else assert(!reads);
     printf("PASS physical RTOS bend input: FNV %08x, batch and captured-cadence replay, recovery mode=%u, reads=%u.\n",hash,BARCODE_WAVE_RECOVERY_OPTICS,reads);
 }
+static void rtos_full_a_fixture(const char *path)
+{
+    begin();FILE *f=fopen(path,"rb");assert(f);uint16_t words[16384];
+    unsigned n=(unsigned)fread(words,2,16384,f);fclose(f);assert(n==7746);
+    uint32_t hash=2166136261u;
+    for(unsigned i=0;i<n;i++){hash=(hash^(words[i]&255u))*16777619u;hash=(hash^(words[i]>>8u))*16777619u;}
+    assert(hash==0x43be51a9u);w.motion=true;w.count=n/2;
+    for(unsigned i=0;i<w.count;i++){w.sample[i]=words[2*i];w.position[i]=(int16_t)words[2*i+1];}
+    char letter=0;bool ok=barcode_waveform_decode(&w,&letter);
+    if(BARCODE_WAVE_LAST_PASS)assert(ok && letter=='A');else assert(!ok);
+    /* Decoding must preserve the exact recorded ADC/time/position words. */
+    for(unsigned i=0;i<w.count;i++)assert(w.sample[i]==words[2*i] && w.position[i]==(int16_t)words[2*i+1]);
+    begin();w.motion=true;
+    for(unsigned i=0;i<945;i++){clock_us+=2000;w.sensor_x=(float)((int)i-945);char c=0;assert(!barcode_waveform_update(&w,174,clock_us,&c));}
+    /* Snapshot word0 is the previous ADC level at the capture boundary,
+     * with no elapsed interval. Seed that level; it is not a duplicate
+     * zero-dt ADC callback (which correctly raises a sampling fault). */
+    assert((words[0]>>12)==0);w.previous=words[0]&4095u;
+    for(unsigned i=1;i<n/2;i++){
+        uint16_t value=words[2*i];clock_us+=(uint32_t)(value>>12)*1000u;
+        w.sensor_x=(float)(int16_t)words[2*i+1];char c=0;
+        if(barcode_waveform_update(&w,value&4095u,clock_us,&c)){assert(c=='A');reads++;}
+    }
+    if(BARCODE_WAVE_LAST_PASS)assert(reads==1);else assert(!reads);
+    printf("PASS saved full-A recovery input: FNV43be51a9, batch/captured-cadence replay, latest mode=%u reads=%u; raw words unchanged.\n",BARCODE_WAVE_LAST_PASS,reads);
+}
+static void transient_recross_matrix(void)
+{
+    unsigned accepted=0,rejected=0;
+    for(unsigned c=0;c<26;c++)for(unsigned reverse=0;reverse<2;reverse++)for(unsigned size=0;size<2;size++){
+        unsigned width[29],total=0,gap=0,narrow=size?80u:40u;
+        for(unsigned i=0;i<29;i++){
+            unsigned j=reverse?28-i:i,p=j/10==1?patterns[c]:0x094;
+            width[i]=narrow*((j%10<9 && (p&(1u<<(8-j%10))))?3u:1u);
+            if(i==1)gap=total;total+=width[i];
+        }
+        for(unsigned bad=0;bad<3;bad++){
+        begin();w.motion=true;int x=-300;unsigned state=0;bool backed=false;
+        for(unsigned tick=0;tick<10000 && x<(int)total+500;tick++){
+            if(bad!=1 && !backed && x==(int)(gap+narrow*3/4)){backed=true;state=narrow;}
+            if(state){x--;state--;}else x++;
+            uint16_t raw=190;unsigned at=x>=0?(unsigned)x:total;
+            if(x>=0 && at<total){unsigned i=0;while(at>=width[i]){at-=width[i];i++;}raw=(i%2 || (bad==2 && i==28))?190:2300;}
+            /* A first-crossing transient optical bump in a white gap, then
+             * a clean repeated traversal. No expected letter is passed. */
+            if(!backed && x>(int)(gap+narrow/3) && x<(int)(gap+narrow/2))raw=1500;
+            clock_us+=2000;w.sensor_x=(float)x;char letter=0;
+            if(barcode_waveform_update(&w,raw,clock_us,&letter)){assert(letter=='A'+(int)c);reads++;}
+        }
+        assert(reads<=1);
+        if(!bad && BARCODE_WAVE_LAST_PASS){assert(reads==1);accepted++;}
+        else {assert(!reads);if(bad)rejected++;}
+        }
+    }
+    printf("PASS104 transient recross A-Z/orientation/size cases, latest mode=%u recovered=%u; %u extra-mark-without-recross/missing-guard negatives rejected.\n",BARCODE_WAVE_LAST_PASS,accepted,rejected);
+}
 int main(int argc,char **argv)
 {
     geometry_model_matrix();long_bar_recross();
-    assert(argc==4);recorded_half_z(argv[1]);new_bend_fixture(argv[2]);short_optical_bar();rtos_bend_fixture(argv[3]);
+    assert(argc==5);recorded_half_z(argv[1]);new_bend_fixture(argv[2]);short_optical_bar();rtos_bend_fixture(argv[3]);rtos_full_a_fixture(argv[4]);transient_recross_matrix();
     spatial_sequence();curved_matrix();spatial_matrix();matrix();rejection_and_recovery();noisy_corpus();prefix_and_export();
     for(unsigned i=0;i<sizeof(recorded)/sizeof(recorded[0]);i++)for(unsigned reverse=0;reverse<2;reverse++){
         begin();samples(190,600000);

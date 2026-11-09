@@ -1,5 +1,10 @@
 # v0.5 loaded track check
 
+Completed on9 November: [half A and Z accepted, full A rejected during recovery](rtos-v0_5-loaded-track-observations.json).
+The [v0.5.1 candidate](rtos-v0_5_1-recross-fix.md) addresses the saved full-A
+failure. Reuse the physical steps below after its verified installation,
+expecting v0.5.1 identity; the original v0.5 setup and checklist follow as history.
+
 The installed v0.5 source is `c34205a`. GP20, USB and MQTT moving aborts
 have passed raised-wheel checks; the stopped broker restart retained the stop
 latch and recovered telemetry without resetting the Pico. See

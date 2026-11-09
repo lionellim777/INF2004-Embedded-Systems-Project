@@ -64,7 +64,7 @@ add_executable(robocar_rtos_motion main.c board.c safety_gate.c motion_record.c 
 target_include_directories(robocar_rtos_motion PRIVATE "${CMAKE_CURRENT_LIST_DIR}"
     "${BASELINE}" "${CMAKE_BINARY_DIR}/generated" "${MTK}/config" "${MTK}/include")
 target_compile_definitions(robocar_rtos_motion PRIVATE _PICO_RP2040_
-    RTOS_TRACK=1 RTOS_RUNTIME_EVIDENCE=1 BARCODE_WAVE_RECOVERY_OPTICS=1 ROBOCAR_CENTER_LINE=1 PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
+    RTOS_TRACK=1 RTOS_RUNTIME_EVIDENCE=1 BARCODE_WAVE_RECOVERY_OPTICS=1 BARCODE_WAVE_LAST_PASS=1 ROBOCAR_CENTER_LINE=1 PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
 target_compile_options(robocar_rtos_motion PRIVATE -Wall -Wextra -Werror -fstack-usage)
 target_link_libraries(robocar_rtos_motion PRIVATE mtkernel pico_stdlib
     hardware_adc hardware_clocks hardware_exception hardware_pwm pico_rand pico_cyw43_arch_lwip_poll pico_lwip_mqtt m)

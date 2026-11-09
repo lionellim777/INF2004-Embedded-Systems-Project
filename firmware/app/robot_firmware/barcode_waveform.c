@@ -39,10 +39,16 @@ static uint32_t fraction(unsigned d,unsigned lo,unsigned hi)
  * a stop or behind the furthest observed position do not add stripe width or
  * duplicate stripes. With flat long bars, another lateral row can contain
  * the same stripe sequence; optical framing and geometry must validate it.
- * Raw samples are retained. */
+ * RTOS latest-pass mode selects the final crossing of rescanned coordinates:
+ * an early filtered optical response during recovery must not be joined to a
+ * later response from the repeated crossing. No edge is inserted/deleted or
+ * chosen using a candidate letter. Raw samples are retained. */
 static bool series_next(const barcode_waveform_t *w,unsigned *index,int32_t *coordinate)
 {
     for(unsigned i=*index+1u;i<w->count;i++){
+#if BARCODE_WAVE_LAST_PASS
+        if(w->motion && !(w->latest_mask[i/8u]&(1u<<(i%8u))))continue;
+#endif
         int32_t next=w->motion?w->position[i]:*coordinate+(int32_t)STEP(w,i);
         if(w->motion && next<=*coordinate)continue;
         *index=i;*coordinate=next;return true;
@@ -99,6 +105,21 @@ bool barcode_waveform_decode(barcode_waveform_t *w,char *letter)
     static const unsigned prominence[]={12,24,48,96,192,384};
     if(!w || !letter || w->count<3u || w->count>BARCODE_WAVE_SAMPLES)return false;
     if(w->motion && w->motion_fault)return false;
+#if BARCODE_WAVE_LAST_PASS
+    if(w->motion){
+        /* A reverse scan marks strict suffix minima in O(sample count).
+         * Reading those marked samples forward gives the latest monotonic
+         * traversal. Include only one observation at a repeated coordinate;
+         * filtering/settling while stopped cannot create extra stripe width.
+         * No allocation, recursion, IRQ mask or destructive compaction. */
+        memset(w->latest_mask,0,sizeof(w->latest_mask));
+        int32_t minimum=INT32_MAX;
+        for(unsigned i=w->count;i-- >0u;){
+            if(w->position[i]>=minimum)continue;
+            minimum=w->position[i];w->latest_mask[i/8u]|=(uint8_t)(1u<<(i%8u));
+        }
+    }
+#endif
     char geometry=0;unsigned geometry_profiles=0;uint32_t *geometry_runs=w->geometry_work;
     char accepted=0,fit=0;uint32_t *fit_runs=w->fit_work;unsigned fit_profiles=0;unsigned best_score=0;bool conflict=false;
     w->complete_profiles=0;
