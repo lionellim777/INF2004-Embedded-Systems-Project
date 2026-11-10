@@ -4,7 +4,25 @@ Firmware and engineering records for the INF2004 Embedded Systems Programming gr
 
 The goal is an autonomous two-wheel robot that follows a line, decodes navigation barcodes, measures humps, avoids obstacles, reacquires the line, and publishes telemetry over Wi-Fi.
 
-## Current status
+## Current development and handoff
+
+**10 November2026: development paused for team handoff.** Lionel and Ezra should
+start with [the consolidated handoff](docs/HANDOFF-2026-11-10.md).
+
+- `main` remains the legacy v5.63 baseline described below.
+- `yixuan/rtos-minimum-bit-state` contains the newer combined µT-Kernel,
+  motor/line/barcode, binary MQTT and protected-stop work. RTOS v0.5.1 has two
+  physical AAZ passes, including a live wireless run with line recovery.
+- Opt-in v0.6-dev3 minimum-bit candidates are built/software-verified but
+  **not installed or hardware-accepted**. Their options default OFF, preserving
+  the accepted implementation. Terrain, obstacle and barcode-command execution
+  integrations still require the respective members' ready interfaces/code.
+
+The handoff records exact commits, hardware/calibration, test evidence,
+private-artifact boundaries and the next acceptance steps. Historical status
+below describes the legacy build; it does not supersede the newer branch work.
+
+## Legacy main baseline
 
 Latest checkpoint: **v5.63 barcode baseline**,7 November2026.
 Two physical home-track runs each accepted full-A, half-A and half-Z on the right
@@ -39,6 +57,7 @@ Detailed evidence and limitations are recorded in [docs/development-status.md](d
 ```text
 docs/                         Project requirements, design and wiring records
 firmware/app/robot_firmware/  Moving firmware, acquisition, control and local web UI
+firmware/app/mission_rtos/    New combined RTOS target and protected hardware owners
 firmware/tests/               Hardware diagnostics and host regression tests
 firmware/releases/            Published calibration UF2 and verification record
 tools/                        Build, replay, test and data-budget helpers

@@ -1,5 +1,11 @@
 # RTOS module handoff draft
 
+**Paused handoff,10 November:** Lionel and Ezra should begin with the
+[consolidated project handoff](HANDOFF-2026-11-10.md). It distinguishes legacy
+`main`, the accepted RTOS image, the latest uninstalled packing candidates and
+the next integration/physical acceptance gates. The contracts below remain a
+draft for team review.
+
 Status: integration proposal, not an agreed team API. The current tested core is
 RTOS v0.5.1 at `924eefe`, branch`yixuan/rtos-barcode-recross`, with two physical
 A/A/Z passes (6/6), including one [live wireless run with full-A and Z recovery observations](testing/rtos-v0_5_1-wireless-track-acceptance.json).

@@ -1,5 +1,10 @@
 # µT-Kernel accepted v0.5.1 and opt-in minimum-bit candidates
 
+**Development paused,10 November2026:** start with the
+[Lionel/Ezra project handoff](../../../docs/HANDOFF-2026-11-10.md) for branch,
+deployment, hardware, private-artifact and integration context. `main` remains
+legacy v5.63; this development branch contains the newer RTOS work.
+
 10 November update: [minimum-bit stage3](../../../docs/minimum-bit-conversion.md#stage-3-motion-owned-state-and-flags)
 is built/software-verified as`0.6-dev3`, on a separate branch and with explicit
 default-OFF options. Full-diagnostic BSS is207156B (176B representation saving).

@@ -1,5 +1,10 @@
 # Remaining project work —10 November2026
 
+**Development paused at the user's request.** The
+[Lionel/Ezra handoff](HANDOFF-2026-11-10.md) is the starting point for resuming.
+It records branch/deployment status and pending work; no candidate flash or
+main merge has been performed as part of the handoff.
+
 Current accepted RTOS core: v0.5.1, implementation`924eefe`, branch
 `yixuan/rtos-barcode-recross`. [Two physical A/A/Z runs now have6/6 target
 reads](testing/rtos-v0_5_1-wireless-track-acceptance.json); the latest has all
