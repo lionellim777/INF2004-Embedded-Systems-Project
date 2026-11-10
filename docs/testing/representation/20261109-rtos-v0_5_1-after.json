@@ -1,0 +1,118 @@
+{
+  "recorded_utc": "2026-11-09T03:09:32.078360+00:00",
+  "firmware_version": "0.5.1",
+  "implementation_commit": "924eefe",
+  "elf_sha256": "75bc98e4f6eb02dd2eca78b020ca0d9e4e3b07e2705980e88807c7c09a53b08f",
+  "uf2_sha256": "b7836015b55e8636b6f154a3139b693851651b810b654da642c85b5a62e2624d",
+  "arm_gcc_layout_bytes": {
+    "motion_record_t": 28,
+    "motion_runtime_t": 1464,
+    "track_runtime_t": 1264,
+    "course_control_t": 1160,
+    "barcode_waveform_t": 74620,
+    "barcode_wave_snapshot_t": 33668,
+    "barcode_wave_attempt_t": 168,
+    "track_ir_t": 16,
+    "track_diagnostics_t": 28,
+    "track_event_t": 8,
+    "safety_gate_t": 8,
+    "binary_command_frame_t": 3,
+    "binary_command_t": 4,
+    "runtime_span_t": 8,
+    "runtime_task_t": 20,
+    "runtime_stack_t": 8,
+    "runtime_summary_t": 40,
+    "scan_state_t": 52,
+    "scan_snapshot_t": 32
+  },
+  "probe": {
+    "compiler": "Arm GNU14.2.rel1 / Cortex-M0+",
+    "flags": [
+      "-std=c11",
+      "-mcpu=cortex-m0plus",
+      "-mthumb",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-DRTOS_TRACK=1",
+      "-DRTOS_RUNTIME_EVIDENCE=1",
+      "-DBARCODE_WAVE_RECOVERY_OPTICS=1",
+      "-DBARCODE_WAVE_LAST_PASS=1",
+      "-I/Users/cyix/Github/INF2004-Embedded-Systems-Project/firmware/app/mission_rtos",
+      "-I/Users/cyix/Github/INF2004-Embedded-Systems-Project/firmware/app/robot_firmware"
+    ],
+    "source": "#include \"motion_runtime.h\"\n#include \"motion_record.h\"\n#include \"track_sensor.h\"\n#include \"barcode_waveform.h\"\n#include \"safety_gate.h\"\n#include \"binary_protocol.h\"\n#include \"runtime_measure.h\"\n#include \"scan_diagnostic.h\"\nconst unsigned sizes[] __attribute__((section(\".sizes\")))={sizeof(motion_record_t),sizeof(motion_runtime_t),sizeof(track_runtime_t),sizeof(course_control_t),sizeof(barcode_waveform_t),sizeof(barcode_wave_snapshot_t),sizeof(barcode_wave_attempt_t),sizeof(track_ir_t),sizeof(track_diagnostics_t),sizeof(track_event_t),sizeof(safety_gate_t),sizeof(binary_command_frame_t),sizeof(binary_command_t),sizeof(runtime_span_t),sizeof(runtime_task_t),sizeof(runtime_stack_t),sizeof(runtime_summary_t),sizeof(scan_state_t),sizeof(scan_snapshot_t)};\n",
+    "source_sha256": "f6442b2bff3d0f43b9582ec61becb89b586e3d9c3ac276d5f3ff06a12aba4024",
+    "linked_waveform_symbol_size_matches": true
+  },
+  "linked": {
+    "text": 451248,
+    "data": 0,
+    "bss": 207332,
+    "total_sram": 270336,
+    "arithmetic_remainder": 63004,
+    "remainder_is_measured_free_memory": false
+  },
+  "largest_relevant_allocations": {
+    "waveform": 74620,
+    "first_words": 32768,
+    "first_profiles": 864,
+    "first_failure": 32,
+    "queue": 7168,
+    "kernel_pool": 32768,
+    "memp_memory_PBUF_POOL_base": 36771
+  },
+  "same_semantics_comparison": {
+    "sample_queue_slots": 512,
+    "legacy_entry_bytes": 16,
+    "current_entry_bytes": 14,
+    "legacy_bytes": 8192,
+    "current_bytes": 7168,
+    "saving_bytes": 1024,
+    "preserves": "timestamp32, left/right raw encoder32, ADC12 and4 zero pad bits"
+  },
+  "application_payload_bytes": {
+    "status": [
+      10
+    ],
+    "link": [
+      1
+    ],
+    "barcode": [
+      5
+    ],
+    "scan_diag": [
+      4,
+      31,
+      46,
+      109,
+      133,
+      153
+    ],
+    "runtime_diag": [
+      34,
+      36
+    ],
+    "motion": [
+      13
+    ],
+    "line": [
+      9
+    ],
+    "command_result": [
+      1
+    ]
+  },
+  "runtime_evidence": "../rtos-v0_5_1-wireless-track-acceptance.json",
+  "remaining_independent_work": [
+    "Review application-owned working state ranges, lifetimes and shared access beyond binary message records.",
+    "Prepare a lean diagnostics profile after preserving the fully validated diagnostic build; current first-failure raw cache alone is32KiB.",
+    "Maintain equivalent-feature comparisons; total BSS change from legacy includes removed UI and added kernel/diagnostics, so is not a packing saving."
+  ],
+  "limits": [
+    "This measures selected current ARM layouts, linked allocations and observed binary payload sizes; it is not a whole-application minimum-bit compliance claim.",
+    "Containers and nested fields are not additive allocations. Kernel task stacks are already inside the32KiB pool.",
+    "Runtime stack watermarks are from the accepted course case, not worst-case bounds or free heap.",
+    "Teammate terrain/obstacle/command ranges require their owners; no algorithms or existing firmware were changed."
+  ]
+}

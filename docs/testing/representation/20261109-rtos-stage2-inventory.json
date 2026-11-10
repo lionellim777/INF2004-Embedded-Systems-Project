@@ -1,0 +1,300 @@
+{
+  "recorded_utc": "2026-11-09T03:48:24.747804+00:00",
+  "scope": "Selected current application header declarations, compact ADC/core enabled",
+  "types": {
+    "adc12_filter_t": {
+      "bytes": 21,
+      "source": "adc12_filter.h"
+    },
+    "barcode_batch_t": {
+      "bytes": 828,
+      "source": "barcode_acquisition.h"
+    },
+    "barcode_capture_t": {
+      "bytes": 408,
+      "source": "barcode_acquisition.h"
+    },
+    "barcode_decode_diagnostic_t": {
+      "bytes": 14,
+      "source": "barcode_decoder.h"
+    },
+    "barcode_edge_t": {
+      "bytes": 8,
+      "source": "barcode_acquisition.h"
+    },
+    "barcode_motion_t": {
+      "bytes": 56,
+      "source": "barcode_motion.h"
+    },
+    "barcode_progress_t": {
+      "bytes": 256,
+      "source": "barcode_drive.h"
+    },
+    "barcode_reader_t": {
+      "bytes": 88,
+      "source": "barcode_reader.h"
+    },
+    "barcode_runs_t": {
+      "bytes": 73,
+      "source": "barcode_runs.h"
+    },
+    "barcode_sample_stats_t": {
+      "bytes": 56,
+      "source": "barcode_acquisition.h"
+    },
+    "barcode_sampler_t": {
+      "bytes": 904,
+      "source": "barcode_acquisition.h"
+    },
+    "barcode_wave_attempt_t": {
+      "bytes": 168,
+      "source": "barcode_waveform.h"
+    },
+    "barcode_wave_profile_t": {
+      "bytes": 144,
+      "source": "barcode_waveform.h"
+    },
+    "barcode_wave_snapshot_t": {
+      "bytes": 33668,
+      "source": "barcode_waveform.h"
+    },
+    "barcode_waveform_t": {
+      "bytes": 74620,
+      "source": "barcode_waveform.h"
+    },
+    "binary_command_frame_t": {
+      "bytes": 3,
+      "source": "binary_protocol.h"
+    },
+    "binary_command_t": {
+      "bytes": 4,
+      "source": "binary_protocol.h"
+    },
+    "board_runtime_trace_t": {
+      "bytes": 24,
+      "source": "board.h"
+    },
+    "board_stop_trace_t": {
+      "bytes": 20,
+      "source": "board.h"
+    },
+    "center_baseline_t": {
+      "bytes": 48,
+      "source": "center_baseline.h"
+    },
+    "center_search_t": {
+      "bytes": 144,
+      "source": "center_search.h"
+    },
+    "center_trim_t": {
+      "bytes": 72,
+      "source": "center_trim.h"
+    },
+    "course_config_t": {
+      "bytes": 4,
+      "source": "course_config.h"
+    },
+    "course_control_t": {
+      "bytes": 1160,
+      "source": "course_control.h"
+    },
+    "course_phase_t": {
+      "bytes": 1,
+      "source": "course_control.h"
+    },
+    "encoder_sample_t": {
+      "bytes": 16,
+      "source": "encoders.h"
+    },
+    "ir_roles_t": {
+      "bytes": 3,
+      "source": "line_check.h"
+    },
+    "line_check_output_t": {
+      "bytes": 16,
+      "source": "line_check.h"
+    },
+    "motion_control_t": {
+      "bytes": 176,
+      "source": "motion_control.h"
+    },
+    "motion_fault_t": {
+      "bytes": 1,
+      "source": "motion_control.h"
+    },
+    "motion_kind_t": {
+      "bytes": 1,
+      "source": "motion_control.h"
+    },
+    "motion_phase_t": {
+      "bytes": 1,
+      "source": "motion_control.h"
+    },
+    "motion_record_t": {
+      "bytes": 28,
+      "source": "motion_record.h"
+    },
+    "motion_runtime_t": {
+      "bytes": 1432,
+      "source": "motion_runtime.h"
+    },
+    "motion_wheel_t": {
+      "bytes": 64,
+      "source": "motion_control.h"
+    },
+    "runtime_span_t": {
+      "bytes": 8,
+      "source": "runtime_measure.h"
+    },
+    "runtime_stack_t": {
+      "bytes": 8,
+      "source": "runtime_measure.h"
+    },
+    "runtime_summary_t": {
+      "bytes": 40,
+      "source": "runtime_measure.h"
+    },
+    "runtime_task_t": {
+      "bytes": 20,
+      "source": "runtime_measure.h"
+    },
+    "safety_gate_t": {
+      "bytes": 8,
+      "source": "safety_gate.h"
+    },
+    "scan_snapshot_t": {
+      "bytes": 32,
+      "source": "scan_diagnostic.h"
+    },
+    "scan_state_t": {
+      "bytes": 52,
+      "source": "scan_diagnostic.h"
+    },
+    "track_control_t": {
+      "bytes": 4,
+      "source": "track_control.h"
+    },
+    "track_diagnostics_t": {
+      "bytes": 28,
+      "source": "track_sensor.h"
+    },
+    "track_event_t": {
+      "bytes": 8,
+      "source": "track_sensor.h"
+    },
+    "track_ir_t": {
+      "bytes": 16,
+      "source": "track_sensor.h"
+    },
+    "track_runtime_t": {
+      "bytes": 1232,
+      "source": "track_runtime.h"
+    }
+  },
+  "enums": {
+    "motion_kind_t": {
+      "values": {
+        "MOTION_NONE": 0,
+        "MOTION_STRAIGHT_30CM": 1,
+        "MOTION_LEFT_90": 2,
+        "MOTION_RIGHT_90": 3,
+        "MOTION_RIGHT_180": 4,
+        "MOTION_BARCODE": 5,
+        "MOTION_CONTINUOUS": 6,
+        "MOTION_COURSE": 7,
+        "MOTION_AVOID": 8
+      },
+      "required_bits": 4
+    },
+    "motion_phase_t": {
+      "values": {
+        "MOTION_IDLE": 0,
+        "MOTION_ACTIVE": 1,
+        "MOTION_DONE": 2,
+        "MOTION_ABORTED": 3,
+        "MOTION_FAULT": 4
+      },
+      "required_bits": 3
+    },
+    "motion_fault_t": {
+      "values": {
+        "MOTION_OK": 0,
+        "MOTION_ENCODER_INVALID": 1,
+        "MOTION_WRONG_DIRECTION": 2,
+        "MOTION_STALLED": 3,
+        "MOTION_LATE_POLL": 4,
+        "MOTION_TIMED_OUT": 5
+      },
+      "required_bits": 3
+    },
+    "course_phase_t": {
+      "values": {
+        "COURSE_FOLLOW": 0,
+        "COURSE_CENTER": 1,
+        "COURSE_BRAKE": 2,
+        "COURSE_TURN": 3,
+        "COURSE_SETTLE": 4,
+        "COURSE_SEEK": 5,
+        "COURSE_FAILED": 6,
+        "COURSE_LOST": 7
+      },
+      "required_bits": 3
+    }
+  },
+  "field_rows": 554,
+  "status_counts": {
+    "CANDIDATE_SOFTWARE_VERIFIED": 11,
+    "CONTAINER_REVIEW_ALLOCATION": 28,
+    "REVIEW_REQUIRED": 412,
+    "DOMAIN_KNOWN_REVIEW_STORAGE": 95,
+    "ENUM_DOMAIN_REVIEW_STORAGE": 4,
+    "PRESERVED_COUNTER_CONTRACT": 4
+  },
+  "source_sha256": {
+    "firmware/app/robot_firmware/obstacle_bypass.h": "3029de79c8d2b7ea28b391859a37a835ca9ec8244f6e316545b7488b006e077c",
+    "firmware/app/robot_firmware/barcode_acquisition.h": "e587a993ee7ac68d375d67f049113ba3f8c50350b22d63c0d6204bcfeaad1a3e",
+    "firmware/app/robot_firmware/barcode_runs.h": "b9b502adc4709d42a93f05a8ab2ffdf2582d66716f804f11f18308cc1beda93f",
+    "firmware/app/robot_firmware/obstacle_plan.h": "4cc49b5d254ecadb3a3f63677b776ccf1e59de9aae43981904d78f4ad708562f",
+    "firmware/app/robot_firmware/center_search.h": "b20c3852ba5a85fae21ab63b6bfe448489285c30262665f79d93f7f75a99c5fa",
+    "firmware/app/robot_firmware/center_trim.h": "1859d3962a7e81c8e3604f83573c9ca4872c7d29b18940bffef3b8ea5cd7c765",
+    "firmware/app/robot_firmware/center_baseline.h": "58669198bdd551a6180fe6f50c660c56fbb43c4136cddcbac7685552d74546e4",
+    "firmware/app/robot_firmware/encoders.h": "618231847534e8d709a71a6c1f1afd27de6d262f41235151dd05ff32a4c0c450",
+    "firmware/app/robot_firmware/barcode_drive.h": "65a72a5650d3249867041e77165a72c8b8719bcdf9a67fadb60d5289f402cc73",
+    "firmware/app/robot_firmware/motion_control.h": "fb7303f7f1be44e1cb9812cc7bd6ccbc648ff501a1c418377f2bb72757372980",
+    "firmware/app/robot_firmware/barcode_motion.h": "f34cdb0359fe946187cdd64f3e93db17247d979d4e3647219e2f80eaf7dad268",
+    "firmware/app/robot_firmware/navigation_commands.h": "e528a83267579f8fba6b8a4edee5815590461db4ffcd7741def371df84039eef",
+    "firmware/app/robot_firmware/line_check.h": "3748f8e2b462608065f35ad402769a37d6f701c9eee86f15c8275cccc7a69eb5",
+    "firmware/app/robot_firmware/barcode_decoder.h": "70b38e15cedce879a394761ba26b03fb18e3aad942aea4eeeb15167b84247c06",
+    "firmware/app/robot_firmware/terrain.h": "9d78076d251e23416665093c74927d50fe9066f45f9f7d1d671083ced7dfbe1a",
+    "firmware/app/robot_firmware/course_config.h": "c7e55f4754c8103aa23c3b98bd5aa25e62235c97c3a446bfc81b0585b764cf61",
+    "firmware/app/robot_firmware/barcode_signal.h": "47cd9c3907a2559ecf673a660c8c255bb96c43360d9807c1cf83213c9aab811f",
+    "firmware/app/robot_firmware/run_diagnostics.h": "9bae034e2839c07ebe4a4e88aec184877ce2aeb847bf2ea1ee19d7df63f886f6",
+    "firmware/app/robot_firmware/barcode_waveform.h": "8cecdf768bf7c8edbaecc8833d873f22233e7cebff0ec956c8437c915a9fa128",
+    "firmware/app/robot_firmware/motor_guard.h": "b69d4234d2f6bcae99c3693c06367c496d5ca47795ef9643fa7dc3cfe2a479af",
+    "firmware/app/robot_firmware/barcode_optical.h": "a85101d957a7af2906f706646f360c44199943d06bbc1076343877586fc9ae40",
+    "firmware/app/robot_firmware/course_control.h": "41e580fd8f8d0ad2ffd88e4a95d09245fbca4d31d5043ca4b1b1640f05e2913d",
+    "firmware/app/robot_firmware/calibration_wifi.h": "bcb26b85817f9cb11d34d3de85a3512d9115354d33de99c607632f55891f84fa",
+    "firmware/app/robot_firmware/barcode_reader.h": "ea85d3c057f95da6694688eb13d352dd7af99fdc78d6e4e98aa015873db2666d",
+    "firmware/app/mission_rtos/binary_protocol.h": "75436adba9d03a6a2a001f9f0160a9ced100112d93287c3424156159784b397c",
+    "firmware/app/mission_rtos/version.h": "f2905407e4617b62fe9057ce30754882863f303622b8fd4caa70fe878a7eeb9d",
+    "firmware/app/mission_rtos/runtime_report.h": "b2628ecad21bb8f37f9af38037d940786d3821b27cb0d27e60c48486a6a4819f",
+    "firmware/app/mission_rtos/safety_gate.h": "46e38a72a8cbd12ecbdb9a7171938f5d9ed9b0acdab8165f01b64b7ca54091b0",
+    "firmware/app/mission_rtos/track_sensor.h": "457a57693d5c0f96ca6868cb93e6279132a1c8816cf52c75119e0cc22f8c51b2",
+    "firmware/app/mission_rtos/track_runtime.h": "40ec8b0d5886259868314689d49bd184d1a24c9695f598cebafc5f7733d30ed9",
+    "firmware/app/mission_rtos/runtime_measure.h": "5f72c63ff657426576e285dc0c55437fc3671020e227fab95185d2fd95a1fdb1",
+    "firmware/app/mission_rtos/adc12_filter.h": "a9089d1422d5fa2d58b8023c07ae1fd1d30dd0d2dbccc7764d49e8c8a43f5ac2",
+    "firmware/app/mission_rtos/network_service.h": "b46238ec9e393199bc899212708a7af4208a979089ab2b6a1e3623bf7f7a9584",
+    "firmware/app/mission_rtos/motion_record.h": "87c95d3f704811939690e4fa135a932a9b29105ce46bf52b7b548b445589701b",
+    "firmware/app/mission_rtos/track_control.h": "71b000befdabf48f18c8d43b95a0a51e3fa2cbab18a0ebe4ef548762eb5124fa",
+    "firmware/app/mission_rtos/motion_runtime.h": "14dae55818e85b758db2f59ff43cf81aa5dc58086ea062167ff700152421703e",
+    "firmware/app/mission_rtos/board.h": "5cbc4514cc448478444315d0086f6c8ef666d05382062de5fc3704a25fb51499",
+    "firmware/app/mission_rtos/scan_diagnostic.h": "ea31023126253899133395d20a24b83006dd0beace554cd5a9cb58c1f89b9371"
+  },
+  "limits": [
+    "This is a declared-type checklist, not whole-application compliance or a count of allocated objects.",
+    "Private C-file records/globals, automatic locals, included-but-unused types and precision/lifetime proof require separate review.",
+    "Candidate verified status means software equivalence/domain evidence; hardware timing is still pending.",
+    "Native validation/staging records may need a wider domain than the checked internal/wire representation; document that purpose.",
+    "Kernel/SDK records are not classified as application data here; task stack/pool budgeting remains separately measured."
+  ]
+}

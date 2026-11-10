@@ -1,0 +1,810 @@
+{
+  "after_change_measurements": null,
+  "ast_compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "commits": {
+    "main": "fefad265ff5aaf11a1de789b6937fdd09c1042da",
+    "obstacle": "4b8ad62b9d14b02dab632fd693661488aae7e747",
+    "terrain": "4e9ba35ca69722ea56b75540cfd78a98bbbea690",
+    "wifi": "0a7604d807a7457a79c481a3a4758ac41fab45d7"
+  },
+  "compiler": "arm-none-eabi-gcc (Arm GNU Toolchain 14.2.Rel1 (Build arm-14.52)) 14.2.1 20241119",
+  "coverage": "Named public application records/enums/scalar aliases plus three copied private main layouts; excludes automatic locals, private transport internals and third-party kernel/SDK fields",
+  "hardware_tests_performed": false,
+  "inventory_rows": 658,
+  "inventory_status_counts": {
+    "ADC12_ASSUMPTION": 5,
+    "ALREADY_PACKED": 1,
+    "CODE_RANGE": 135,
+    "CONTAINER_REVIEW": 81,
+    "KEEP_PENDING_LIFETIME_REVIEW": 7,
+    "OWNER_DECISION": 402,
+    "PACKED_OWNER_REVIEW": 14,
+    "RECODING_PROPOSAL": 7,
+    "STRUCTURAL": 6
+  },
+  "layouts": {
+    "main": {
+      "enums": {
+        "avoid_phase_t": {
+          "required_bits": 5,
+          "values": {
+            "AVOID_ALIGN_CONFIRM": 17,
+            "AVOID_ALIGN_TURN": 16,
+            "AVOID_AXLE_ADVANCE": 15,
+            "AVOID_CHECK_LEFT": 19,
+            "AVOID_CHECK_TAPE": 13,
+            "AVOID_CLEAR_TAIL": 20,
+            "AVOID_FAILED": 21,
+            "AVOID_FOLLOW": 0,
+            "AVOID_MOVE_ALONG": 7,
+            "AVOID_MOVE_OUT": 4,
+            "AVOID_RETURN_LINE": 11,
+            "AVOID_SCAN_FORWARD": 6,
+            "AVOID_SCAN_INITIAL": 18,
+            "AVOID_SCAN_OUT": 3,
+            "AVOID_SCAN_SIDE": 9,
+            "AVOID_TAPE_PROBE": 14,
+            "AVOID_TURN_ALONG": 10,
+            "AVOID_TURN_FORWARD": 5,
+            "AVOID_TURN_LOOK": 8,
+            "AVOID_TURN_OUT": 2,
+            "AVOID_VERIFY": 12,
+            "AVOID_WAIT": 1
+          }
+        },
+        "course_phase_t": {
+          "required_bits": 3,
+          "values": {
+            "COURSE_BRAKE": 2,
+            "COURSE_CENTER": 1,
+            "COURSE_FAILED": 6,
+            "COURSE_FOLLOW": 0,
+            "COURSE_LOST": 7,
+            "COURSE_SEEK": 5,
+            "COURSE_SETTLE": 4,
+            "COURSE_TURN": 3
+          }
+        },
+        "motion_fault_t": {
+          "required_bits": 3,
+          "values": {
+            "MOTION_ENCODER_INVALID": 1,
+            "MOTION_LATE_POLL": 4,
+            "MOTION_OK": 0,
+            "MOTION_STALLED": 3,
+            "MOTION_TIMED_OUT": 5,
+            "MOTION_WRONG_DIRECTION": 2
+          }
+        },
+        "motion_kind_t": {
+          "required_bits": 4,
+          "values": {
+            "MOTION_AVOID": 8,
+            "MOTION_BARCODE": 5,
+            "MOTION_CONTINUOUS": 6,
+            "MOTION_COURSE": 7,
+            "MOTION_LEFT_90": 2,
+            "MOTION_NONE": 0,
+            "MOTION_RIGHT_180": 4,
+            "MOTION_RIGHT_90": 3,
+            "MOTION_STRAIGHT_30CM": 1
+          }
+        },
+        "motion_phase_t": {
+          "required_bits": 3,
+          "values": {
+            "MOTION_ABORTED": 3,
+            "MOTION_ACTIVE": 1,
+            "MOTION_DONE": 2,
+            "MOTION_FAULT": 4,
+            "MOTION_IDLE": 0
+          }
+        },
+        "navigation_command_t": {
+          "required_bits": 3,
+          "values": {
+            "NAV_COMMAND_INVALID": 5,
+            "NAV_COMMAND_LEFT": 1,
+            "NAV_COMMAND_NONE": 0,
+            "NAV_COMMAND_RIGHT": 2,
+            "NAV_COMMAND_STRAIGHT": 3,
+            "NAV_COMMAND_UTURN": 4
+          }
+        }
+      },
+      "field_rows": 596,
+      "types": {
+        "avoid_phase_t": {
+          "bytes": 1,
+          "source": "obstacle_bypass.h"
+        },
+        "barcode_batch_t": {
+          "bytes": 828,
+          "source": "barcode_acquisition.h"
+        },
+        "barcode_capture_t": {
+          "bytes": 408,
+          "source": "barcode_acquisition.h"
+        },
+        "barcode_decode_diagnostic_t": {
+          "bytes": 14,
+          "source": "barcode_decoder.h"
+        },
+        "barcode_edge_t": {
+          "bytes": 8,
+          "source": "barcode_acquisition.h"
+        },
+        "barcode_motion_t": {
+          "bytes": 56,
+          "source": "barcode_motion.h"
+        },
+        "barcode_optical_t": {
+          "bytes": 2020,
+          "source": "barcode_optical.h"
+        },
+        "barcode_progress_t": {
+          "bytes": 256,
+          "source": "barcode_drive.h"
+        },
+        "barcode_reader_t": {
+          "bytes": 88,
+          "source": "barcode_reader.h"
+        },
+        "barcode_runs_t": {
+          "bytes": 73,
+          "source": "barcode_runs.h"
+        },
+        "barcode_sample_stats_t": {
+          "bytes": 56,
+          "source": "barcode_acquisition.h"
+        },
+        "barcode_sampler_t": {
+          "bytes": 904,
+          "source": "barcode_acquisition.h"
+        },
+        "barcode_signal_t": {
+          "bytes": 36,
+          "source": "barcode_signal.h"
+        },
+        "barcode_wave_attempt_t": {
+          "bytes": 168,
+          "source": "barcode_waveform.h"
+        },
+        "barcode_wave_profile_t": {
+          "bytes": 144,
+          "source": "barcode_waveform.h"
+        },
+        "barcode_wave_snapshot_t": {
+          "bytes": 33668,
+          "source": "barcode_waveform.h"
+        },
+        "barcode_waveform_t": {
+          "bytes": 73596,
+          "source": "barcode_waveform.h"
+        },
+        "button_t": {
+          "bytes": 16,
+          "source": "robot_firmware.c (exact copied declaration)"
+        },
+        "calibration_core_t": {
+          "bytes": 26640,
+          "source": "wireless/calibration_core.h"
+        },
+        "center_baseline_t": {
+          "bytes": 80,
+          "source": "center_baseline.h"
+        },
+        "center_search_t": {
+          "bytes": 144,
+          "source": "center_search.h"
+        },
+        "center_trim_t": {
+          "bytes": 72,
+          "source": "center_trim.h"
+        },
+        "course_config_t": {
+          "bytes": 4,
+          "source": "course_config.h"
+        },
+        "course_control_t": {
+          "bytes": 1160,
+          "source": "course_control.h"
+        },
+        "course_phase_t": {
+          "bytes": 1,
+          "source": "course_control.h"
+        },
+        "encoder_sample_t": {
+          "bytes": 16,
+          "source": "encoders.h"
+        },
+        "ir_roles_t": {
+          "bytes": 3,
+          "source": "line_check.h"
+        },
+        "line_check_output_t": {
+          "bytes": 16,
+          "source": "line_check.h"
+        },
+        "motion_control_t": {
+          "bytes": 176,
+          "source": "motion_control.h"
+        },
+        "motion_fault_t": {
+          "bytes": 1,
+          "source": "motion_control.h"
+        },
+        "motion_kind_t": {
+          "bytes": 1,
+          "source": "motion_control.h"
+        },
+        "motion_phase_t": {
+          "bytes": 1,
+          "source": "motion_control.h"
+        },
+        "motion_wheel_t": {
+          "bytes": 64,
+          "source": "motion_control.h"
+        },
+        "motor_guard_t": {
+          "bytes": 8,
+          "source": "motor_guard.h"
+        },
+        "motor_t": {
+          "bytes": 16,
+          "source": "robot_firmware.c (exact copied declaration)"
+        },
+        "navigation_command_t": {
+          "bytes": 1,
+          "source": "navigation_commands.h"
+        },
+        "navigation_manoeuvre_t": {
+          "bytes": 12,
+          "source": "navigation_commands.h"
+        },
+        "obstacle_bypass_t": {
+          "bytes": 2824,
+          "source": "obstacle_bypass.h"
+        },
+        "obstacle_plan_t": {
+          "bytes": 24,
+          "source": "obstacle_plan.h"
+        },
+        "run_diagnostics_t": {
+          "bytes": 76,
+          "source": "run_diagnostics.h"
+        },
+        "terrain_status_t": {
+          "bytes": 28,
+          "source": "terrain.h"
+        },
+        "waveform_sample_t": {
+          "bytes": 16,
+          "source": "robot_firmware.c (exact copied declaration)"
+        }
+      }
+    },
+    "obstacle": {
+      "enums": {
+        "obstacle_status_t": {
+          "required_bits": 2,
+          "values": {
+            "OBSTACLE_NOT_MEASURED": 0,
+            "OBSTACLE_OVER_LIMIT": 3,
+            "OBSTACLE_UNAVAILABLE": 2,
+            "OBSTACLE_VALID": 1
+          }
+        }
+      },
+      "field_rows": 0,
+      "types": {
+        "obstacle_sample_t": {
+          "bytes": 2,
+          "source": "obstacle_data.h"
+        },
+        "obstacle_status_t": {
+          "bytes": 1,
+          "source": "obstacle_data.h"
+        }
+      }
+    },
+    "terrain": {
+      "enums": {
+        "terrain_motion_t": {
+          "required_bits": 3,
+          "values": {
+            "TERRAIN_MOTION_ACCELERATING": 2,
+            "TERRAIN_MOTION_CLIMBING": 4,
+            "TERRAIN_MOTION_DESCENDING": 5,
+            "TERRAIN_MOTION_IMPACT": 6,
+            "TERRAIN_MOTION_MOVING": 7,
+            "TERRAIN_MOTION_STATIONARY": 1,
+            "TERRAIN_MOTION_TURNING": 3,
+            "TERRAIN_MOTION_UNKNOWN": 0
+          }
+        }
+      },
+      "field_rows": 14,
+      "types": {
+        "terrain_motion_t": {
+          "bytes": 1,
+          "source": "terrain.h"
+        },
+        "terrain_status_t": {
+          "bytes": 14,
+          "source": "terrain.h"
+        }
+      }
+    },
+    "wifi": {
+      "enums": {
+        "telemetry_event_kind_t": {
+          "required_bits": 2,
+          "values": {
+            "TELEMETRY_EVENT_BARCODE": 0,
+            "TELEMETRY_EVENT_HUMP": 1,
+            "TELEMETRY_EVENT_OBSTACLE": 3,
+            "TELEMETRY_EVENT_SCAN_POINT": 2
+          }
+        },
+        "telemetry_mission_state_t": {
+          "required_bits": 2,
+          "values": {
+            "TELEMETRY_MISSION_IDLE": 1,
+            "TELEMETRY_MISSION_RUNNING": 2,
+            "TELEMETRY_MISSION_STOPPED": 3,
+            "TELEMETRY_MISSION_UNKNOWN": 0
+          }
+        },
+        "telemetry_motion_state_t": {
+          "required_bits": 3,
+          "values": {
+            "TELEMETRY_MOTION_ACCELERATING": 2,
+            "TELEMETRY_MOTION_CLIMBING": 4,
+            "TELEMETRY_MOTION_DESCENDING": 5,
+            "TELEMETRY_MOTION_IMPACT": 6,
+            "TELEMETRY_MOTION_STATIONARY": 1,
+            "TELEMETRY_MOTION_TURNING": 3,
+            "TELEMETRY_MOTION_UNKNOWN": 0
+          }
+        },
+        "telemetry_source_t": {
+          "required_bits": 3,
+          "values": {
+            "TELEMETRY_SOURCE_LINE": 2,
+            "TELEMETRY_SOURCE_MISSION": 0,
+            "TELEMETRY_SOURCE_MOTION": 1,
+            "TELEMETRY_SOURCE_OBSTACLE": 4,
+            "TELEMETRY_SOURCE_TERRAIN": 3
+          }
+        }
+      },
+      "field_rows": 48,
+      "types": {
+        "telemetry_event_kind_t": {
+          "bytes": 1,
+          "source": "telemetry.h"
+        },
+        "telemetry_event_t": {
+          "bytes": 20,
+          "source": "telemetry.h"
+        },
+        "telemetry_line_t": {
+          "bytes": 16,
+          "source": "telemetry.h"
+        },
+        "telemetry_mission_state_t": {
+          "bytes": 1,
+          "source": "telemetry.h"
+        },
+        "telemetry_mission_t": {
+          "bytes": 12,
+          "source": "telemetry.h"
+        },
+        "telemetry_motion_state_t": {
+          "bytes": 1,
+          "source": "telemetry.h"
+        },
+        "telemetry_motion_t": {
+          "bytes": 28,
+          "source": "telemetry.h"
+        },
+        "telemetry_obstacle_t": {
+          "bytes": 28,
+          "source": "telemetry.h"
+        },
+        "telemetry_sample_t": {
+          "bytes": 32,
+          "source": "telemetry.h"
+        },
+        "telemetry_snapshot_t": {
+          "bytes": 104,
+          "source": "telemetry.h"
+        },
+        "telemetry_source_t": {
+          "bytes": 1,
+          "source": "telemetry.h"
+        },
+        "telemetry_terrain_t": {
+          "bytes": 20,
+          "source": "telemetry.h"
+        },
+        "telemetry_wheel_history_t": {
+          "bytes": 108,
+          "source": "telemetry.h"
+        }
+      }
+    }
+  },
+  "measurement_tool_sha256": "12ddef12dd4e6bc767111403daa25e2c85ad93614c1637cc5c3cab649e8d4cc8",
+  "memory_before": {
+    "arithmetic_remainder_bytes": 46900,
+    "bss_bytes": 223436,
+    "chip_sram_bytes": 270336,
+    "data_bytes": 0,
+    "elf_flash_matches_frozen_uf2": true,
+    "elf_sha256": "7ccc614452c39673090c421f897445ff3c922b9b15a3db11e86c3ee96334674d",
+    "frozen_uf2_sha256": "a4e2eccb6fb4e74cd49a6d25214bc1be1807c7e8c23de6664ecd32dac1f6a2a3",
+    "kernel_pool_on_wifi_branch_bytes": 98304,
+    "largest_ram_symbols": [
+      {
+        "address": "0x2002229c",
+        "bytes": 73596,
+        "kind": "b",
+        "name": "waveform"
+      },
+      {
+        "address": "0x20002a58",
+        "bytes": 37008,
+        "kind": "b",
+        "name": "clients"
+      },
+      {
+        "address": "0x2000f804",
+        "bytes": 26640,
+        "kind": "b",
+        "name": "core"
+      },
+      {
+        "address": "0x20016ee0",
+        "bytes": 24515,
+        "kind": "B",
+        "name": "memp_memory_PBUF_POOL_base"
+      },
+      {
+        "address": "0x2001e06c",
+        "bytes": 16403,
+        "kind": "B",
+        "name": "ram_heap"
+      },
+      {
+        "address": "0x2000c210",
+        "bytes": 8192,
+        "kind": "b",
+        "name": "network_stack"
+      },
+      {
+        "address": "0x20035224",
+        "bytes": 8192,
+        "kind": "b",
+        "name": "waveform_queue"
+      },
+      {
+        "address": "0x20040000",
+        "bytes": 4096,
+        "kind": "b",
+        "name": "core1_stack"
+      },
+      {
+        "address": "0x20034218",
+        "bytes": 4096,
+        "kind": "b",
+        "name": "waveform_details"
+      },
+      {
+        "address": "0x20001a78",
+        "bytes": 2824,
+        "kind": "b",
+        "name": "avoidance"
+      },
+      {
+        "address": "0x2001602c",
+        "bytes": 2404,
+        "kind": "B",
+        "name": "cyw43_state"
+      },
+      {
+        "address": "0x2001d864",
+        "bytes": 2020,
+        "kind": "b",
+        "name": "optical"
+      },
+      {
+        "address": "0x2001d0a0",
+        "bytes": 1251,
+        "kind": "B",
+        "name": "memp_memory_TCP_PCB_base"
+      },
+      {
+        "address": "0x2000bae8",
+        "bytes": 1160,
+        "kind": "b",
+        "name": "course"
+      },
+      {
+        "address": "0x2000f0a8",
+        "bytes": 1024,
+        "kind": "b",
+        "name": "barcode_trace"
+      },
+      {
+        "address": "0x20016a80",
+        "bytes": 1024,
+        "kind": "b",
+        "name": "hw_endpoints"
+      },
+      {
+        "address": "0x20002680",
+        "bytes": 904,
+        "kind": "b",
+        "name": "barcode_sampler"
+      },
+      {
+        "address": "0x2000eb50",
+        "bytes": 828,
+        "kind": "b",
+        "name": "barcode_batch"
+      },
+      {
+        "address": "0x2000e808",
+        "bytes": 588,
+        "kind": "b",
+        "name": "_vendord_itf"
+      },
+      {
+        "address": "0x2001d584",
+        "bytes": 515,
+        "kind": "B",
+        "name": "memp_memory_TCP_SEG_base"
+      },
+      {
+        "address": "0x2000f4ac",
+        "bytes": 512,
+        "kind": "b",
+        "name": "batch.0"
+      },
+      {
+        "address": "0x2000ee8c",
+        "bytes": 408,
+        "kind": "b",
+        "name": "barcode_capture"
+      },
+      {
+        "address": "0x2000bf98",
+        "bytes": 384,
+        "kind": "b",
+        "name": "default_alarm_pool_entries"
+      },
+      {
+        "address": "0x2000e37c",
+        "bytes": 312,
+        "kind": "B",
+        "name": "__sf"
+      },
+      {
+        "address": "0x2001cea4",
+        "bytes": 259,
+        "kind": "B",
+        "name": "memp_memory_PBUF_base"
+      }
+    ],
+    "main_stack_reservation_bytes": 4096,
+    "naive_bss_plus_kernel_pool_bytes": 321740,
+    "naive_sum_is_combined_link_measurement": false,
+    "remainder_is_free_runtime_ram": false,
+    "static_data_plus_bss_bytes": 223436,
+    "text_bytes": 568016
+  },
+  "mqtt_before": {
+    "cases": [
+      {
+        "decoded": {
+          "boot_id": 1,
+          "captured_ms": 0,
+          "line": null,
+          "mission": null,
+          "motion": null,
+          "obstacle": null,
+          "schema": 1,
+          "sequence": 1,
+          "terrain": null
+        },
+        "name": "all_producers_invalid",
+        "payload_bytes": 125
+      },
+      {
+        "decoded": {
+          "boot_id": 1,
+          "captured_ms": 12345,
+          "line": {
+            "barcode": "A",
+            "captured_ms": 12345,
+            "ir": [
+              300,
+              300,
+              200
+            ],
+            "on_line": true,
+            "simulated": true
+          },
+          "mission": {
+            "captured_ms": 12345,
+            "simulated": true,
+            "state": "running"
+          },
+          "motion": {
+            "captured_ms": 12345,
+            "distance_mm": 250,
+            "left_mm_s": 50,
+            "left_ticks": -10000,
+            "right_mm_s": 50,
+            "right_ticks": 10000,
+            "simulated": true
+          },
+          "obstacle": {
+            "captured_ms": 12345,
+            "closest_mm": 300,
+            "left_clearance_mm": 400,
+            "right_clearance_mm": 400,
+            "scan_id": 1,
+            "simulated": true,
+            "width_mm": 100
+          },
+          "schema": 1,
+          "sequence": 2,
+          "terrain": {
+            "captured_ms": 12345,
+            "highest_hump_mm": 40,
+            "hump_mm": 20,
+            "motion": "stationary",
+            "simulated": true
+          }
+        },
+        "name": "representative_all_producers_A",
+        "payload_bytes": 603
+      },
+      {
+        "decoded": {
+          "boot_id": 1,
+          "captured_ms": 12345,
+          "line": {
+            "barcode": "?",
+            "captured_ms": 12345,
+            "ir": [
+              300,
+              300,
+              200
+            ],
+            "on_line": true,
+            "simulated": true
+          },
+          "mission": {
+            "captured_ms": 12345,
+            "simulated": true,
+            "state": "running"
+          },
+          "motion": {
+            "captured_ms": 12345,
+            "distance_mm": 250,
+            "left_mm_s": 50,
+            "left_ticks": -10000,
+            "right_mm_s": 50,
+            "right_ticks": 10000,
+            "simulated": true
+          },
+          "obstacle": {
+            "captured_ms": 12345,
+            "closest_mm": 300,
+            "left_clearance_mm": 400,
+            "right_clearance_mm": 400,
+            "scan_id": 1,
+            "simulated": true,
+            "width_mm": 100
+          },
+          "schema": 1,
+          "sequence": 3,
+          "terrain": {
+            "captured_ms": 12345,
+            "highest_hump_mm": 40,
+            "hump_mm": 20,
+            "motion": "stationary",
+            "simulated": true
+          }
+        },
+        "name": "same_values_Z_input",
+        "payload_bytes": 603
+      },
+      {
+        "decoded": {
+          "angle_mdeg": -45000,
+          "boot_id": 1,
+          "captured_ms": 12345,
+          "kind": "scan_point",
+          "scan_id": 1,
+          "schema": 1,
+          "sequence": 4,
+          "value": 300
+        },
+        "name": "representative_scan_event",
+        "payload_bytes": 121
+      }
+    ],
+    "method": "Real branch serializer executed on host, independently parsed with Python JSON; synthetic fixtures, not network traffic",
+    "mqtt_topic_and_protocol_overhead_included": false,
+    "terminator_in_payload": false,
+    "z_preserved": false
+  },
+  "release_report_source_hashes_verified": true,
+  "schema": 1,
+  "scope": "Pre-change baseline; no runtime/RTOS/packing changes",
+  "source_sha256": {
+    "main": {
+      "firmware/app/robot_firmware/barcode_acquisition.c": "6e549af280051b67997f268a062a2aaea38fe02f2909bd62acbaafdf396c93c1",
+      "firmware/app/robot_firmware/barcode_acquisition.h": "e587a993ee7ac68d375d67f049113ba3f8c50350b22d63c0d6204bcfeaad1a3e",
+      "firmware/app/robot_firmware/barcode_decoder.c": "a4b11993a33edfb0cfef9c18d403fd235a2458d6094adf3d1e8e3a81cbc3afdd",
+      "firmware/app/robot_firmware/barcode_decoder.h": "70b38e15cedce879a394761ba26b03fb18e3aad942aea4eeeb15167b84247c06",
+      "firmware/app/robot_firmware/barcode_drive.h": "65a72a5650d3249867041e77165a72c8b8719bcdf9a67fadb60d5289f402cc73",
+      "firmware/app/robot_firmware/barcode_motion.h": "f34cdb0359fe946187cdd64f3e93db17247d979d4e3647219e2f80eaf7dad268",
+      "firmware/app/robot_firmware/barcode_optical.h": "a85101d957a7af2906f706646f360c44199943d06bbc1076343877586fc9ae40",
+      "firmware/app/robot_firmware/barcode_reader.c": "ea7a04bdaf3d9670411176ff552a900bb7e2833b676d883d00169cbe980fd882",
+      "firmware/app/robot_firmware/barcode_reader.h": "ea85d3c057f95da6694688eb13d352dd7af99fdc78d6e4e98aa015873db2666d",
+      "firmware/app/robot_firmware/barcode_runs.h": "b9b502adc4709d42a93f05a8ab2ffdf2582d66716f804f11f18308cc1beda93f",
+      "firmware/app/robot_firmware/barcode_signal.h": "47cd9c3907a2559ecf673a660c8c255bb96c43360d9807c1cf83213c9aab811f",
+      "firmware/app/robot_firmware/barcode_waveform.c": "2e99dcf7cfbea3c4f521085deb3c9798b1f96154626cc8bf36cfcc33435b719f",
+      "firmware/app/robot_firmware/barcode_waveform.h": "ef1012d20b2eee591ec727af0467260ef2f34de43a3f4af5ae273bf40fb92d3b",
+      "firmware/app/robot_firmware/calibration_wifi.h": "bcb26b85817f9cb11d34d3de85a3512d9115354d33de99c607632f55891f84fa",
+      "firmware/app/robot_firmware/center_baseline.h": "7c734034441790b3016d42ff6dd9c8d26c348fcee900f19c0faa5ab94eb7b058",
+      "firmware/app/robot_firmware/center_search.h": "b20c3852ba5a85fae21ab63b6bfe448489285c30262665f79d93f7f75a99c5fa",
+      "firmware/app/robot_firmware/center_trim.h": "1859d3962a7e81c8e3604f83573c9ca4872c7d29b18940bffef3b8ea5cd7c765",
+      "firmware/app/robot_firmware/course_config.h": "c7e55f4754c8103aa23c3b98bd5aa25e62235c97c3a446bfc81b0585b764cf61",
+      "firmware/app/robot_firmware/course_control.c": "480ada0c3904c17b555ff489043a716aea1cf1638cc79b8c34c44254d7b6de6c",
+      "firmware/app/robot_firmware/course_control.h": "41e580fd8f8d0ad2ffd88e4a95d09245fbca4d31d5043ca4b1b1640f05e2913d",
+      "firmware/app/robot_firmware/encoders.c": "1b684c010e0db68f029b620a7fd04fa412762c04770fb921d8bd2bf7cd1b6f66",
+      "firmware/app/robot_firmware/encoders.h": "618231847534e8d709a71a6c1f1afd27de6d262f41235151dd05ff32a4c0c450",
+      "firmware/app/robot_firmware/line_check.h": "3748f8e2b462608065f35ad402769a37d6f701c9eee86f15c8275cccc7a69eb5",
+      "firmware/app/robot_firmware/motion_control.c": "d6d17594a193624b3f15a038152cbb493a4394afee79790db5d25cb00c60fe53",
+      "firmware/app/robot_firmware/motion_control.h": "fb7303f7f1be44e1cb9812cc7bd6ccbc648ff501a1c418377f2bb72757372980",
+      "firmware/app/robot_firmware/motor_guard.h": "b69d4234d2f6bcae99c3693c06367c496d5ca47795ef9643fa7dc3cfe2a479af",
+      "firmware/app/robot_firmware/navigation_commands.c": "65be7ccd36ce1d8010e5b808533bea8502b68ad89ae69bca0683415525ad2e06",
+      "firmware/app/robot_firmware/navigation_commands.h": "e528a83267579f8fba6b8a4edee5815590461db4ffcd7741def371df84039eef",
+      "firmware/app/robot_firmware/obstacle_bypass.c": "fd4129c1c594fc0b61c596fea27166ed1181831bf66f003e7ad5b3a7d6d40c48",
+      "firmware/app/robot_firmware/obstacle_bypass.h": "3029de79c8d2b7ea28b391859a37a835ca9ec8244f6e316545b7488b006e077c",
+      "firmware/app/robot_firmware/obstacle_plan.h": "4cc49b5d254ecadb3a3f63677b776ccf1e59de9aae43981904d78f4ad708562f",
+      "firmware/app/robot_firmware/robot_firmware.c": "8b5a1adff95c07e09332024c31c9e96a8ad2a55ae09dd5a076d483b1300d7b84",
+      "firmware/app/robot_firmware/run_diagnostics.c": "7715b4547a2f68fba2c315fcc83afd91b3d02fdbf4f83334b6575107abaec9cd",
+      "firmware/app/robot_firmware/run_diagnostics.h": "9bae034e2839c07ebe4a4e88aec184877ce2aeb847bf2ea1ee19d7df63f886f6",
+      "firmware/app/robot_firmware/stationary_barcode.c": "bc20d4004d43f0c5e0c66883688d0ee5ec7e9c6f9cc89bd09ebff0b885ae594a",
+      "firmware/app/robot_firmware/terrain.c": "e036eaa07a8fade629de13c27e6a4e2be12d7624fa03d0a04cb5a4d77ddb8392",
+      "firmware/app/robot_firmware/terrain.h": "9d78076d251e23416665093c74927d50fe9066f45f9f7d1d671083ced7dfbe1a",
+      "firmware/app/robot_firmware/wireless/calibration_core.c": "01b0eda748bd8b24c1b14aa1d3a4f1bb4522a7412e4902cfd34aeab43f45c303",
+      "firmware/app/robot_firmware/wireless/calibration_core.h": "a9c9ae0c1634a80bab4ab9e63bed925c6318493be1d6a2ec474b569c73dea55c",
+      "firmware/app/robot_firmware/wireless/calibration_wifi.c": "020709fb2c0bd7d4f0bbaa3927833a85ee47af5e18388fcb940bf97b0a3e1ed1",
+      "firmware/app/robot_firmware/wireless/dhcpserver.c": "2541984107957e11d24c10aee8871812bb532ad354a970101486dfae52a057df"
+    },
+    "obstacle": {
+      "firmware/app/robot_firmware/obstacle_data.h": "a53733dd7ebf62e6203531c50beac5dea15fc2ae2ce7de9e74439df82a13bf45"
+    },
+    "terrain": {
+      "firmware/app/robot_firmware/terrain.h": "e497cdb39dfbb30efd50380250d5d7d82a65db3d536ab8ce48fe6cb2f260b3d9"
+    },
+    "wifi": {
+      "include/telemetry.h": "abaf87942c19fe66cdf3b77eb92a1a638382965579cd312cf372423ce7b82db3",
+      "src/telemetry.c": "7b3977924006d05551572cbf5c6df3743f743b6d2ffecbe3add87152a0818b95"
+    }
+  },
+  "target_flags": [
+    "-std=c11",
+    "-mcpu=cortex-m0plus",
+    "-mthumb"
+  ]
+}

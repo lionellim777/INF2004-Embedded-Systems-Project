@@ -2,6 +2,7 @@
 #define CENTER_TRIM_H
 #include <stdbool.h>
 #include <stdint.h>
+#include "control_representation.h"
 /* A centre reading has no left/right sign. Trial a hinted direction, retain
  * measurable improvement, reverse once on deterioration or stalled progress.
  * Absolute time/yaw budgets are never renewed by optical noise or progress. */
@@ -9,7 +10,11 @@
 #define CENTER_TRIM_LIMIT_COUNTS 240u
 #define CENTER_TRIM_STALL_US 500000u
 typedef struct {
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    bool active:1,reversed:1,exhausted:1,no_response:1;
+#else
     bool active,reversed,exhausted,no_response;
+#endif
     int direction,last_good;
     int32_t entry_level,best_level,progress_level;
     int64_t entry_delta,previous_delta;
