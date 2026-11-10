@@ -62,10 +62,20 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
                 if (board_ready_to_start() && board_start(&r->token)) {
                     bool began;
 #ifdef RTOS_TRACK
-                    if(board_selected()==MOTION_COURSE){
+                    uint8_t selected=board_selected();
+                    if(selected==MOTION_COURSE
+#ifdef RTOS_OBSTACLE
+                       || selected==BOARD_OBSTACLE_SELECT
+#endif
+                    ){
                         motion_init(&r->motion);r->motion.kind=MOTION_COURSE;
                         r->motion.start=enc;r->motion.start_us=now;r->motion.phase=MOTION_ACTIVE;
-                        began=track_runtime_begin(&r->track,r->token,enc,now);
+#ifdef RTOS_OBSTACLE
+                        if(selected==BOARD_OBSTACLE_SELECT)
+                            began=track_runtime_begin_obstacle(&r->track,r->token,enc,now);
+                        else
+#endif
+                            began=track_runtime_begin(&r->track,r->token,enc,now);
                         if(!began){motion_abort(&r->motion);track_runtime_end();}
                     }else
 #endif

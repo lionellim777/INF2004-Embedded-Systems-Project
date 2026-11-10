@@ -610,9 +610,9 @@ static bool button_fell(button_t *button, uint pin, uint64_t now_us)
 static void print_controls(void)
 {
 #ifdef ROBOCAR_WIRELESS_CALIBRATION
-    printf("\nAAI10 MOTION INTEGRATION v5.63 WIRELESS | motion-aware barcode + per-attempt diagnostics | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.63-left-bypass-dev WIRELESS | motion-aware barcode + per-attempt diagnostics | %s %s\n", __DATE__, __TIME__);
 #else
-    printf("\nAAI10 MOTION INTEGRATION v5.63 USB | %s %s\n", __DATE__, __TIME__);
+    printf("\nAAI10 MOTION INTEGRATION v5.63-left-bypass-dev USB | %s %s\n", __DATE__, __TIME__);
 #endif
     printf("Starts STOPPED. Existing IR, sonar, servo and terrain settings retained.\n");
     printf("Batch 5: CPR2543 wheel60mm track115mm; turn early290 L90+65 R180-60.\n");
@@ -913,7 +913,7 @@ int main(void)
                         motion_init(&motion);motion.kind=MOTION_AVOID;motion.phase=MOTION_ACTIVE;
                         motion.start=enc;motion.start_us=now_us;
                         obstacle_bypass_begin(&avoidance,enc,now_us,baseline);
-                        printf("[AVOID BEGIN] barcode=DISABLED direction=RIGHT departure=5DEG_EDGE_SCAN edge_rule=2FAR_OR_3NO_RETURN path_rule=2VALID_FAR_OR_3COMPLETED_NO_RETURN outward_step_mm=100 return=INVERSE_ANGLE warning_cm=45 approach_cm=20 max_offset_mm=600 max_along_mm=1200 scan_stages=INITIAL_AND_POST_ANGLED_MOVE clear_action=STRAIGHT_SEEK baseline=%ld.\n",(long)baseline);
+                        printf("[AVOID BEGIN] barcode=DISABLED direction=LEFT departure=5DEG_EDGE_SCAN edge_rule=2FAR_OR_3NO_RETURN path_rule=2VALID_FAR_OR_3COMPLETED_NO_RETURN outward_step_mm=100 return=INVERSE_ANGLE warning_cm=45 approach_cm=20 max_offset_mm=600 max_along_mm=1200 scan_stages=INITIAL_AND_POST_ANGLED_MOVE clear_action=STRAIGHT_SEEK baseline=%ld.\n",(long)baseline);
                     }else motion_state=ready?"IR_SAMPLING_UNAVAILABLE":"CENTER_BASELINE_NOT_READY";
                 } else if (pending == MOTION_NONE || scan_kind(pending)) {
                     motion_init(&motion);
@@ -1059,19 +1059,19 @@ int main(void)
                 printf("[AVOID TAPE] from=%s to=%s decision=%s center=%ld reference=%ld samples=%u no_return=%u sonar=%s approach_heading_deg=%d first_ink_mm=%u.\n",obstacle_bypass_phase(before),obstacle_bypass_phase(avoidance.phase),avoidance.tape_decision?avoidance.tape_decision:"NONE",(long)centre_blackness,(long)avoidance.reference,avoidance.rejoin_good,avoidance.no_return,sonar_status,avoidance.route_heading_deg,avoidance.probe_first_black_mm);
             if(avoidance.phase!=before&&(before==AVOID_ALIGN_TURN||before==AVOID_ALIGN_CONFIRM))
                 printf("[AVOID ALIGN] heading_deg=%ld direction=%d rejected=%u center=%ld reference=%ld.\n",
-                    (long)(((int64_t)motion_left_position(&avoidance.align_origin,enc)-motion_right_position(&avoidance.align_origin,enc))*90/2000),
+                    (long)obstacle_bypass_alignment_heading(&avoidance,enc),
                     avoidance.align_direction,avoidance.align_rejected,(long)centre_blackness,(long)avoidance.reference);
             if((avoidance.phase!=before||out.stop)&&avoidance.leg.kind!=MOTION_NONE)printf("[AVOID LEG] phase=%s L=%ld/%ld R=%ld/%ld invalid=%lu/%lu.\n",obstacle_bypass_phase(before),(long)motion_left_position(&avoidance.leg,enc),(long)avoidance.leg.left.target,(long)motion_right_position(&avoidance.leg,enc),(long)avoidance.leg.right.target,(unsigned long)enc.left_invalid,(unsigned long)enc.right_invalid);
             if(scan!=avoidance.scan_serial&&before==AVOID_SCAN_INITIAL)
-                printf("[AVOID PLAN] edge=%u echo_candidate=%u near_servo=%u clear_servo=%u angle_A=%u edge_shifts=%u offset_mm=%u lateral_mm=%u diagonal_mm=%u forward_mm=%u near_count=%u/%u/%u/%u/%u/%u/%u/%u/%u far_count=%u/%u/%u/%u/%u/%u/%u/%u/%u no_return_count=%u/%u/%u/%u/%u/%u/%u/%u/%u; scan=90..50 by5; next sweep only after 100mm angled move and original-heading restoration.\n",
-                    avoidance.plan.right_edge_known,avoidance.plan.edge_from_no_return,avoidance.plan.edge_servo_deg,avoidance.plan.clear_servo_deg,avoidance.plan.angle_deg,avoidance.edge_shift_count,avoidance.offset_mm,avoidance.plan.lateral_mm,avoidance.plan.travel_mm,avoidance.plan.forward_mm,
-                    avoidance.plan_near[0],avoidance.plan_near[1],avoidance.plan_near[2],avoidance.plan_near[3],avoidance.plan_near[4],avoidance.plan_near[5],avoidance.plan_near[6],avoidance.plan_near[7],avoidance.plan_near[8],
-                    avoidance.plan_far[0],avoidance.plan_far[1],avoidance.plan_far[2],avoidance.plan_far[3],avoidance.plan_far[4],avoidance.plan_far[5],avoidance.plan_far[6],avoidance.plan_far[7],avoidance.plan_far[8],
-                    avoidance.plan_no_return[0],avoidance.plan_no_return[1],avoidance.plan_no_return[2],avoidance.plan_no_return[3],avoidance.plan_no_return[4],avoidance.plan_no_return[5],avoidance.plan_no_return[6],avoidance.plan_no_return[7],avoidance.plan_no_return[8]);
+                printf("[AVOID PLAN] edge=%u echo_candidate=%u near_servo=%u clear_servo=%u angle_A=%u edge_shifts=%u offset_mm=%u lateral_mm=%u diagonal_mm=%u forward_mm=%u near_count=%u/%u/%u/%u/%u/%u/%u/%u far_count=%u/%u/%u/%u/%u/%u/%u/%u no_return_count=%u/%u/%u/%u/%u/%u/%u/%u; scan=90..125 by5; next sweep only after 100mm angled move and original-heading restoration.\n",
+                    avoidance.plan.left_edge_known,avoidance.plan.edge_from_no_return,avoidance.plan.edge_servo_deg,avoidance.plan.clear_servo_deg,avoidance.plan.angle_deg,avoidance.edge_shift_count,avoidance.offset_mm,avoidance.plan.lateral_mm,avoidance.plan.travel_mm,avoidance.plan.forward_mm,
+                    avoidance.plan_counts[0].near,avoidance.plan_counts[1].near,avoidance.plan_counts[2].near,avoidance.plan_counts[3].near,avoidance.plan_counts[4].near,avoidance.plan_counts[5].near,avoidance.plan_counts[6].near,avoidance.plan_counts[7].near,
+                    avoidance.plan_counts[0].far,avoidance.plan_counts[1].far,avoidance.plan_counts[2].far,avoidance.plan_counts[3].far,avoidance.plan_counts[4].far,avoidance.plan_counts[5].far,avoidance.plan_counts[6].far,avoidance.plan_counts[7].far,
+                    avoidance.plan_counts[0].no_return,avoidance.plan_counts[1].no_return,avoidance.plan_counts[2].no_return,avoidance.plan_counts[3].no_return,avoidance.plan_counts[4].no_return,avoidance.plan_counts[5].no_return,avoidance.plan_counts[6].no_return,avoidance.plan_counts[7].no_return);
             if(avoidance.phase!=before&&before==AVOID_CHECK_LEFT)
                 printf("[AVOID LEFT] servo=125 far=%u/%u side_seen=%u next=%s; oblique ray is not clearance proof.\n",avoidance.left_far,avoidance.left_samples,avoidance.side_seen,obstacle_bypass_phase(avoidance.next));
             if(scan!=avoidance.scan_serial)printf("[AVOID SCAN] phase=%s nearest_cm=%.1f blocked=%u no_echo=%u/%u center_clear=%u center_no_return=%u side_loop=%u side_seen=%u clear_checks=%u nearest_angle=%u blocked_angle=%u far_rays=%u far_samples=%u last_side_mm=%u. Three completed centre no-returns count as open; valid blockers still veto.\n",
-                obstacle_bypass_phase(before),avoidance.scan_min_cm,avoidance.scan_blocked,avoidance.scan_no_echo,before==AVOID_SCAN_INITIAL?27:15,avoidance.scan_center_clear,avoidance.scan_center_no_return,avoidance.angled_probe,avoidance.side_seen,avoidance.clear_checks,avoidance.scan_nearest_angle,avoidance.scan_blocked_angle,avoidance.scan_far_rays,avoidance.scan_far_samples,avoidance.last_side_seen_mm);
+                obstacle_bypass_phase(before),avoidance.scan_min_cm,avoidance.scan_blocked,avoidance.scan_no_echo,before==AVOID_SCAN_INITIAL?OBSTACLE_PLAN_RAYS*3:15,avoidance.scan_center_clear,avoidance.scan_center_no_return,avoidance.angled_probe,avoidance.side_seen,avoidance.clear_checks,avoidance.scan_nearest_angle,avoidance.scan_blocked_angle,avoidance.scan_far_rays,avoidance.scan_far_samples,avoidance.last_side_seen_mm);
             if(completed!=avoidance.completed)printf("[AVOID COMPLETE] count=%u GP28 tape confirmed; following resumed.\n",avoidance.completed);
         } else if (running && motion.phase == MOTION_ACTIVE &&
                    (motion.kind == MOTION_NONE || scan_kind(motion.kind))) {
@@ -1234,7 +1234,7 @@ int main(void)
                    (unsigned long)(final.read_errors - diagnostics.start_errors), motion_state);
             if (scan_kind(motion.kind)) { barcode_result(); }
             if(avoid_run)printf("[AVOID RESULT] detected=%u completed=%u phase=%s edge=%u echo_candidate=%u near_servo=%u clear_servo=%u angle_A=%u edge_shifts=%u diagonal_mm=%u outward_done_mm=%u offset_mm=%u along_mm=%u scans=%u no_echo=%u sonar_retries=%u sonar_resumes=%u encoder_skips=%u/%u tape_checks=%u rejected=%u axle_mm=%u align_dir=%d reverse_sweep=%u align_rejected=%u fault=%s outcome=%s; geometry provisional, physical clearance requires observation.\n",
-                avoidance.detected,avoidance.completed,obstacle_bypass_phase(avoidance.phase),avoidance.plan.right_edge_known,avoidance.plan.edge_from_no_return,avoidance.plan.edge_servo_deg,avoidance.plan.clear_servo_deg,avoidance.return_deg,avoidance.edge_shift_count,avoidance.plan.travel_mm,avoidance.departure_done_mm,avoidance.offset_mm,avoidance.along_mm,avoidance.scans,avoidance.no_echo,avoidance.sonar_retries,avoidance.sonar_resumes,avoidance.encoder_skips[0],avoidance.encoder_skips[1],avoidance.rejoin_attempts,avoidance.rejoin_rejected,avoidance.axle_mm,avoidance.align_direction,avoidance.align_reversed,avoidance.align_rejected,avoidance.fault?avoidance.fault:"NONE",motion_state);
+                avoidance.detected,avoidance.completed,obstacle_bypass_phase(avoidance.phase),avoidance.plan.left_edge_known,avoidance.plan.edge_from_no_return,avoidance.plan.edge_servo_deg,avoidance.plan.clear_servo_deg,avoidance.return_deg,avoidance.edge_shift_count,avoidance.plan.travel_mm,avoidance.departure_done_mm,avoidance.offset_mm,avoidance.along_mm,avoidance.scans,avoidance.no_echo,avoidance.sonar_retries,avoidance.sonar_resumes,avoidance.encoder_skips[0],avoidance.encoder_skips[1],avoidance.rejoin_attempts,avoidance.rejoin_rejected,avoidance.axle_mm,avoidance.align_direction,avoidance.align_reversed,avoidance.align_rejected,avoidance.fault?avoidance.fault:"NONE",motion_state);
             if(avoid_run)printf("[SONAR RESULT] last_status=%s last_pulse_us=%lu max_pulse_us=%lu measurement_window_us=45000.\n",sonar_status,(unsigned long)sonar_pulse_us,(unsigned long)sonar_max_pulse_us);
             if(course_run)printf("[COURSE RESULT] encounters=%u turns=%u Y=%s Z=%s advance_mm=%u updates=%u replacements=%u deferred_replacements=%u pending=%c remaining=%u deferred=%c recoveries=%u trims=%u trim_reversals=%u trim_no_response=%u fixed_ref=%ld confirmation_retries=%u wide_searches=%u settle_coast=%ld/%ld sensor_layout=%s flow=%u arc_attempts=%u arc_rejoins=%u arc_fallbacks=%u previews=%u edge_coasts=%u arc_source=%s arc_exit=%s arc_gate=%s drift_max_cps=%u outcome=%s.\n",
                 course.junctions,course.turns,course_action_name(course.config.y_action),course_action_name(course.config.z_action),course.config.advance_mm,

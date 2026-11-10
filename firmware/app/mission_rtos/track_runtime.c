@@ -2,6 +2,12 @@
 #include "track_sensor.h"
 #include "network_service.h"
 #include <string.h>
+#ifdef RTOS_OBSTACLE
+#include "obstacle_bypass.h"
+#include "obstacle_io.h"
+/* The Motion task alone reads and writes the controller. */
+static obstacle_bypass_t obstacle;
+#endif
 
 static int32_t level(uint16_t raw,int white,int black)
 {
@@ -27,6 +33,9 @@ void track_runtime_observe(uint64_t now)
 bool track_runtime_begin(track_runtime_t *t,uint16_t token,encoder_sample_t enc,uint64_t now)
 {
     track_ir_t ir;int32_t baseline,spread;
+#ifdef RTOS_OBSTACLE
+    t->obstacle_enabled=false;
+#endif
     t->status="TRACK_START_NOT_ALIGNED";t->reads=0;t->letter=0;
     if(!sensors(&ir,now) || !center_baseline_value(&t->baseline,now,&baseline,&spread) ||
        level(ir.raw[1],178,2908)<IR_BLACK_LEVEL)return false;
@@ -38,6 +47,16 @@ bool track_runtime_begin(track_runtime_t *t,uint16_t token,encoder_sample_t enc,
     t->token=token;t->requested_us=now;t->state=0;t->reads=0;t->letter=0;
     t->status="TRACK_DECODER_ARMING";track_request(token);return true;
 }
+#ifdef RTOS_OBSTACLE
+bool track_runtime_begin_obstacle(track_runtime_t *t,uint16_t token,encoder_sample_t enc,uint64_t now)
+{
+    if(!track_runtime_begin(t,token,enc,now))return false;
+    obstacle_bypass_begin(&obstacle,enc,now,t->course.center_reference);
+    obstacle_io_begin();
+    t->obstacle_enabled=true;
+    return true;
+}
+#endif
 line_check_output_t track_runtime_step(track_runtime_t *t,encoder_sample_t enc,uint64_t now)
 {
     track_ir_t ir;
@@ -51,12 +70,32 @@ line_check_output_t track_runtime_step(track_runtime_t *t,encoder_sample_t enc,u
     track_event_t event;
     while(track_event_take(t->token,&event)){
         t->reads++;t->letter=event.letter;
-        (void)course_on_barcode(&t->course,event.letter,enc,now,event.crossing);
+#ifdef RTOS_OBSTACLE
+        if(!t->obstacle_enabled)
+#endif
+            (void)course_on_barcode(&t->course,event.letter,enc,now,event.crossing);
     }
     int32_t levels[3]={level(ir.raw[0],191,3164),level(ir.raw[1],178,2908),level(ir.raw[2],141,842)};
+#ifdef RTOS_OBSTACLE
+    if(t->obstacle_enabled){
+        obstacle_range_t range=obstacle_io_poll();
+        line_check_output_t out=obstacle_bypass_guarded_step(&obstacle,ir_roles(levels),levels[1],
+            enc,now,range.fresh,range.valid,range.cm,range.error,range.no_return);
+        obstacle_io_angle(obstacle.servo_angle);
+        track_recoveries(obstacle.line.recoveries);
+        t->status=out.state;
+        return out;
+    }
+#endif
     course_center_level(&t->course,levels[1]);course_right_level(&t->course,levels[2]);
     line_check_output_t out=course_step(&t->course,ir_roles(levels),enc,now);
     track_recoveries(t->course.recoveries);
     t->status=out.state;return out;
 }
-void track_runtime_end(void) { track_stop(); }
+void track_runtime_end(void)
+{
+#ifdef RTOS_OBSTACLE
+    obstacle_io_end();
+#endif
+    track_stop();
+}

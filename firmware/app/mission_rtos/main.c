@@ -15,6 +15,9 @@
 #include "network_settings.h"
 #include "runtime_report.h"
 #include "port/task_observe.h"
+#ifdef RTOS_OBSTACLE
+#include "obstacle_io.h"
+#endif
 #ifndef RTOS_WAIT_FOR_USB
 #define RTOS_WAIT_FOR_USB 0
 #endif
@@ -54,7 +57,12 @@ static void decoder_task(int start_code,void *context)
 static void observer_task(int start_code, void *context)
 {
     (void)start_code; (void)context;
-    puts("RTOS track integration v" RTOS_FIRMWARE_VERSION ": real motion/line/barcode producers; terrain/obstacle UNAVAILABLE");
+    puts("RTOS track integration v" RTOS_FIRMWARE_VERSION ": real motion/line/barcode producers");
+#ifdef RTOS_OBSTACLE
+    puts("o=experimental obstacle mode. GP20 required to start. Terrain unavailable.");
+#else
+    puts("Terrain and obstacle unavailable.");
+#endif
     puts("Default t=track AAZ scan. Optional f=30cm,l=L90,r=R90,u=R180. GP20 press/release starts; next press stops. x=stop. No remote start.");
     uint32_t last_print = 0;
     uint32_t last_info = 0;
@@ -66,6 +74,9 @@ static void observer_task(int start_code, void *context)
         uint8_t selected = command == 't' ? MOTION_COURSE : command == 'f' ? MOTION_STRAIGHT_30CM :
             command == 'l' ? MOTION_LEFT_90 : command == 'r' ? MOTION_RIGHT_90 :
             command == 'u' ? MOTION_RIGHT_180 : MOTION_NONE;
+#ifdef RTOS_OBSTACLE
+        if(command=='o')selected=BOARD_OBSTACLE_SELECT;
+#endif
         if (command == 'x') board_stop(STOP_BUTTON);
         if (selected != MOTION_NONE && board_select(selected))
             printf("SELECT=%u; physical GP20 required\n", selected);
@@ -143,6 +154,12 @@ int main(void)
         for (;;) tight_loop_contents();
     }
     encoders_init();
+#ifdef RTOS_OBSTACLE
+    if(!obstacle_io_init()){
+        board_stop(STOP_INIT);puts("[RTOS_BOOT] error=obstacle_io");
+        for(;;)tight_loop_contents();
+    }
+#endif
     if(!track_sensor_init()){
         board_stop(STOP_INIT);puts("[RTOS_BOOT] error=adc_timer");
         for(;;)tight_loop_contents();

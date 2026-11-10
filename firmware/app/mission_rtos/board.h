@@ -14,6 +14,10 @@ bool board_apply(uint16_t token, float left, float right);
 void board_stop(uint8_t reason);
 void board_gate_snapshot(bool *armed, uint8_t *reason);
 bool board_select(uint8_t kind);
+#ifdef RTOS_OBSTACLE
+/* Local selector only. Obstacle mode still publishes track-format motion. */
+enum { BOARD_OBSTACLE_SELECT = 6 };
+#endif
 uint8_t board_selected(void);
 void board_publish(const motion_record_t *record);
 void board_read(uint8_t output[MOTION_RECORD_BYTES]);

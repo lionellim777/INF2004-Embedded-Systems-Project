@@ -6,11 +6,33 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef RTOS_OBSTACLE
+#include "obstacle_io.h"
+#endif
 
 static uint64_t clock_us;
 static bool button,adc_live=true,decode_live=true,travel=true;
 static unsigned irq_depth,input;
 static uint16_t raw[3]={191,141,2908},pwm[8][2];
+#ifdef RTOS_OBSTACLE
+static bool obstacle_active;
+static unsigned obstacle_angle;
+static uint64_t next_echo;
+void obstacle_io_begin(void)
+{
+    obstacle_active=true;
+    obstacle_angle=90;
+    next_echo=clock_us;
+}
+void obstacle_io_end(void) { obstacle_active=false; }
+void obstacle_io_angle(unsigned degrees) { obstacle_angle=degrees; }
+obstacle_range_t obstacle_io_poll(void)
+{
+    if(!obstacle_active || clock_us<next_echo)return (obstacle_range_t){0};
+    next_echo=clock_us+60000;
+    return (obstacle_range_t){.cm=obstacle_angle==90?20:100,.fresh=true,.valid=true};
+}
+#endif
 static repeating_timer_t *guard,*adc_timer;
 static encoder_sample_t enc;
 static int32_t left_travel,right_travel;
@@ -252,4 +274,33 @@ static void event_ring_wrap(void)
     board_stop(STOP_BUTTON);advance(100000);stopped();diagnostic_export("events-wrap");
     puts("PASS12 alternating A/Z reads across ADC/event ring wraps with concurrent simulated Motion consumption and stopped export");
 }
-int main(void){pipeline();failures();extended_codec();clock_wrap();held_boot();first_failure_evidence();diagnostic_boundaries();event_ring_wrap();adc_range_rejection();return 0;}
+#ifdef RTOS_OBSTACLE
+static void obstacle_stop_during_turn(void)
+{
+    begin_test();
+    assert(board_select(BOARD_OBSTACLE_SELECT));
+    start();
+    assert(obstacle_active && latest().kind==MOTION_TRACK_KIND);
+    for(unsigned i=0;i<500&&armed()&&!(pwm[4][1]&&pwm[5][0]);i++)
+        advance(10000);
+    assert(armed() && pwm[4][1] && pwm[5][0]);
+    assert(!strcmp(runtime.track.status,"TURN_LEFT_OUT"));
+    uint16_t token=runtime.token;
+    board_stop(STOP_BUTTON);
+    stopped();
+    advance(30000);
+    assert(!obstacle_active);
+    assert(!board_apply(token,-0.3f,0.3f));
+    stopped();
+    puts("PASS RTOS obstacle detection and left turn through Motion, STOP cancels sonar and rejects stale drive token");
+}
+#endif
+int main(void)
+{
+    pipeline();failures();extended_codec();clock_wrap();held_boot();
+    first_failure_evidence();diagnostic_boundaries();event_ring_wrap();adc_range_rejection();
+#ifdef RTOS_OBSTACLE
+    obstacle_stop_during_turn();
+#endif
+    return 0;
+}

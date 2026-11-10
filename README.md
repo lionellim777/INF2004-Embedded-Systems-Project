@@ -6,23 +6,35 @@ The goal is an autonomous two-wheel robot that follows a line, decodes navigatio
 
 ## Current development and handoff
 
-**10 November2026: development paused for team handoff.** Lionel and Ezra should
-start with [the consolidated handoff](docs/HANDOFF-2026-11-10.md).
+Yixuan’s [10 November handoff](docs/HANDOFF-2026-11-10.md) records the baseline,
+including the two physical RTOS v0.5.1 AAZ passes. The repository contains both
+the Pico SDK calibration target and the µT-Kernel mission target. The RTOS
+minimum-bit options and the obstacle mode build option default to OFF.
 
-- `main` remains the legacy v5.63 baseline described below.
-- `yixuan/rtos-minimum-bit-state` contains the newer combined µT-Kernel,
-  motor/line/barcode, binary MQTT and protected-stop work. RTOS v0.5.1 has two
-  physical AAZ passes, including a live wireless run with line recovery.
-- Opt-in v0.6-dev3 minimum-bit candidates are built/software-verified but
-  **not installed or hardware-accepted**. Their options default OFF, preserving
-  the accepted implementation. Terrain, obstacle and barcode-command execution
-  integrations still require the respective members' ready interfaces/code.
+### Obstacle manoeuvring handoff
 
-The handoff records exact commits, hardware/calibration, test evidence,
-private-artifact boundaries and the next acceptance steps. Historical status
-below describes the legacy build; it does not supersede the newer branch work.
+- On detection, the car stops and scans left in 5° steps to calculate A. It
+  turns left by A, drives 100 mm, turns right by A, and scans ahead. A detected
+  obstacle repeats the step. A clear check starts straight tape seeking. The
+  car turns left first after qualifying the tape crossing.
+- The obstacle controller uses **1,936 bytes** on Pico W, down from **2,952**.
+  Bounded scan counts, angles and travel fields are packed. Encoder snapshots
+  retain modulo-32 counts and sonar ranges retain their existing precision.
+- The [calibration build](firmware/app/robot_firmware/README.md) creates the
+  `AAI10-Calibrate` access point and serves the page at `192.168.4.1`.
+- The [RTOS obstacle USB UF2](firmware/releases/robocar_rtos_obstacle_dev_usb.uf2)
+  enables the opt-in obstacle adapter. Over USB, select `o` while stopped,
+  then press and release GP20. GP20 also stops the car. Use `t` for normal
+  track mode. The RTOS build joins the configured Wi-Fi network when rebuilt
+  with the ignored `firmware/app/mission_rtos/network_settings.local.h`.
+  MQTT telemetry is optional for the bypass. An MQTT STOP can cancel it.
+- Both Pico W targets built and the obstacle host regressions passed. An RTOS
+  mock run passed detection, left-turn output and STOP cancellation. Windows
+  blocked the final mock rerun and the wide-versus-packed trace comparison.
+  Physical RTOS acceptance remains pending. See the [field ranges, build
+  options and acceptance steps](docs/testing/rtos-obstacle-dev.md).
 
-## Legacy main baseline
+## Legacy calibration baseline
 
 Latest checkpoint: **v5.63 barcode baseline**,7 November2026.
 Two physical home-track runs each accepted full-A, half-A and half-Z on the right
@@ -47,8 +59,8 @@ not universal reliability or the whole final mission.
 | Line following | Centre/right control, encoder feedback, bounded expanding recovery and GP20 controls. Two AAZ home routes including the right bend completed; whole-course/junction acceptance remains. |
 | Wheel encoders and motion | About 2543 counts/revolution; 30 cm and 90/180-degree calibration incorporated into moving firmware. School runs recorded right-wheel non-progress during loaded turns. v5.53 increases bounded turn effort and preserves per-wheel fault evidence. Subsequent straight-strip bypass completed; broader repeatability remains unverified. |
 | Barcode decoding / navigation | Decoding accepted on the current home setup: AAZ twice, including half-Z during turning. A-Z host tests and configurable Y/Z route actions exist; final command mapping and physical navigation manoeuvres remain separate. |
-| Obstacle bypass and line recovery | Bounded right-side bypass and perpendicular tape alignment implemented. Earlier home runs resumed following. v5.53 straight-strip bypass completed, while the bend rejoin lost tape. v5.56 restores right-first rejoin and adds scan-planned departure with left-side clearance checks; physical retests pending. |
-| Wi-Fi/MQTT telemetry | Main has a local calibration AP/page/logs. `wifi-buddy-1` has standalone µT-Kernel/MQTT work and validation records; real-producer/final-robot integration remains. |
+| Obstacle bypass and line recovery | Current left bypass and left-first tape alignment are described in the obstacle handoff above. |
+| Wi-Fi/MQTT telemetry | The calibration target serves the local AP and page. The RTOS mission target joins the configured network and publishes binary MQTT telemetry. |
 
 Detailed evidence and limitations are recorded in [docs/development-status.md](docs/development-status.md).
 

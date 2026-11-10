@@ -221,7 +221,7 @@ static void run(unsigned scenario){
     for(unsigned i=0;i<25000&&!out.stop&&!a.completed;i++){
         bool fresh=i%12==0,valid=true,stall=false;float cm=180;int center=(a.phase==AVOID_FOLLOW||a.phase==AVOID_VERIFY||a.phase==AVOID_CHECK_TAPE||a.phase==AVOID_TAPE_PROBE)?700:0;
         if(a.phase==AVOID_FOLLOW)cm=25;
-        if(a.phase==AVOID_SCAN_INITIAL)cm=a.servo_angle>=80?20:100;
+        if(a.phase==AVOID_SCAN_INITIAL)cm=a.servo_angle<=100?20:100;
         if(a.phase==AVOID_SCAN_SIDE||a.phase==AVOID_CHECK_LEFT)cm=a.along_mm<=300?28:180;
         if(scenario==1&&a.phase==AVOID_MOVE_OUT)cm=10;
         if(scenario==2&&a.phase==AVOID_SCAN_FORWARD)cm=20;
@@ -230,7 +230,7 @@ static void run(unsigned scenario){
         if(scenario==5&&a.phase==AVOID_MOVE_ALONG)cm=10;
         if(scenario==6&&a.phase==AVOID_SCAN_FORWARD)cm=180; /* clear original heading needs no side observation */
         if(scenario==7&&a.phase==AVOID_MOVE_OUT)enc.left_invalid=2;
-        if(scenario==17&&a.phase==AVOID_TURN_OUT&&motion_left_position(&a.leg,enc)>400)enc.right_invalid=1;
+        if(scenario==17&&a.phase==AVOID_TURN_OUT&&motion_left_position(&a.leg,enc)<-400)enc.right_invalid=1;
         if(scenario==8&&a.phase==AVOID_SCAN_FORWARD&&a.offset_mm<450)cm=22;
         if(scenario==9&&a.phase==AVOID_SCAN_FORWARD&&a.along_mm>300)cm=22;
         if(scenario==10&&a.phase==AVOID_SCAN_FORWARD&&a.servo_angle==90)valid=false;
@@ -251,7 +251,7 @@ static void run(unsigned scenario){
         if(scenario==15&&a.phase==AVOID_CHECK_TAPE)center=0;
         if(scenario==16&&a.phase==AVOID_VERIFY)center=0;
         if(a.phase==AVOID_TURN_OUT)
-            assert(a.leg.left.target==1100*(int)a.departure_deg/90&&a.leg.right.target==-1100*(int)a.departure_deg/90);
+            assert(a.leg.left.target==-1090*(int)a.departure_deg/90&&a.leg.right.target==1090*(int)a.departure_deg/90);
         if(a.phase==AVOID_TURN_ALONG)
             assert(a.leg.left.target==1100&&a.leg.right.target==-1100);
         tick(fresh,valid,cm,center,stall);
@@ -268,7 +268,7 @@ static void run(unsigned scenario){
         assert(!a.completed);
     }else{
         if(out.stop||a.completed!=1){fprintf(stderr,"scenario%u completed=%u stopped=%d reason=%s phase=%s\n",scenario,a.completed,out.stop,out.state,obstacle_bypass_phase(a.phase));assert(0);}
-        assert(a.phase==AVOID_FOLLOW&&a.detected==1&&(a.plan.edge_from_no_return||a.plan.right_edge_known));
+        assert(a.phase==AVOID_FOLLOW&&a.detected==1&&(a.plan.edge_from_no_return||a.plan.left_edge_known));
         assert(seen_phases&(1u<<AVOID_VERIFY));
         if(scenario==18)assert(a.no_echo>0);
         if(scenario==8)assert(a.offset_mm>=450&&a.offset_mm<=550);
@@ -576,7 +576,7 @@ static void spatial_ink_tests(void){
         while(a.phase==AVOID_CHECK_TAPE)tick(true,true,180,700,false);
         assert(a.phase==AVOID_TAPE_PROBE);
         for(unsigned i=0;i<600&&!out.stop&&a.phase==AVOID_TAPE_PROBE;i++){
-            double mm=(motion_left_position(&a.tape_origin,enc)+motion_right_position(&a.tape_origin,enc))/(2*13.491);
+            double mm=(obstacle_encoder_delta(a.tape_origin.left_raw,enc.left_raw)+obstacle_encoder_delta(enc.right_raw,a.tape_origin.right_raw))/(2*13.491);
             int center=700;
             if(mode==0)center=mm<3?700:0; /* half narrow bar */
             if(mode==1)center=mm<18||mm>=30?700:0; /* full wide bar + gap + next ink */
@@ -601,7 +601,7 @@ static void straight_seek_alignment_test(void){
     for(unsigned transient=0;transient<2;transient++){
         init();a.phase=AVOID_ALIGN_TURN;a.episode_us=now;
         a.angled_probe=true;a.return_deg=65;a.align_direction=1;a.align_armed=true;
-        a.align_origin.start=enc;
+        a.align_origin=obstacle_encoder_origin(enc);
         motion_begin(&a.leg,MOTION_RIGHT_90,enc,now);a.leg.slow_turn=true;
         left=1222;right=-1222; /* approximately 110 degrees, beyond old A window */
         tick(true,true,180,700,false);
@@ -624,10 +624,10 @@ static void alignment_tests(void){
     for(unsigned mode=0;mode<14;mode++){
         init();a.phase=AVOID_CHECK_TAPE;a.candidate_us=a.phase_us=a.episode_us=now;
         a.offset_mm=200;a.resume_phase=AVOID_MOVE_ALONG;a.rejoin_attempts=1;
-        /* A small odometry bias still prefers the right path toward the approach. */
-        a.episode_origin.start.left_raw=(uint32_t)-600;
-        if(mode==11||mode==13)a.episode_origin.start.left_raw=2000; /* positive approach bias must still choose right */
-        if(mode==12)a.episode_origin.start.left_raw=(uint32_t)-2000; /* negative approach bias must still choose right */
+        /* A small odometry bias still prefers the left path toward the approach. */
+        a.episode_origin.left_raw=(uint32_t)-600;
+        if(mode==11||mode==13)a.episode_origin.left_raw=2000; /* positive approach bias must still choose left */
+        if(mode==12)a.episode_origin.left_raw=(uint32_t)-2000; /* negative approach bias must still choose left */
         double x=-120,y=0,heading=0;
         unsigned visited=0;bool saw_lost=false;
         for(unsigned i=0;i<5000&&!out.stop&&!a.completed;i++){
@@ -647,7 +647,7 @@ static void alignment_tests(void){
             if(mode==1&&(a.phase==AVOID_ALIGN_TURN||a.phase==AVOID_ALIGN_CONFIRM))center=0;
             /* Force preferred sweep to miss, exercise opposite full sweep. */
             if((mode==2||mode==13)&&a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)center=0;
-            double degrees=-heading*180/3.14159265359;
+            double degrees=heading*180/3.14159265359;
             /* Barcode-like ink at 20..40deg must not end the turn. */
             if((mode==7||mode==9)&&a.phase==AVOID_ALIGN_TURN){
                 if(mode==9)center=0;
@@ -667,7 +667,7 @@ static void alignment_tests(void){
             out=obstacle_bypass_step(&a,(ir_roles_t){false,center>=250,false},center,enc,now,fresh,mode!=10,cm);
             if(mode==5&&a.phase==AVOID_AXLE_ADVANCE)a.leg.alignment_drive=false;
             visited|=1u<<a.phase;
-            if(a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)assert(a.align_direction==1);
+            if(a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)assert(a.align_direction==-1);
             if(a.phase==AVOID_ALIGN_CONFIRM){
                 assert(!out.left&&!out.right);
                 assert(fabs(degrees)>=59&&fabs(degrees)<=116);
@@ -686,43 +686,41 @@ static void alignment_tests(void){
             assert(!strcmp(out.state,reason));
         }
     }
-    puts("PASS 14 perpendicular geometry cases: right-first regardless of odometry bias, both sweeps, early false ink, rejected confirmation recovery, absent tape, load and obstacles");
+    puts("PASS 14 perpendicular geometry cases: left-first regardless of odometry bias, both sweeps, early false ink, rejected confirmation recovery, absent tape, load and obstacles");
 }
 static void planned_detour_tests(void){
-    float narrow[OBSTACLE_PLAN_RAYS]={20,100,100,100,100,100,100,100,100};
-    unsigned near[OBSTACLE_PLAN_RAYS]={3,0,0,0,0,0,0,0,0};
-    unsigned far[OBSTACLE_PLAN_RAYS]={0,3,3,3,3,3,3,3,3};
-    unsigned no_return[OBSTACLE_PLAN_RAYS]={0};
-    obstacle_plan_t p=obstacle_plan(narrow,near,far,no_return);
-    assert(p.right_edge_known&&p.angle_deg==50&&p.edge_servo_deg==90&&p.clear_servo_deg==85);
+    float narrow[OBSTACLE_PLAN_RAYS]={20,100,100,100,100,100,100,100};
+    obstacle_ray_counts_t narrow_counts[OBSTACLE_PLAN_RAYS]={{.near=3},{.far=3}};
+    obstacle_plan_t p=obstacle_plan(narrow,narrow_counts);
+    assert(p.left_edge_known&&p.angle_deg==50&&p.edge_servo_deg==90&&p.clear_servo_deg==95);
     assert(p.lateral_mm>=220&&p.lateral_mm<=225&&p.travel_mm>=285&&p.travel_mm<=295);
-    float wide[OBSTACLE_PLAN_RAYS]={20,20,20,20,20,100,100,100,100};
-    unsigned wide_near[OBSTACLE_PLAN_RAYS]={3,3,3,3,3,0,0,0,0};
-    unsigned wide_far[OBSTACLE_PLAN_RAYS]={0,0,0,0,0,3,3,3,3};
-    obstacle_plan_t w=obstacle_plan(wide,wide_near,wide_far,no_return);
-    assert(w.right_edge_known&&w.angle_deg>p.angle_deg&&w.lateral_mm>p.lateral_mm);
-    unsigned all_near[OBSTACLE_PLAN_RAYS]={3,3,3,3,3,3,3,3,3};
-    unsigned no_far[OBSTACLE_PLAN_RAYS]={0};
-    w=obstacle_plan(wide,all_near,no_far,no_return);assert(!w.right_edge_known&&!w.edge_from_no_return);
-    far[1]=1;w=obstacle_plan(narrow,near,far,no_return);assert(!w.right_edge_known&&!w.edge_from_no_return);
-    far[1]=0;w=obstacle_plan(narrow,near,far,no_return);assert(!w.right_edge_known&&!w.edge_from_no_return);
-    no_return[1]=2;w=obstacle_plan(narrow,near,far,no_return);assert(!w.edge_from_no_return);
-    no_return[1]=3;w=obstacle_plan(narrow,near,far,no_return);
-    assert(!w.right_edge_known&&w.edge_from_no_return&&w.angle_deg>=45&&w.travel_mm>200);
-    near[0]=0;w=obstacle_plan(narrow,near,far,no_return);assert(!w.edge_from_no_return);
+    float wide[OBSTACLE_PLAN_RAYS]={20,20,20,20,20,100,100,100};
+    obstacle_ray_counts_t wide_counts[OBSTACLE_PLAN_RAYS]={
+        {.near=3},{.near=3},{.near=3},{.near=3},{.near=3},{.far=3},{.far=3},{.far=3}
+    };
+    obstacle_plan_t w=obstacle_plan(wide,wide_counts);
+    assert(w.left_edge_known&&w.angle_deg>p.angle_deg&&w.lateral_mm>p.lateral_mm);
+    for(unsigned i=0;i<OBSTACLE_PLAN_RAYS;i++)wide_counts[i]=(obstacle_ray_counts_t){.near=3};
+    w=obstacle_plan(wide,wide_counts);assert(!w.left_edge_known&&!w.edge_from_no_return);
+    narrow_counts[1].far=1;w=obstacle_plan(narrow,narrow_counts);assert(!w.left_edge_known&&!w.edge_from_no_return);
+    narrow_counts[1].far=0;w=obstacle_plan(narrow,narrow_counts);assert(!w.left_edge_known&&!w.edge_from_no_return);
+    narrow_counts[1].no_return=2;w=obstacle_plan(narrow,narrow_counts);assert(!w.edge_from_no_return);
+    narrow_counts[1].no_return=3;w=obstacle_plan(narrow,narrow_counts);
+    assert(!w.left_edge_known&&w.edge_from_no_return&&w.angle_deg>=45&&w.travel_mm>200);
+    narrow_counts[0].near=0;w=obstacle_plan(narrow,narrow_counts);assert(!w.edge_from_no_return);
     /* After the first angled departure, face the original route heading,
      * repeat A once when the forward scan is blocked, then seek the tape. */
     init();bool planned=false,saw_forward=false,saw_repeat=false,saw_return=false;
     for(unsigned i=0;i<25000&&!out.stop&&!a.completed;i++){
         float cm=a.phase==AVOID_FOLLOW?20:180;
-        if(a.phase==AVOID_SCAN_INITIAL)cm=a.servo_angle>=80?20:100;
+        if(a.phase==AVOID_SCAN_INITIAL)cm=a.servo_angle<=100?20:100;
         if(a.phase==AVOID_SCAN_FORWARD&&a.offset_mm<340)cm=20;
         int center=(a.phase==AVOID_FOLLOW||a.phase==AVOID_VERIFY||a.phase==AVOID_CHECK_TAPE||a.phase==AVOID_TAPE_PROBE)?700:0;
         if(a.phase==AVOID_MOVE_ALONG)center=((motion_left_position(&a.leg,enc)+motion_right_position(&a.leg,enc))/(2*13.491f))>35?700:0;
-        if(a.phase==AVOID_TURN_OUT){planned=true;if(a.offset_mm)saw_repeat=true;assert(a.departure_deg==55&&a.leg.left.target==672&&a.leg.right.target==-672);}
+        if(a.phase==AVOID_TURN_OUT){planned=true;if(a.offset_mm)saw_repeat=true;assert(a.departure_deg==55&&a.leg.left.target==-666&&a.leg.right.target==666);}
         if(a.phase==AVOID_TURN_FORWARD){
             if(!saw_forward)assert(a.departure_done_mm==100&&a.offset_mm>=80&&a.offset_mm<=100);
-            saw_forward=true;assert(a.leg.left.target==-666&&a.leg.right.target==666);
+            saw_forward=true;assert(a.leg.left.target==672&&a.leg.right.target==-672);
         }
         assert(a.phase!=AVOID_SCAN_OUT&&a.phase!=AVOID_SCAN_SIDE);
         assert(a.phase!=AVOID_TURN_TO_LINE&&a.phase!=AVOID_TURN_LOOK);
@@ -753,11 +751,11 @@ static void unknown_scan_tests(void){
             mode==2?AVOID_SCAN_FORWARD:AVOID_SCAN_RETURN;
         a.departure_travel_mm=a.outward_mm=100;a.offset_mm=mode==0?300:250;a.return_deg=55;
         for(unsigned i=0;i<1200&&!out.stop;i++){
-            bool valid=!(mode==0?a.servo_angle==75:a.servo_angle==90);
-            float cm=mode==0&&a.servo_angle>=80?20:100;
+            bool valid=!(mode==0?a.servo_angle==105:a.servo_angle==90);
+            float cm=mode==0&&a.servo_angle<=100?20:100;
             tick(i%12==0,valid,cm,0,false);
         }
-        const char *reason=mode==0?"AVOID_RIGHT_EDGE_UNKNOWN":mode==1?"AVOID_OUTWARD_RANGE_UNKNOWN":
+        const char *reason=mode==0?"AVOID_LEFT_EDGE_UNKNOWN":mode==1?"AVOID_OUTWARD_RANGE_UNKNOWN":
             mode==2?"AVOID_FORWARD_RANGE_UNKNOWN":"AVOID_RETURN_RANGE_UNKNOWN";
         assert(out.stop&&!strcmp(out.state,reason));
     }
@@ -772,7 +770,7 @@ static void edge_shift_tests(void){
     init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_INITIAL;
     a.phase_us=a.episode_us=now;a.approach_min_cm=20;
     for(unsigned i=0;i<1000&&!out.stop;i++)tick(i%12==0,true,20,0,false);
-    assert(out.stop&&!strcmp(out.state,"AVOID_RIGHT_EDGE_UNKNOWN"));
+    assert(out.stop&&!strcmp(out.state,"AVOID_LEFT_EDGE_UNKNOWN"));
     assert(a.edge_shift_count==0&&a.offset_mm==0&&a.scan_serial==1);
     puts("PASS inconclusive initial edge stops without extra scan manoeuvres");
 }
@@ -782,14 +780,14 @@ static void echo_edge_tests(void){
     bool planned=false;
     for(unsigned i=0;i<3000&&!out.stop;i++){
         bool initial=a.phase==AVOID_SCAN_INITIAL;
-        bool valid=!(initial&&a.servo_angle<=55);
+        bool valid=!(initial&&a.servo_angle>=125);
         a.no_return=initial&&!valid;
         float cm=initial?20:100;
         tick(i%12==0,valid,cm,0,false);
         if(a.plan.edge_from_no_return)planned=true;
         if(a.phase==AVOID_MOVE_OUT)break;
     }
-    assert(planned&&a.plan.edge_from_no_return&&!a.plan.right_edge_known);
+    assert(planned&&a.plan.edge_from_no_return&&!a.plan.left_edge_known);
     assert(a.departure_deg>=45&&a.edge_shift_count==0&&a.offset_mm==0);
     assert(!out.stop&&a.phase==AVOID_MOVE_OUT&&a.departure_step_mm==100&&a.scan_serial==1);
     puts("PASS initial no-return edge plan leads directly to 100mm angled move without another sweep");

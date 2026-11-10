@@ -14,6 +14,9 @@ with tempfile.TemporaryDirectory(prefix='rtos-track-') as name:
     if os.environ.get('RTOS_TEST_COMPACT_ADC')=='1':command.append('-DRTOS_COMPACT_ADC_STATE=1')
     if os.environ.get('RTOS_TEST_COMPACT_CORE')=='1':command+=['-DRTOS_COMPACT_CORE_STATE=1','-DCENTER_BASELINE_COMPACT=1']
     if os.environ.get('RTOS_TEST_COMPACT_CONTROL')=='1':command+=['-DROBOCAR_COMPACT_CONTROL_STATE=1']
+    if os.environ.get('RTOS_TEST_OBSTACLE')=='1':
+        command.append('-DRTOS_OBSTACLE=1')
+        sources.append(BASE/'obstacle_bypass.c')
     if os.environ.get('RTOS_TEST_FIRST_FAILURE_CACHE')=='0':command.append('-DRTOS_NO_FIRST_FAILURE_CACHE=1')
     command += ['-I'+str(p) for p in [APP,BASE,TEST,folder]]
     command += [str(p) for p in sources]+[str(TEST/'track_integration_test.c'),'-o',str(folder/'test')]

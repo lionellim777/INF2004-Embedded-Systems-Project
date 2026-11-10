@@ -149,6 +149,9 @@ bool board_select(uint8_t kind)
 #ifdef RTOS_TRACK
     supported=supported || kind==MOTION_TRACK_KIND;
 #endif
+#ifdef RTOS_OBSTACLE
+    supported = supported || kind == BOARD_OBSTACLE_SELECT;
+#endif
     bool result = supported && !safety_gate_armed(&gate);
     if (result) control = (uint8_t)((control & (uint8_t)~SELECT_MASK) | kind);
     restore_interrupts(irq);

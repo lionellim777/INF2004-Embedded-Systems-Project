@@ -11,6 +11,18 @@ enum { SETTLE_US=300000, RANGE_STALE_US=400000, EPISODE_US=240000000,
        SENSOR_LEAD_MM=120, MAX_EPISODES=5, INITIAL_OFFSET_MM=250,
        WARNING_CM=45, APPROACH_CM=20, MIN_PIVOT_CM=12, APPROACH_CONFIRM_US=600000 };
 static const unsigned angles[]={50,70,90,110,125};
+enum { SCAN_SAMPLES_PER_RAY = 3 };
+_Static_assert(AVOID_FAILED < 32, "Bypass phases use five bits");
+_Static_assert(sizeof(obstacle_ray_counts_t) == 1, "Ray counts use one byte per angle");
+_Static_assert(STEP_MM <= 127 && EDGE_SHIFT_MM <= 127, "Outward steps use seven bits");
+_Static_assert(MAX_OFFSET_MM <= 1023 && MAX_OFFSET_MM * 3u / 2u <= 1023,
+               "Lateral distance and diagonal from a minimum 45-degree turn use ten bits");
+_Static_assert(MAX_ALONG_MM + ALONG_STEP_MM + STEP_MM <= 2047,
+               "Along distance includes a final leg before its limit is checked");
+_Static_assert(SCAN_SAMPLES_PER_RAY <= 3, "Per-ray counters use two bits");
+_Static_assert(OBSTACLE_PLAN_RAYS * SCAN_SAMPLES_PER_RAY <= 31 &&
+               sizeof angles / sizeof angles[0] * SCAN_SAMPLES_PER_RAY <= 31,
+               "Sweep totals use five bits");
 /* Provisional bypass-only trims from the 2 Nov overhead video. Encoder travel
  * is not yaw feedback: surface slip and camera perspective limit accuracy.
  * Keep standalone calibration and the tape-guided alignment sweep unchanged. */
@@ -19,7 +31,7 @@ static const float counts_per_mm=2543.0f/(3.14159265f*60.0f);
 
 const char *obstacle_bypass_phase(avoid_phase_t p)
 {
-    const char *names[]={"FOLLOW","SETTLE","TURN_RIGHT_OUT","SCAN_RIGHT_PATH","MOVE_OUT",
+    const char *names[]={"FOLLOW","SETTLE","TURN_LEFT_OUT","SCAN_RIGHT_PATH","MOVE_OUT",
         "FACE_FORWARD","SCAN_FORWARD","MOVE_ALONG","FACE_OBJECT","SCAN_OBJECT_SIDE",
         "FACE_ALONG","SEEK_RETURN_LINE","VERIFY_LINE","CHECK_FOUND_TAPE",
         "PROBE_TAPE_HEADING","ADVANCE_AXLE_TO_TAPE","ALIGN_WITH_TAPE","CONFIRM_TAPE_HEADING","SCAN_OBJECT_EDGE","CHECK_LEFT_EDGE","CLEAR_REAR_MARGIN",
@@ -63,7 +75,8 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     if(p==AVOID_CHECK_LEFT){a->servo_angle=125;a->left_samples=a->left_far=0;a->left_near=false;return;}
     if(scan_phase(p)){
         if(p==AVOID_SCAN_INITIAL){for(unsigned i=0;i<OBSTACLE_PLAN_RAYS;i++){
-            a->plan_cm[i]=401;a->plan_near[i]=a->plan_far[i]=a->plan_no_return[i]=0;
+            a->plan_cm[i]=401;
+            a->plan_counts[i]=(obstacle_ray_counts_t){0};
         }}
         a->scan_index=a->samples=a->scan_no_echo=a->scan_center_clear=a->scan_center_no_return=0;a->scan_min_cm=401;
         a->scan_ray_far=a->scan_far_rays=a->scan_far_samples=0;
@@ -73,8 +86,8 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     }
     a->servo_angle=90;
     motion_kind_t turn=MOTION_NONE;
-    if(p==AVOID_TURN_OUT||p==AVOID_TURN_ALONG)turn=MOTION_RIGHT_90;
-    if(p==AVOID_TURN_FORWARD||p==AVOID_TURN_LOOK||p==AVOID_TURN_TO_LINE)turn=MOTION_LEFT_90;
+    if(p==AVOID_TURN_FORWARD||p==AVOID_TURN_ALONG)turn=MOTION_RIGHT_90;
+    if(p==AVOID_TURN_OUT||p==AVOID_TURN_LOOK||p==AVOID_TURN_TO_LINE)turn=MOTION_LEFT_90;
     if(p==AVOID_TURN_RETURN||p==AVOID_TURN_CLEARANCE)turn=MOTION_RIGHT_90;
     if(p==AVOID_ALIGN_TURN)turn=a->align_direction>0?MOTION_RIGHT_90:MOTION_LEFT_90;
     if(turn!=MOTION_NONE){
@@ -99,9 +112,9 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
             a->leg.right.target=a->leg.right.target*10/90;
         }
         if(p==AVOID_ALIGN_TURN){
-            if(!a->align_reversed)a->align_origin.start=enc;
+            if(!a->align_reversed)a->align_origin=obstacle_encoder_origin(enc);
             a->align_hit_us=0;a->align_armed=true;
-            /* Operator-selected right-first rejoin. The opposite sweep is
+            /* Left-first rejoin. The opposite sweep is
              * only a bounded fallback if the right sweep finds no tape. */
             int degrees=a->align_reversed?220:110;
             a->leg.left.target=a->align_direction*1000*degrees/90;
@@ -111,7 +124,7 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     else if(forward_phase(p)){
         unsigned mm=p==AVOID_MOVE_OUT?a->departure_step_mm:p==AVOID_MOVE_ALONG?(a->angled_probe?STEP_MM:ALONG_STEP_MM):p==AVOID_CLEAR_TAIL?100:
             p==AVOID_TAPE_PROBE?60:p==AVOID_AXLE_ADVANCE?a->axle_mm:
-            (unsigned)ceilf((a->offset_mm-SENSOR_LEAD_MM+60)/sinf((a->return_deg?a->return_deg:90)*0.01745329252f));
+            (unsigned)ceilf(((unsigned)a->offset_mm-SENSOR_LEAD_MM+60)/sinf((a->return_deg?a->return_deg:90)*0.01745329252f));
         motion_begin_distance(&a->leg,mm,enc,now);
         a->leg.alignment_drive=p==AVOID_TAPE_PROBE||p==AVOID_AXLE_ADVANCE;
     }else if(p==AVOID_VERIFY){
@@ -123,13 +136,17 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
 void obstacle_bypass_begin(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t now,int32_t reference)
 {
     memset(a,0,sizeof(*a));a->phase=AVOID_FOLLOW;a->servo_angle=90;a->last_us=now;
-    a->origin.start=enc;a->reference=reference;a->wall_us=a->active_us=now;
+    a->origin=enc;a->reference=reference;a->wall_us=a->active_us=now;
     a->encoder_seen[0]=enc.left_invalid;a->encoder_seen[1]=enc.right_invalid;
     course_begin(&a->line,(course_config_t){'s','s',SENSOR_LEAD_MM},enc,now);
     course_set_center_reference(&a->line,reference);
 }
-static int32_t mean_mm(const motion_control_t *m,encoder_sample_t enc)
-{return (int32_t)(((int64_t)motion_left_position(m,enc)+motion_right_position(m,enc))/(2*counts_per_mm));}
+static int32_t mean_mm(obstacle_encoder_origin_t origin, encoder_sample_t enc)
+{
+    int32_t left=obstacle_encoder_delta(origin.left_raw,enc.left_raw);
+    int32_t right=obstacle_encoder_delta(enc.right_raw,origin.right_raw);
+    return (int32_t)(((int64_t)left+right)/(2*counts_per_mm));
+}
 /* Pause a detour without discarding its encoder target. On rejection, wait
  * again for the restored sonar direction and restart PI from zero output. */
 static void resume_detour(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t now)
@@ -154,16 +171,16 @@ static bool may_find_tape(avoid_phase_t p)
 /* Encoder-estimated heading relative to the axle-centred crossing. Use both
  * wheels and retain the origin across the opposite sweep. This is a geometric
  * gate, not proof that black ink is route tape or that tyres did not slip. */
-static int32_t alignment_heading(const obstacle_bypass_t *a,encoder_sample_t enc)
+int32_t obstacle_bypass_alignment_heading(const obstacle_bypass_t *a,encoder_sample_t enc)
 {
-    int64_t differential=(int64_t)motion_left_position(&a->align_origin,enc)-
-        motion_right_position(&a->align_origin,enc);
+    int64_t differential=(int64_t)obstacle_encoder_delta(a->align_origin.left_raw,enc.left_raw)-
+        obstacle_encoder_delta(enc.right_raw,a->align_origin.right_raw);
     return (int32_t)(differential*90/2000);
 }
 static int32_t route_heading(const obstacle_bypass_t *a,encoder_sample_t enc)
 {
-    int64_t differential=(int64_t)motion_left_position(&a->episode_origin,enc)-
-        motion_right_position(&a->episode_origin,enc);
+    int64_t differential=(int64_t)obstacle_encoder_delta(a->episode_origin.left_raw,enc.left_raw)-
+        obstacle_encoder_delta(enc.right_raw,a->episode_origin.right_raw);
     int32_t degrees=(int32_t)(differential*90/2000)%360;
     if(degrees>180)degrees-=360;
     if(degrees< -180)degrees+=360;
@@ -177,7 +194,7 @@ static bool route_direction_ok(const obstacle_bypass_t *a,encoder_sample_t enc)
 }
 static bool alignment_window(const obstacle_bypass_t *a,encoder_sample_t enc)
 {
-    int32_t heading=alignment_heading(a,enc)*a->align_direction;
+    int32_t heading=obstacle_bypass_alignment_heading(a,enc)*a->align_direction;
     /* Straight tape seeking no longer approaches at the diagonal angle A.
      * Inspect the bounded sweep instead of using A as the tape bearing. */
     if(a->angled_probe)return heading>=25&&heading<=115;
@@ -206,9 +223,10 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
     if(now<a->last_us||now-a->last_us>250000)return fail(a,"AVOID_CONTROL_LATE");
     a->last_us=now;
     if(!encoder_health_ok(a,enc,now))return fail(a,"AVOID_ENCODER_INVALID");
-    enc.left_invalid=a->origin.start.left_invalid;
-    enc.right_invalid=a->origin.start.right_invalid;
-    int32_t l=motion_left_position(&a->origin,enc),r=motion_right_position(&a->origin,enc);
+    enc.left_invalid=a->origin.left_invalid;
+    enc.right_invalid=a->origin.right_invalid;
+    int32_t l=obstacle_encoder_delta(a->origin.left_raw,enc.left_raw),
+            r=obstacle_encoder_delta(enc.right_raw,a->origin.right_raw);
     if(l<=-COURSE_LIMIT_COUNTS||l>=COURSE_LIMIT_COUNTS||r<=-COURSE_LIMIT_COUNTS||r>=COURSE_LIMIT_COUNTS)
         return fail(a,"AVOID_RUN_TRAVEL_LIMIT");
     if(a->phase!=AVOID_FOLLOW&&now-a->episode_us>=EPISODE_US)return fail(a,"AVOID_EPISODE_TIMEOUT");
@@ -234,9 +252,9 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         }
         if(a->rejoin_good>=2){
             a->saved_leg=a->leg;
-            motion_abort(&a->leg);a->tape_origin.start=enc;a->align_reversed=false;
+            motion_abort(&a->leg);a->tape_origin=obstacle_encoder_origin(enc);a->align_reversed=false;
             a->route_heading_deg=route_heading(a,enc);
-            a->align_direction=1; /* explicit operator right-first preference */
+            a->align_direction=-1; /* Left first after finding tape. */
             a->probe_black=true;a->probe_gap=false;a->probe_first_black_mm=0;
             a->tape_decision="SPATIAL_INK_CHECK";
             enter(a,AVOID_TAPE_PROBE,enc,now);
@@ -255,7 +273,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         /* Do not immediately reacquire the starting tape under the bottle.
          * First leave it and move at least 80 mm laterally. */
         bool departed=a->offset_mm>=80||
-            (a->phase==AVOID_MOVE_OUT&&mean_mm(&a->leg,enc)>=80);
+            (a->phase==AVOID_MOVE_OUT&&mean_mm(obstacle_encoder_origin(a->leg.start),enc)>=80);
         if(tape&&departed&&a->rejoin_armed){
             a->resume_phase=a->phase;a->resume_servo=a->servo_angle;
             a->candidate_us=now;a->rejoin_attempts++;a->rejoin_good=0;a->tape_decision="CHECKING";
@@ -279,7 +297,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         return quiet(a);
     }
     if(a->phase==AVOID_TAPE_PROBE){
-        int mm=mean_mm(&a->tape_origin,enc);
+        int mm=mean_mm(a->tape_origin,enc);
         if(a->probe_black&&center<200){
             a->probe_black=false;a->probe_gap=true;
             a->probe_first_black_mm=mm>0?(unsigned)mm:0;
@@ -321,8 +339,8 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
              * add 20% odometry margin. Large heading change invalidates pursuit. */
             float approach_travel_cm=0;
             if(a->approach_warning&&!a->approach_pending){
-                float dl=motion_left_position(&a->approach_origin,enc)/counts_per_mm;
-                float dr=motion_right_position(&a->approach_origin,enc)/counts_per_mm;
+                float dl=obstacle_encoder_delta(a->approach_origin.left_raw,enc.left_raw)/counts_per_mm;
+                float dr=obstacle_encoder_delta(enc.right_raw,a->approach_origin.right_raw)/counts_per_mm;
                 float yaw=fabsf(dl-dr)/115.0f;
                 a->approach_yaw_rad=yaw;
                 approach_travel_cm=1.2f*(fabsf(dl+dr)*0.5f+130.0f*yaw)/10.0f;
@@ -331,7 +349,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             }
             if(fresh&&valid&&cm<=WARNING_CM){
                 if(!a->approach_warning){
-                    a->approach_warning=true;a->approach_origin.start=enc;
+                    a->approach_warning=true;a->approach_origin=obstacle_encoder_origin(enc);
                     a->approach_estimate_cm=a->approach_anchor_cm=cm;a->approach_min_cm=cm;
                     a->approach_yaw_rad=0;
                 }
@@ -360,7 +378,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             if(a->approach_hits<2&&now-a->approach_us<APPROACH_CONFIRM_US)
                 return (line_check_output_t){0,0,false,"OBSTACLE_CONFIRM_STOPPED"};
             if(a->detected>=MAX_EPISODES)return fail(a,"AVOID_EPISODE_LIMIT");
-            a->detected++;a->episode_us=now;a->episode_origin.start=enc;a->offset_mm=a->along_mm=0;
+            a->detected++;a->episode_us=now;a->episode_origin=obstacle_encoder_origin(enc);a->offset_mm=a->along_mm=0;
             /* Front tip is 130mm ahead of axle, half-width <=60mm: pivot
              * radius ~=143mm before margins and object width. 200mm lateral
              * offset allowed the tip to touch a bottle during side inspection.
@@ -401,7 +419,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             /* Wait for a NEW forward-facing sample, not the last side ray. */
             if(!a->range_us||now-a->range_us>RANGE_STALE_US)return fail(a,"AVOID_RANGE_STALE");
             if(a->next==AVOID_AXLE_ADVANCE){
-                int32_t remaining=SENSOR_LEAD_MM+8-mean_mm(&a->tape_origin,enc);
+                int32_t remaining=SENSOR_LEAD_MM+8-mean_mm(a->tape_origin,enc);
                 if(remaining<40||remaining>140)return fail(a,"AVOID_TAPE_POSITION_UNCERTAIN");
                 a->axle_mm=(unsigned)remaining; /* include coast during settling */
             }
@@ -417,8 +435,8 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         float limit=a->offset_mm/10.0f+20;
         if(valid&&cm<=limit){a->left_near=true;a->side_seen=true;a->last_side_seen_mm=a->along_mm;a->tail_margin_done=false;}
         if(valid&&cm>limit)a->left_far++;
-        if(++a->left_samples>=3){
-            if(!a->left_near&&a->left_far>=2&&(a->side_seen||a->plan.right_edge_known)&&!a->tail_margin_done)
+        if(++a->left_samples>=SCAN_SAMPLES_PER_RAY){
+            if(!a->left_near&&a->left_far>=2&&(a->side_seen||a->plan.left_edge_known)&&!a->tail_margin_done)
                 wait_for(a,AVOID_CLEAR_TAIL,now);
             else wait_for(a,AVOID_TURN_LOOK,now);
         }
@@ -429,13 +447,13 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         if(!fresh||now-a->phase_us<SETTLE_US)return quiet(a);
         float limit=a->phase==AVOID_SCAN_SIDE?a->offset_mm/10.0f+20.0f:
             a->phase==AVOID_SCAN_OUT?(a->departure_travel_mm-a->departure_done_mm)/10.0f+20.0f:
-            a->phase==AVOID_SCAN_RETURN?(a->offset_mm-60)/10.0f/sinf((a->return_deg?a->return_deg:90)*0.01745329252f)+20.0f:25.0f;
+            a->phase==AVOID_SCAN_RETURN?((unsigned)a->offset_mm-60)/10.0f/sinf((a->return_deg?a->return_deg:90)*0.01745329252f)+20.0f:25.0f;
         if(valid){
             if(a->phase==AVOID_SCAN_INITIAL){
                 float edge_limit=fminf(45.0f,fmaxf(30.0f,a->approach_min_cm+15.0f));
-                if(cm<=edge_limit){a->plan_near[a->scan_index]++;
+                if(cm<=edge_limit){a->plan_counts[a->scan_index].near++;
                     if(cm<a->plan_cm[a->scan_index])a->plan_cm[a->scan_index]=cm;
-                }else a->plan_far[a->scan_index]++;
+                }else a->plan_counts[a->scan_index].far++;
             }
             if(cm<a->scan_min_cm){a->scan_min_cm=cm;a->scan_nearest_angle=a->servo_angle;}
             bool in_corridor=true;
@@ -459,9 +477,9 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->scan_no_echo++;
             if(a->servo_angle==90&&a->no_return)
                 a->scan_center_no_return++;
-            if(a->phase==AVOID_SCAN_INITIAL&&a->no_return)a->plan_no_return[a->scan_index]++;
+            if(a->phase==AVOID_SCAN_INITIAL&&a->no_return)a->plan_counts[a->scan_index].no_return++;
         }
-        if(++a->samples<3)return quiet(a);
+        if(++a->samples<SCAN_SAMPLES_PER_RAY)return quiet(a);
         if(a->scan_ray_far>=2)a->scan_far_rays++;
         a->samples=a->scan_ray_far=0;
         unsigned count=a->phase==AVOID_SCAN_INITIAL?OBSTACLE_PLAN_RAYS:sizeof(angles)/sizeof(angles[0]);
@@ -471,10 +489,10 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         }
         a->scans++;a->scan_serial++;
         if(a->phase==AVOID_SCAN_INITIAL){
-            a->plan=obstacle_plan(a->plan_cm,a->plan_near,a->plan_far,a->plan_no_return);
+            a->plan=obstacle_plan(a->plan_cm,a->plan_counts);
             if(a->scan_min_cm<MIN_PIVOT_CM)return fail(a,"AVOID_APPROACH_TOO_CLOSE");
-            if(!a->plan.right_edge_known&&!a->plan.edge_from_no_return)
-                return fail(a,"AVOID_RIGHT_EDGE_UNKNOWN");
+            if(!a->plan.left_edge_known&&!a->plan.edge_from_no_return)
+                return fail(a,"AVOID_LEFT_EDGE_UNKNOWN");
             if(a->offset_mm+a->plan.lateral_mm>MAX_OFFSET_MM)
                 return fail(a,"AVOID_OBJECT_TOO_WIDE_OR_PATH_BLOCKED");
             a->departure_deg=a->plan.angle_deg;a->outward_mm=a->plan.lateral_mm;
@@ -552,11 +570,11 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
              * a second stationary sweep instead of driving another 200 mm.
              * This authorises a cautious monitored return, not proof of an
              * empty swept volume; all movement obstacle/stale guards remain. */
-            else if((a->side_seen||a->plan.right_edge_known)&&a->along_mm>=MIN_ALONG_MM&&
+            else if((a->side_seen||a->plan.left_edge_known)&&a->along_mm>=MIN_ALONG_MM&&
                 a->along_mm>=a->last_side_seen_mm+ALONG_STEP_MM&&
                 (a->scan_center_clear>=2||a->scan_far_rays>=2||a->scan_center_no_return>=3))a->clear_checks++;
             else a->clear_checks=0;
-            if((a->side_seen||a->plan.right_edge_known)&&a->clear_checks>=2&&a->along_mm>=MIN_ALONG_MM)
+            if((a->side_seen||a->plan.left_edge_known)&&a->clear_checks>=2&&a->along_mm>=MIN_ALONG_MM)
                 wait_for(a,a->return_deg<90?AVOID_TURN_RETURN:AVOID_SCAN_RETURN,now);
             else if(a->clear_checks==1)wait_for(a,AVOID_SCAN_SIDE,now);
             else wait_for(a,AVOID_TURN_ALONG,now);
@@ -619,7 +637,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         case AVOID_TURN_LOOK:wait_for(a,AVOID_SCAN_SIDE,now);break;
         case AVOID_TAPE_PROBE:
             if(a->probe_gap){
-                int remaining=SENSOR_LEAD_MM+8-mean_mm(&a->tape_origin,enc);
+                int remaining=SENSOR_LEAD_MM+8-mean_mm(a->tape_origin,enc);
                 if(remaining<40||remaining>140)return fail(a,"AVOID_TAPE_POSITION_UNCERTAIN");
                 a->axle_mm=(unsigned)remaining;
                 a->tape_decision="SINGLE_CROSSING";
