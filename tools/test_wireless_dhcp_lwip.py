@@ -21,3 +21,15 @@ for old in (True,False):
     cmd+=list(map(str,files))+['-o',str(opts/'dhcp-test')]
     subprocess.run(cmd,env=env,check=True)
     subprocess.run([str(opts/'dhcp-test')],env=env,check=True)
+# First-resend delay of a lost TCP reply, with old (3 s) and current config.
+tcp_files=sorted((lwip/'core').glob('*.c'))+sorted((lwip/'core/ipv4').glob('*.c'))+[lwip/'netif/ethernet.c',root/'firmware/tests/wireless_tcp_rto_lwip_test.c']
+for old in (True,False):
+    opts=build/('rto-old' if old else 'rto-fixed');opts.mkdir(exist_ok=True)
+    config=(app/'lwipopts.h').read_text().replace('#define MEM_ALIGNMENT 4', '#define MEM_ALIGNMENT 8')
+    if old: config+='\n#undef LWIP_TCP_RTO_TIME\n#define LWIP_TCP_RTO_TIME 3000\n'
+    (opts/'lwipopts.h').write_text(config)
+    cmd=['clang','-std=c11','-DLWIP_DONT_PROVIDE_BYTEORDER_FUNCTIONS=1','-Wall','-Wextra','-Werror','-Wno-unused-function','-fsanitize=address,undefined','-g','-I'+str(opts),'-I'+str(port),'-I'+str(lwip/'include')]
+    if old: cmd+=['-DEXPECT_OLD_RTO=1']
+    cmd+=list(map(str,tcp_files))+['-o',str(opts/'rto-test')]
+    subprocess.run(cmd,env=env,check=True)
+    subprocess.run([str(opts/'rto-test')],env=env,check=True)

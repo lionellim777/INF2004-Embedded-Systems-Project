@@ -1,0 +1,35 @@
+{
+  "file": "firmware/releases/robocar_motion_integration_v5_57_wireless.uf2",
+  "base_commit": "5fb1983ea0eee52a58a194246501b21e800c9c92",
+  "version": "v5.57",
+  "target": "Pico W / RP2040; centred GP28; GP26 barcode",
+  "bytes": 1096704,
+  "blocks": 2142,
+  "sha256": "da2bc8b6ad7bb1be3011408d253dedbed5228f87c5740a9e857a984c8b444d94",
+  "linked_text_bytes": 548256,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 154884,
+  "build": "Release; -Wall -Wextra -Werror; ROBOCAR_CENTER_LINE=ON; wireless on core1",
+  "uf2_checks": "Every block magic, RP2040 family, payload length, index/count, flash address bounds and contiguous unique addresses passed; firmware version and complete embedded page verified.",
+  "software_checks": [
+    "Reference reader original synthetic suite",
+    "832 waveform matrix frames",
+    "3000 noisy synthetic frames, zero wrong letters in that corpus",
+    "Ten recorded width sequences in both directions converted to synthetic signals",
+    "50 centred production-main and 18 legacy-main scenarios",
+    "15 existing barcode/motion suites",
+    "Packed storage and ARM layout checks",
+    "Wireless core/transport/core1 tests, including 12 retained lines",
+    "Mocked Chrome UI controls/download/disconnect/mobile tests",
+    "Compiled embedded HTML exactly matches source"
+  ],
+  "physical_validation": "Pending. Not flashed or run on a robot. Current sensor mounting reported approximately 1 mm clearance and 3 mm narrow bars.",
+  "limits": [
+    "Old raised-height 10 ms-bin reconstructions still do not decode; not raw physical replay.",
+    "Full grey-sample history is not exported.",
+    "Actual 2 ms sample timing, foreground work time and curved/reversing trajectories remain unverified.",
+    "Course actions emit after 250 ms trailing white; test with Y/Z straight first.",
+    "No fixed sensor-footprint or hardware-reliability claim."
+  ],
+  "procedure": "docs/testing/barcode-v5_57-waveform.md"
+}

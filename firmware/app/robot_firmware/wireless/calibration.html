@@ -203,7 +203,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head><body>
 <div class="wrap">
-<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.56-tape-align-dev</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
+<header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.63</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
 <main class="grid">
 
 <section id="controls" class="board" aria-label="Test controls">
@@ -212,7 +212,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 <select id="test-mode" class="setting" disabled>
 <option value="o">Follow track + avoid obstacle</option>
 <option value="v">Barcode sensor check · motors off</option>
-<option value="course">Follow track + read barcodes</option>
+<option value="course" selected>Follow track + read barcodes</option>
 <option value="f">30 cm forward</option><option value="l">Left 90°</option><option value="r">Right 90°</option><option value="u">Right 180°</option>
 </select></div>
 <button id="prepare" class="primary" disabled>Record sensor · 5 seconds</button><button id="stop" class="stop">Stop</button>
@@ -228,7 +228,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 </details></div>
 </section>
 
-<section id="optical-panel" class="board"><header><h2>Sensor result</h2></header><p id="optical-summary" role="status">No recording yet.</p><canvas id="optical-plot" width="900" height="220" aria-label="Barcode sensor readings across five seconds" hidden></canvas><small id="plot-help" hidden>Higher readings mean darker. Dashed lines: 226 / 220. Driving uses a 6 ms average; this graph shows raw readings and does not confirm a decoded barcode.</small></section>
+<section id="optical-panel" class="board"><header><h2>Sensor result</h2></header><p id="optical-summary" role="status">No recording yet.</p><canvas id="optical-plot" width="900" height="220" aria-label="Barcode sensor readings across five seconds" hidden></canvas><small id="plot-help" hidden>Higher readings mean darker. Course mode reads peaks and dips after a 6 ms average. This graph shows raw readings and does not confirm a decoded barcode.</small></section>
 
 <div class="col">
 <section id="now" class="board" aria-labelledby="now-h">
@@ -314,7 +314,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 </div>
 <script>
 'use strict';
-let cursor=0, boot='', transcript='', busy=false, online=false, robotIdle=false, downloadedResult='', requestBusy=false, resultPending=false;
+let cursor=0, boot='', transcript='', busy=false, online=false, pollFailures=0, robotIdle=false, downloadedResult='', requestBusy=false, resultPending=false;
 const el=id=>document.getElementById(id);
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 let lastData=0;
@@ -330,7 +330,7 @@ function drawOptical(){
  const y=v=>h-25-v/top*(h-40),x=i=>48+i/500*(w-60);
  ctx.font='13px system-ui';ctx.fillStyle='#bcbab2';ctx.fillText('Raw '+Math.ceil(top),5,15);ctx.fillText('0 s',48,h-5);ctx.fillText('5 s',w-30,h-5);
  ctx.strokeStyle='#f4a62a';ctx.setLineDash([5,4]);
- for(const value of [220,226]){ctx.beginPath();ctx.moveTo(48,y(value));ctx.lineTo(w-10,y(value));ctx.stroke();ctx.fillText(String(value),value===220?5:w-35,y(value)-3);}
+
  ctx.setLineDash([]);ctx.strokeStyle='#f3f1ea';
  opticalBins.forEach((v,i)=>{if(!v)return;ctx.beginPath();ctx.moveTo(x(i),y(v[0]));ctx.lineTo(x(i),y(v[1])-1);ctx.stroke();});
 }
@@ -642,8 +642,8 @@ setInterval(()=>{
 
 function setOnline(value){online=value;el('connection').textContent=value?'Connected':'Offline · join AAI10-Calibrate';el('connection').className=value?'online':'offline';refreshButtons();}
 function refreshButtons(){document.querySelectorAll('.setting,#prepare').forEach(b=>b.disabled=!online||!robotIdle||requestBusy);}
-async function request(path,options={}){const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),3500);try{return await fetch(path,{...options,cache:'no-store',signal:ctl.signal});}finally{clearTimeout(timer);}}
-async function poll(){if(busy)return;busy=true;try{const r=await request('/logs?since='+cursor);if(!r.ok)throw Error('HTTP '+r.status);lastData=Date.now();const newBoot=r.headers.get('X-Boot');const next=Number(r.headers.get('X-Next'));let text=await r.text();if(boot&&newBoot!==boot){append('\n[CAR POWER RESET: previous selection and retained results cleared]\n');cursor=0;downloadedResult='';opticalBins=[];drawOptical();el('optical-summary').textContent='Car restarted; capture cleared.';robotIdle=false;refreshButtons();el('message').textContent='Car restarted. Choose a test and prepare it again.';el('optical-plot').hidden=true;el('plot-help').hidden=true;el('result').textContent='Car restarted; no current result.';boot=newBoot;return;}boot=newBoot;if(r.headers.get('X-Gap')==='1')append('\n[LOG GAP: older car log bytes unavailable; download includes the retained result]\n');cursor=next;const wasIdle=robotIdle,wasOnline=online;robotIdle=r.headers.get('X-Idle')==='1';setOnline(true);append(text);if(robotIdle&&(!wasIdle||!wasOnline||!downloadedResult||resultPending))await recover();}catch(e){setOnline(false);}finally{busy=false;setTimeout(poll,500);}}
+async function request(path,options={}){const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),6000);try{return await fetch(path,{...options,cache:'no-store',signal:ctl.signal});}finally{clearTimeout(timer);}}
+async function poll(){if(busy)return;busy=true;try{const r=await request('/logs?since='+cursor);if(!r.ok)throw Error('HTTP '+r.status);lastData=Date.now();pollFailures=0;const newBoot=r.headers.get('X-Boot');const next=Number(r.headers.get('X-Next'));let text=await r.text();if(boot&&newBoot!==boot){append('\n[CAR POWER RESET: previous selection and retained results cleared]\n');cursor=0;downloadedResult='';opticalBins=[];drawOptical();el('optical-summary').textContent='Car restarted; capture cleared.';robotIdle=false;refreshButtons();el('message').textContent='Car restarted. Choose a test and prepare it again.';el('optical-plot').hidden=true;el('plot-help').hidden=true;el('result').textContent='Car restarted; no current result.';boot=newBoot;return;}boot=newBoot;if(r.headers.get('X-Gap')==='1')append('\n[LOG GAP: older car log bytes unavailable; download includes the retained result]\n');cursor=next;const wasIdle=robotIdle,wasOnline=online;robotIdle=r.headers.get('X-Idle')==='1';setOnline(true);append(text);if(robotIdle&&(!wasIdle||!wasOnline||!downloadedResult||resultPending))await recover();}catch(e){/* One lost poll at range is normal; the age label shows staleness. */if(++pollFailures>=3)setOnline(false);}finally{busy=false;setTimeout(poll,500);}}
 async function sendSelection(path){requestBusy=true;refreshButtons();try{const r=await request(path,{method:'POST',headers:{'X-Calibrate':'1'}});const reply=await r.text();if(!r.ok)throw Error(reply);el('message').textContent=path==='/command/v'?'Requested. Wait for the recording confirmation.':path==='/command/x'?'Stop requested. GP20 stops locally if Wi-Fi is unavailable.':'Requested. Wait for the ready confirmation before pressing GP20.';append('\n[BROWSER] '+reply+'\n');}catch(e){el('message').textContent='Request not confirmed. Check the live log; use GP20 to abort locally.';}finally{requestBusy=false;refreshButtons();}}
 function command(ch){return sendSelection('/command/'+ch);}
 el('prepare').onclick=()=>{
@@ -655,7 +655,33 @@ el('prepare').onclick=()=>{
 };
 el('stop').onclick=()=>command('x');
 async function recover(){resultPending=true;try{const r=await request('/result');if(!r.ok)throw Error();const recovered=await r.text();if(recovered!==downloadedResult)append('\n[RETAINED SNAPSHOT]\n'+recovered,true);downloadedResult=recovered;resultPending=false;el('result').textContent=downloadedResult;}catch(e){el('result').textContent=downloadedResult||'Could not reach the car. Retrying while stopped.';}}
-el('download').onclick=async()=>{await recover();const metadata='AAI10 v5.56-tape-align-dev wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';const blob=new Blob([metadata,'RECOVERED RESULT (may duplicate log):\n',downloadedResult||'Current result unavailable; see captured live log.\n','\nLIVE LOG:\n',transcript],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-motion-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+async function waveformDownload(){
+ let offset=0,total=0,id='',checksum='',hash=2166136261,parts=[];const expectedBoot=boot;
+ for(let page=0;page<64;page++){
+  const r=await request('/waveform?offset='+offset);
+  if(page===0&&r.status===404)return '[WAVEFORM EXPORT] No frozen waveform available in this run.\n';
+  if(!r.ok)throw Error('Scanner data HTTP '+r.status);
+  const responseBoot=r.headers.get('X-Boot');if(responseBoot&&responseBoot!==expectedBoot)throw Error('Car restarted during scanner download');
+  const text=await r.text(),m=text.match(/\[WAVEFORM CHUNK\] id=(\d+) offset=(\d+) count=(\d+) total=(\d+) fnv=([0-9a-f]{8}) packed=([0-9a-f]+)\n/);
+  if(!m)throw Error('Malformed scanner data');
+  const count=Number(m[3]);if(Number(m[2])!==offset||count<1||count>256||m[6].length!==count*4)throw Error('Incomplete scanner chunk');
+  if(!page){id=m[1];total=Number(m[4]);checksum=m[5];if(total<1||total>16384)throw Error('Invalid scanner length');}
+  if(m[1]!==id||Number(m[4])!==total||m[5]!==checksum||offset+count>total)throw Error('Scanner capture changed during download');
+  for(let i=0;i<m[6].length;i+=4){const word=parseInt(m[6].slice(i,i+4),16);hash=Math.imul(hash^(word&255),16777619)>>>0;hash=Math.imul(hash^(word>>>8),16777619)>>>0;}
+  parts.push(text);offset+=count;
+  if(offset===total){if(hash.toString(16).padStart(8,'0')!==checksum)throw Error('Scanner checksum mismatch');return parts.join('')+'[WAVEFORM COMPLETE] samples='+total+' checksum=OK\n';}
+ }
+ throw Error('Scanner download exceeded capture bound');
+}
+el('download').onclick=async()=>{
+ if(!robotIdle){el('message').textContent='Stop the car before downloading its saved scan.';return;}
+ requestBusy=true;refreshButtons();let wave='';
+ try{await recover();el('message').textContent='Collecting saved scan data…';wave=await waveformDownload();el('message').textContent='Log and saved scan data downloaded.';}
+ catch(e){wave='[WAVEFORM EXPORT INCOMPLETE] '+e.message+'\n';el('message').textContent='Log saved, but scan data is incomplete. Download again before another run.';}
+ finally{requestBusy=false;refreshButtons();}
+ const metadata='AAI10 v5.63 wireless calibration\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';
+ const blob=new Blob([metadata,'RECOVERED RESULT (may duplicate log):\n',downloadedResult||'Current result unavailable; see captured live log.\n','\nFROZEN SCANNER DATA:\n',wave,'\nLIVE LOG:\n',transcript],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-motion-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
 updateMode();
 setPhase('IDLE','Choose a test and prepare it. The car starts only when GP20 is pressed.');
 flap(el('bc-letter'),'–');

@@ -8,7 +8,7 @@
 #define CAL_RESULT_TITLE "v5.7 stationary barcode / motors OFF / black>250 white<=220"
 #else
 #include "calibration_page.h"
-#define CAL_RESULT_TITLE "v5.56-tape-align-dev wireless / obstacle bypass test, barcode disabled in avoidance mode / course test available / diagnostics retained / filtered black>=226 white<=220 mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..1000cps bounded-search"
+#define CAL_RESULT_TITLE "v5.63 wireless / motion-aware GP26 barcode widths + per-attempt diagnostics, timed right-edge arc gate / obstacle mode disables barcodes / frozen scan export available / course reader=LOCAL_EXTREMA grey500Hz mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..1000cps bounded-search"
 #endif
 #include "dhcpserver.h"
 #include "pico/cyw43_arch.h"
@@ -47,7 +47,7 @@ static void shared_exit(void){}
 #define CLIENT_COUNT 3u
 #define REQUEST_CAPACITY 1536u
 #define BODY_CAPACITY 10240u
-_Static_assert(BODY_CAPACITY > 11u*CAL_LINE_CAPACITY+256u+sizeof(CAL_RESULT_TITLE)+180u, "retained results must fit HTTP body");
+_Static_assert(BODY_CAPACITY > 12u*CAL_LINE_CAPACITY+256u+sizeof(CAL_RESULT_TITLE)+180u, "retained results must fit HTTP body");
 #define CLIENT_TIMEOUT_US 5000000u
 
 typedef struct {
@@ -71,6 +71,19 @@ static dhcp_server_t dhcp;
 static bool ready;
 static uint32_t boot_id;
 static uint32_t max_poll_us;
+static const uint16_t *export_samples;
+static const char *export_details;
+static unsigned export_count;
+static uint32_t export_id,export_checksum;
+void calibration_wifi_set_waveform(const uint16_t *samples,unsigned count,
+    const char *details,uint32_t id,uint32_t checksum)
+{
+    shared_enter();
+    bool valid=samples && details && count && count<=16384u;
+    export_samples=valid?samples:NULL;export_details=valid?details:NULL;
+    export_count=valid?count:0;export_id=id;export_checksum=checksum;
+    shared_exit();
+}
 
 static void capture(const char *data, int length)
 {
@@ -219,10 +232,26 @@ static void handle_request(client_t *c)
         size_t n = calibration_read(&core, cursor, c->data, sizeof(c->data), &next, &gap);
         shared_exit();
         response(c, "200 OK", "text/plain", c->data, n, next, gap);
+    } else if (strcmp(method,"GET")==0 && strncmp(path,"/waveform?offset=",17u)==0) {
+        uint32_t offset;
+        if(!calibration_parse_cursor(path+17u,&offset)){
+            plain(c,"400 Bad Request","Invalid waveform offset.\n");return;
+        }
+        shared_enter();
+        if(!export_samples){shared_exit();plain(c,"404 Not Found","No frozen scan. Stop and download after a barcode run.\n");return;}
+        if(offset>=export_count){shared_exit();plain(c,"400 Bad Request","Waveform offset outside capture.\n");return;}
+        unsigned count=export_count-offset;if(count>256u)count=256u;
+        int n=snprintf(c->data,sizeof(c->data),"%.*s[WAVEFORM CHUNK] id=%lu offset=%lu count=%u total=%u fnv=%08lx packed=",
+            offset?0:4095,export_details,(unsigned long)export_id,(unsigned long)offset,
+            count,export_count,(unsigned long)export_checksum);
+        for(unsigned i=0;i<count;i++)n+=snprintf(c->data+n,sizeof(c->data)-(size_t)n,"%04x",export_samples[offset+i]);
+        c->data[n++]='\n';c->data[n]=0;
+        shared_exit();
+        response(c,"200 OK","text/plain",c->data,(size_t)n,0u,false);
     } else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0) {
         shared_enter();
-        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n[PREVIOUS RUN]\n%s%s[CURRENT RUN]\n%s%s%s%s%s%s%s%s%s%s",
-                         (unsigned long)boot_id, core.previous_stop, core.previous_detail, core.stop, core.settled, core.summary, core.timing, core.barcode, core.trace[0], core.trace[1], core.course_result, core.optical_result, core.motion_detail);
+        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n[PREVIOUS RUN]\n%s%s[CURRENT RUN]\n%s%s%s%s%s%s%s%s%s%s%s",
+                         (unsigned long)boot_id, core.previous_stop, core.previous_detail, core.stop, core.settled, core.summary, core.timing, core.barcode, core.trace[0], core.trace[1], core.course_result, core.optical_result, core.motion_detail, core.waveform);
         if (core.stop[0] == '\0' && core.settled[0] == '\0' && core.optical_result[0] == '\0') {
             n += snprintf(c->data + n, sizeof(c->data) - (size_t)n,
                           "No completed/aborted test result retained in this boot yet.\n");
@@ -300,7 +329,13 @@ static bool network_init(void)
 {
     boot_id = get_rand_32();
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0) { return false; }
+    /* SDK default channel 3 overlaps busy channels 1 and 6; 11 does not.
+     * Init resets it, so set it here, before the AP starts. */
+    cyw43_wifi_ap_set_channel(&cyw43_state, 11u);
     cyw43_arch_enable_ap_mode(AP_NAME, AP_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
+    /* SDK default is PM2 power-save; keep the radio awake so distant clients
+     * don't see dropped or late packets. Must follow enable_ap_mode. */
+    (void)cyw43_wifi_pm(&cyw43_state, CYW43_NONE_PM);
     ip_addr_t gateway, mask;
     IP4_ADDR(&gateway, 192, 168, 4, 1);
     IP4_ADDR(&mask, 255, 255, 255, 0);

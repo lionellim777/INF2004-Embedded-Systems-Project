@@ -23,6 +23,7 @@ typedef struct {
     char summary[CAL_LINE_CAPACITY];
     char timing[CAL_LINE_CAPACITY];
     char barcode[CAL_LINE_CAPACITY];
+    char waveform[CAL_LINE_CAPACITY];
     char trace[2][CAL_LINE_CAPACITY];
     char optical_result[256];
     char pending;

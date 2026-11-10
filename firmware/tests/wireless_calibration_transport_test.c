@@ -6,7 +6,7 @@
 static uint64_t now;
 static int aborts, closes, frees;
 static bool no_memory, close_fails;
-static char wire[40000];static size_t wire_length;
+static char wire[sizeof(calibration_page)+40000];static size_t wire_length;
 static struct tcp_pcb fake_pcb;
 static struct udp_pcb fake_udp;
 static struct pbuf udp_packet;
@@ -20,8 +20,11 @@ uint64_t time_us_64(void){return now;}
 #endif
 uint32_t get_rand_32(void){return 123;}
 void stdio_set_driver_enabled(stdio_driver_t*d,bool v){(void)d;(void)v;}
-int cyw43_arch_init_with_country(int x){(void)x;return 0;}
-void cyw43_arch_enable_ap_mode(const char*a,const char*b,int c){(void)a;(void)b;(void)c;}
+cyw43_t cyw43_state;static uint32_t radio_pm=~0u;static bool ap_enabled;static unsigned ap_started_channel;
+/* Like the SDK: init resets the AP channel to 3; enable reads it. */
+int cyw43_arch_init_with_country(int x){(void)x;cyw43_state.ap_channel=3;return 0;}
+void cyw43_arch_enable_ap_mode(const char*a,const char*b,int c){(void)a;(void)b;(void)c;ap_enabled=true;ap_started_channel=cyw43_state.ap_channel;}
+int cyw43_wifi_pm(cyw43_t*s,uint32_t pm){assert(s==&cyw43_state);assert(ap_enabled);radio_pm=pm;return 0;}
 void cyw43_arch_disable_ap_mode(void){}void cyw43_arch_deinit(void){}void cyw43_arch_poll(void){
 #ifdef TEST_NETWORK_CORE1
     radio_poll_hook();
@@ -55,6 +58,10 @@ static void feed(client_t*c,const char*text,size_t n){struct pbuf p={(u16_t)n,(v
 static void drain(client_t*c){for(unsigned i=0;c->pcb && i<100;i++){size_t queued=c->queued;assert(client_sent(c,c->pcb,(u16_t)(queued-c->acknowledged))==ERR_OK);}assert(c->pcb==NULL);}
 static void http_tests(void){
     assert(calibration_wifi_init());
+    /* SDK default PM2 lets the radio nap; at range that drops/delays packets. */
+    assert(radio_pm==CYW43_NONE_PM);
+    /* Channel 3 overlaps the busy 1 and 6; 11 does not. */
+    assert(ap_started_channel==11u);
     client_t*c=open_client();core.selection_allowed=true;
     const char *req="POST /command/f HTTP/1.1\r\nHost: 192.168.4.1\r\nX-Calibrate: 1\r\nContent-Length: 0\r\n\r\n";
     /* Every byte arrives separately, as is legal on TCP. */
@@ -66,13 +73,29 @@ static void http_tests(void){
     core.selection_allowed=false;c=open_client();req="POST /command/r HTTP/1.1\r\nx-calibrate: 1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"409"));
     c=open_client();req="POST /command/x HTTP/1.1\r\nX-Calibrate: 1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"202"));assert(calibration_wifi_getchar()=='x');
     c=open_client();req="GET /logs?since=0 HTTP/1.1\r\n\r\n";capture("test log\n",9);feed(c,req,strlen(req));drain(c);assert(strstr(wire,"test log\n"));assert(strstr(wire,"X-Next: 9\r\n"));
-    /* Eleven maximum retained lines still fit and survive the HTTP result. */
-    char *fields[]={core.stop,core.settled,core.summary,core.timing,core.barcode,core.trace[0],core.trace[1],core.course_result,core.motion_detail,core.previous_stop,core.previous_detail};
-    for(unsigned i=0;i<11;i++){memset(fields[i],'A'+i,CAL_LINE_CAPACITY-1);fields[i][CAL_LINE_CAPACITY-2]='\n';fields[i][CAL_LINE_CAPACITY-1]=0;}
+    /* Twelve maximum retained lines, including the new waveform result. */
+    char *fields[]={core.stop,core.settled,core.summary,core.timing,core.barcode,core.trace[0],core.trace[1],core.course_result,core.motion_detail,core.previous_stop,core.previous_detail,core.waveform};
+    for(unsigned i=0;i<12;i++){memset(fields[i],'A'+i,CAL_LINE_CAPACITY-1);fields[i][CAL_LINE_CAPACITY-2]='\n';fields[i][CAL_LINE_CAPACITY-1]=0;}
     c=open_client();req="GET /result HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);
-    for(unsigned i=0;i<11;i++)assert(strstr(wire,fields[i]));
+    for(unsigned i=0;i<12;i++)assert(strstr(wire,fields[i]));
     strcpy(core.optical_result,"[OPTICAL RESULT] samples=5000\n");
     c=open_client();req="GET /result HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,core.optical_result));
+    static uint16_t words[300];for(unsigned i=0;i<300;i++)words[i]=(uint16_t)(0x2000u+i);
+    calibration_wifi_set_waveform(words,300,"[WAVEFORM SNAPSHOT] test=1\n",77,0x12345678);
+    c=open_client();req="GET /waveform?offset=0 HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);
+    assert(strstr(wire,"[WAVEFORM SNAPSHOT] test=1") && strstr(wire,"id=77 offset=0 count=256 total=300 fnv=12345678 packed=20002001"));
+    c=open_client();req="GET /waveform?offset=256 HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);
+    assert(strstr(wire,"offset=256 count=44 total=300") && !strstr(wire,"[WAVEFORM SNAPSHOT] test=1"));
+    c=open_client();req="GET /waveform?offset=300 HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"400 Bad Request"));
+    c=open_client();req="GET /waveform?offset=-1 HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"400 Bad Request"));
+    static uint16_t large_words[16384];large_words[16383]=0xbeef;
+    calibration_wifi_set_waveform(large_words,16384,"[WAVEFORM SNAPSHOT] motion=1\n",88,0xaabbccdd);
+    c=open_client();req="GET /waveform?offset=16383 HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);
+    assert(strstr(wire,"count=1 total=16384") && strstr(wire,"packed=beef"));
+    calibration_wifi_set_waveform(large_words,16385,"invalid",0,0);
+    c=open_client();req="GET /waveform?offset=0 HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"404 Not Found"));
+    calibration_wifi_set_waveform(NULL,0,NULL,0,0);
+    c=open_client();req="GET /waveform?offset=0 HTTP/1.1\r\n\r\n";feed(c,req,strlen(req));drain(c);assert(strstr(wire,"404 Not Found"));
     core.selection_allowed=true;c=open_client();req="POST /command/v HTTP/1.1\r\nX-Calibrate: 1\r\n\r\n";
     feed(c,req,strlen(req));drain(c);assert(strstr(wire,"202")&&strstr(wire,"motors stay off"));assert(calibration_wifi_getchar()=='v');
     core.selection_allowed=true;c=open_client();req="POST /command/b HTTP/1.1\r\nX-Calibrate: 1\r\n\r\n";

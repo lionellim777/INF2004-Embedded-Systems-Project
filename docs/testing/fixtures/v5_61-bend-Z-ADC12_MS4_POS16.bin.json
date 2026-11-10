@@ -1,0 +1,10 @@
+{
+  "source_export": "AAI10-motion-2026-11-06T15-28-29-298Z.txt",
+  "samples_words": 4924,
+  "readings": 2462,
+  "encoding": "ADC12_MS4_POS16",
+  "fnv1a": "9a48ce7e",
+  "original_result": "NO_VALID_FRAMED_WINDOW",
+  "new_batch_pattern": "Z",
+  "limit": "Frozen batch decoding validates a pattern; it does not replay motor control or establish physical scan reliability."
+}

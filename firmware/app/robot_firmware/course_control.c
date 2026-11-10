@@ -38,9 +38,35 @@ void course_set_cruise_limit(course_control_t *c,unsigned cps)
 {c->cruise_limit_cps=cps<450?450:cps>1000?1000:cps;}
 void course_note_barcode_activity(course_control_t *c,uint64_t now)
 {c->barcode_seen=true;c->barcode_activity_us=now;}
+void course_enable_flow_follow(course_control_t *c,bool enabled)
+{c->flow_follow=enabled;}
+void course_right_level(course_control_t *c,int32_t level)
+{c->right_level_valid=true;c->right_level=level;}
 #if ROBOCAR_CENTER_LINE
 static bool near_barcode(const course_control_t *c,uint64_t now)
 {return c->barcode_seen && (now<c->barcode_activity_us || now-c->barcode_activity_us<2000000u);}
+static void front_preview(course_control_t *c,uint64_t now)
+{
+    /* GP27 raw ~211 enters; ~183 releases under the existing 141/842
+     * calibration. Logged bend-side rises 210..321 were often below the
+     * old raw316 binary threshold. Require 30ms, not one reflective spike. */
+    bool weak=c->center_level<c->center_reference*85/100;
+    bool side=c->right_level_valid && c->right_level>=(c->right_preview?60:100);
+    if(c->phase!=COURSE_FOLLOW || !weak || !side){
+        c->right_preview=false;c->right_preview_tracking=false;return;
+    }
+    if(!c->right_preview_tracking){c->right_preview_tracking=true;c->right_preview_since=now;}
+    if(now-c->right_preview_since>=30000u){
+        if(!c->right_preview)c->right_previews++;
+        c->right_preview=true;
+        if(c->bend_active)return; /* Never flip a committed arc's budget/sign. */
+        c->bend_direction=1;c->bend_hint_us=now;c->bend_source="RIGHT_PREVIEW";
+        /* An observed right edge supersedes a guessed left trim. */
+        if(c->center_trim.active && c->center_trim.direction<0){
+            center_trim_clear(&c->center_trim);c->center_trim.last_good=1;
+        }
+    }
+}
 #endif
 static void apply_action(course_control_t *c,char action,char source,uint64_t now,bool on_crossing)
 {
@@ -67,7 +93,7 @@ const char *course_on_barcode(course_control_t *c,char letter,encoder_sample_t e
         c->remaining_junctions=0;c->pending_action=c->pending_source=0;c->deferred=false;
         stopped(c,"COURSE_BARCODE_STOP");return "STOP_NOW";
     }
-    if(c->phase!=COURSE_FOLLOW){
+    if(c->phase!=COURSE_FOLLOW || (c->flow_follow && c->bend_active)){
         if(c->deferred)c->deferred_replacements++;
         c->deferred=true;c->deferred_action=action;c->deferred_source=letter;
         return "DEFERRED_UNTIL_MANOEUVRE_COMPLETE";
@@ -108,6 +134,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
     bool both=ir.left&&ir.right;
     float center_steer=0;
 #if ROBOCAR_CENTER_LINE
+    if(c->flow_follow && c->center_level_valid)front_preview(c,now);
     if(c->center_level_valid && c->phase==COURSE_FOLLOW && !c->bend_active){
         /* A weak GP28 plus GP27 black is a right-edge hint, not a crossing. */
         both=ir.right && c->center_level>=c->center_reference*80/100;
@@ -119,11 +146,12 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
                 ((int64_t)l-r-c->center_trim.entry_delta)*c->center_trim.direction>=20&&
                 c->center_level>=c->center_trim.entry_level+20;
             int good_direction=c->center_trim.direction;
-            center_steer=center_trim_step(&c->center_trim,c->center_level,c->center_reference,
-                                         ir.right,l,r,now);
+            center_steer=center_trim_step_profile(&c->center_trim,c->center_level,c->center_reference,
+                                         ir.right||c->right_preview,l,r,now,c->flow_follow);
             if(good_hint&&!c->center_trim.exhausted&&
                (!c->center_trim.active||c->center_trim.direction==good_direction)){
                 c->bend_direction=good_direction;c->bend_hint_us=now;
+                c->bend_source="CONFIRMED_TRIM";
             }
             if(!active && c->center_trim.active)c->trim_attempts++;
             if(!reversed && c->center_trim.reversed)c->trim_reversals++;
@@ -141,7 +169,8 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
      * previously established moving line. No indefinite blind forward drive. */
     if(c->phase==COURSE_FOLLOW){
         bool strong=c->center_level_valid&&c->center_level>=c->center_reference*85/100;
-        bool permitted=!c->bend_disabled&&!near_barcode(c,now)&&!both;
+        bool permitted=!c->bend_disabled&&(c->flow_follow||!near_barcode(c,now))&&
+            (!both || (c->flow_follow && c->bend_active));
         if(!permitted){c->bend_ready=false;c->bend_ready_us=0;}
         if(!c->bend_active&&permitted&&strong&&!ir.right&&c->drive.launch_complete){
             if(!c->bend_ready_us){c->bend_ready_us=now;c->bend_ready_l=l;c->bend_ready_r=r;}
@@ -150,20 +179,30 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         }else if(!c->bend_ready)c->bend_ready_us=0;
         if(!c->bend_active&&permitted&&ir.right&&!both){
             c->bend_direction=1;c->bend_hint_us=now;
+            c->bend_source="RIGHT_BLACK";
         }
         bool recent=c->bend_hint_us&&now-c->bend_hint_us<=1500000u;
-        if(!c->bend_active&&!ir.left&&permitted&&c->bend_ready&&recent&&
-           !c->center_trim.exhausted&&c->drive.launch_complete){
+        /* A search direction is a drift-correction prior, not a measured
+         * bend. In centre/right flow mode require CURRENT right-side ink for
+         * a hard arc; keep memory for gentle probes and bounded search only. */
+        bool direction_confirmed=c->flow_follow ?
+            (c->bend_direction==1 && c->right_preview) : recent;
+        bool arc_entry=!ir.left || (c->flow_follow && c->center_level<c->center_reference*65/100);
+        bool measured_reentry=c->flow_follow && c->right_preview && c->recoveries && l>=200 && r>=200;
+        if(!c->bend_active&&arc_entry&&permitted&&(c->bend_ready||measured_reentry)&&direction_confirmed&&
+           (!c->center_trim.exhausted||measured_reentry)&&c->drive.launch_complete){
             c->bend_active=true;c->bend_ready=false;c->bend_ready_us=0;
             c->bend_start_us=now;c->bend_l=l;c->bend_r=r;c->bend_strong_us=0;
             c->bend_attempts++;center_trim_clear(&c->center_trim);
+            c->loss_coast=false;c->bend_exit="ACTIVE";
         }
         if(c->bend_active){
             int32_t dl=l-c->bend_l,dr=r-c->bend_r;
             int32_t yaw=(dl-dr)*c->bend_direction;
             /* 540 counts ~=40mm per wheel; 400 differential counts ~=18deg.
              * The time/distance/yaw budget is never reset by flickering ink. */
-            bool exhausted=!permitted||now-c->bend_start_us>=650000u||
+            bool side_conflict=c->flow_follow && c->right_preview && c->bend_direction<0;
+            bool exhausted=!permitted||side_conflict||now-c->bend_start_us>=650000u||
                 dl>=540||dr>=540||yaw>=400||dl< -20||dr< -20||yaw< -64;
             if(strong){if(!c->bend_strong_us)c->bend_strong_us=now;}
             else c->bend_strong_us=0;
@@ -171,14 +210,21 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
                 c->bend_active=false;c->drive.center_bend=false;c->bend_completed++;
                 c->center_trim.last_good=c->bend_direction;c->bend_hint_us=now;
                 c->drive.center_steer=0;center_steer=0;
+                c->bend_exit="MOVING_REACQUIRED";
+                if(c->flow_follow && c->deferred){
+                    c->deferred=false;apply_action(c,c->deferred_action,c->deferred_source,now,both);
+                    if(c->phase==COURSE_BRAKE)return hold("COURSE_BARCODE_BRAKE");
+                }
                 /* Keep speed feedback and motor effort: no stopped launch. */
             }else if(exhausted){
                 c->bend_active=false;c->drive.center_bend=false;c->bend_fallbacks++;
                 c->center_trim.last_good=c->bend_direction;
                 ir.left=false; /* zero-power bounded search below */
+                c->bend_exit=!permitted?"OVERRIDE":side_conflict?"SIDE_CONFLICT":now-c->bend_start_us>=650000u?"TIME_LIMIT":
+                    dl>=540||dr>=540?"TRAVEL_LIMIT":yaw>=400?"YAW_LIMIT":"WRONG_MOTION";
             }else{
                 c->drive.center_bend=true;c->drive.center_cruise_cps=600;
-                float amount=strong?100.0f:now-c->bend_start_us<40000u?220.0f:540.0f;
+                float amount=strong?100.0f:now-c->bend_start_us<40000u?220.0f:c->flow_follow?480.0f:540.0f;
                 c->drive.center_steer=amount*c->bend_direction;
                 line_check_output_t arc=barcode_drive_step_profile((ir_roles_t){0},now-c->segment_us,
                     l-c->segment_l,r-c->segment_r,false,&c->drive,true,true);
@@ -188,6 +234,24 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
             }
         }
     }else {c->bend_active=c->bend_ready=false;c->bend_ready_us=0;c->drive.center_bend=false;}
+    /* If direction is momentarily unknown after a proven straight segment,
+     * allow at most80ms /80 encoder counts forward for GP27 to provide a
+     * side hint. This budget cannot be renewed by repeated white readings. */
+    if(c->flow_follow && c->phase==COURSE_FOLLOW){
+        if(ir.left || c->bend_active){c->loss_coast=false;}
+        else if(!c->bend_disabled && c->bend_ready && c->drive.launch_complete && !c->center_trim.exhausted){
+            if(!c->loss_coast){c->loss_coast=true;c->coast_us=now;c->coast_l=l;c->coast_r=r;c->loss_coasts++;}
+            if(now-c->coast_us<80000u && l-c->coast_l<80 && r-c->coast_r<80 &&
+               l>=c->coast_l-20 && r>=c->coast_r-20){
+                c->drive.center_steer=0;c->drive.center_cruise_cps=600;
+                line_check_output_t forward=barcode_drive_step_profile((ir_roles_t){0},now-c->segment_us,
+                    l-c->segment_l,r-c->segment_r,false,&c->drive,true,true);
+                if(forward.stop)return stopped(c,forward.state);
+                forward.state="CENTER_EDGE_PREVIEW";return forward;
+            }
+            c->loss_coast=false;c->bend_ready=false;
+        }
+    }
     /* GP28 (ir.left legacy field) now sits directly on the tape. Both-white
      * is loss, not a centred state. Do not decode fragments during search. */
     if(c->phase==COURSE_FOLLOW && !ir.left){
@@ -201,14 +265,14 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
                       c->center_trim.last_good?c->center_trim.last_good:-1;
         center_search_begin(&c->center_search,direction,l,r,now);
         if(c->recovery_limit_counts)c->center_search.limit=c->recovery_limit_counts>240?240:(int)c->recovery_limit_counts;
-        if(near_barcode(c,now))c->center_search.limit=60;
+        if(!c->flow_follow && near_barcode(c,now))c->center_search.limit=60;
         center_trim_clear(&c->center_trim);
     }
     if(c->phase==COURSE_LOST || c->phase==COURSE_SEEK){
         bool after_turn=c->phase==COURSE_SEEK;
         /* Recent barcode activity narrows the existing search; it no longer
          * ends the mission immediately. Never reset its origins or budget. */
-        if(!after_turn && near_barcode(c,now))c->center_search.limit=60;
+        if(!c->flow_follow && !after_turn && near_barcode(c,now))c->center_search.limit=60;
         if(!c->center_search_started){
             center_search_begin(&c->center_search,course_action_left(c->turn_action)?-1:1,l,r,now);
             c->center_search.limit=400; /* explicit turn retains its bounded seek */
@@ -219,13 +283,18 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         int32_t reacquire=c->center_reference*(c->center_search.confirming?70:85)/100;
         if(reacquire<300)reacquire=300;
         bool strong=c->center_level_valid?c->center_level>=reacquire:ir.left;
+        c->center_search.retry_confirmation=c->flow_follow && !after_turn;
+        c->center_search.extended_recovery=c->flow_follow && !after_turn && !c->recovery_limit_counts;
         line_check_output_t search=center_search_step(&c->center_search,strong,l,r,now);
+        if(!strcmp(search.state,"CENTER_SEARCH_WIDEN"))c->wide_searches++;
+        if(!strcmp(search.state,"CENTER_CONFIRM_RETRY"))c->confirmation_retries++;
         if(search.stop)return stopped(c,!after_turn && c->center_search.limit==60 &&
             !strcmp(search.state,"CENTER_LINE_NOT_REACQUIRED")?"CENTER_LOCAL_RECOVERY_EXHAUSTED":search.state);
         if(c->center_search.found){
             c->center_search_started=false;c->phase=COURSE_FOLLOW;
             center_trim_clear(&c->center_trim);c->center_trim.last_good=c->center_search.direction;
             c->bend_direction=c->center_search.direction;c->bend_hint_us=now;
+            c->bend_source=c->flow_follow?"RECOVERY_PRIOR":"CONFIRMED_RECOVERY";
             if(after_turn)c->turns++;else c->recoveries++;
             c->candidate=false;c->clear_tracking=false;
             c->latched=true;c->exit_l=l;c->exit_r=r;c->both_us=now;c->entry_l=l;c->entry_r=r;

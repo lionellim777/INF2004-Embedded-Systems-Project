@@ -1,0 +1,94 @@
+{
+  "date_reviewed": "2026-11-08",
+  "firmware": "rtos-motion-v0.2",
+  "source_commit": "d58f686",
+  "raw_log_local": "serial-output/rtos-bench-20261107-224521.log",
+  "raw_log_sha256": "6bde129a8a0a07c2db4af613e9883874bb523fc8b3527b28c26b2e653e2f84e0",
+  "original_summary_local": "serial-output/rtos-bench-20261107-224521.json",
+  "original_summary_sha256": "b060c30948ad1f721caf234f23e273f167eac82df51a637e0ba1f3ece2f98ac2",
+  "first_capture_ms": 368235,
+  "last_capture_ms": 5644695,
+  "observed_span_ms": 5276460,
+  "summary": {
+    "decoded_packets": 25127,
+    "parse_errors": 0,
+    "max_motion_gap_us": 143902,
+    "phases_seen": [
+      2,
+      1,
+      3
+    ],
+    "fault_codes_seen": [
+      0
+    ],
+    "stop_traces": [
+      {
+        "sequence": 5,
+        "reason": 6,
+        "requested_us": 379410701,
+        "disabled_us": 379410703,
+        "register_write_delay_us": 2,
+        "max_alarm_gap_us": 5002
+      },
+      {
+        "sequence": 6,
+        "reason": 1,
+        "requested_us": 387525553,
+        "disabled_us": 387525555,
+        "register_write_delay_us": 2,
+        "max_alarm_gap_us": 5001
+      },
+      {
+        "sequence": 7,
+        "reason": 1,
+        "requested_us": 412530871,
+        "disabled_us": 412530872,
+        "register_write_delay_us": 1,
+        "max_alarm_gap_us": 5001
+      }
+    ],
+    "commands_requested": [
+      "f",
+      "x",
+      "x"
+    ],
+    "last_motion": {
+      "captured_ms": 5644695,
+      "left_counts": 39,
+      "right_counts": 30,
+      "left_mm_s": 0,
+      "right_mm_s": 0,
+      "kind": 1,
+      "phase": 3,
+      "fault": 0,
+      "stop_reason": 1,
+      "valid": true,
+      "stop_latched": true
+    },
+    "firmware_version": "0.2"
+  },
+  "trace_lines": [
+    "[STOP_TRACE] seq=5 reason=6 request_us=379410701 off_us=379410703 alarm_gap_us=5002",
+    "[STOP_TRACE] seq=6 reason=1 request_us=387525553 off_us=387525555 alarm_gap_us=5001",
+    "[STOP_TRACE] seq=7 reason=1 request_us=412530871 off_us=412530872 alarm_gap_us=5001"
+  ],
+  "command_lines": [
+    "[HOST_COMMAND] f",
+    "[HOST_COMMAND] x",
+    "[HOST_COMMAND] x"
+  ],
+  "acceptance": [
+    "RTOS/USB boot observed",
+    "Encoder-bounded completion observed",
+    "GP20 abort with stop latch observed",
+    "USB abort while armed observed",
+    "No reported controller faults or decode errors in this capture"
+  ],
+  "limits": [
+    "2 user-stop events on supported wheels; no loaded course test",
+    "Write latency 1-2us excludes physical press detection and mechanical coasting",
+    "Cumulative max task gap143902us is not localized to the active portion; no hard real-time guarantee",
+    "No radio/broker test yet; no runtime stack margin measurement",
+    "Sensor/mission integrations and whole-application packing remain pending"
+  ]
+}
