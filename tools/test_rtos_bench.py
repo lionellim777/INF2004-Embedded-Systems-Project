@@ -41,6 +41,14 @@ def main():
         c2.line('[RTOS_INFO] version=0.3 network_state=1 network_error=0 uptime_ms=2')
         assert c2.ready and c2.command('f')==b'f'
         c2.close()
+        for version in ('0.6-dev3','0.6-dev3-lean'):
+            candidate=Capture(Path(folder)/version.replace('.','_'))
+            candidate.line('[RTOS_INFO] version='+version+' network_state=1 uptime_ms=2')
+            assert candidate.ready and candidate.command('t')==b't'
+            try:candidate.command('start')
+            except ValueError:pass
+            else:raise AssertionError('Candidate allowed remote start')
+            candidate.close()
         try:Capture(path)
         except FileExistsError:pass
         else:raise AssertionError('Existing evidence log overwritten')

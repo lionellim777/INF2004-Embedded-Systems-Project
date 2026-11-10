@@ -102,7 +102,7 @@ def prepare(folder=PRIVATE):
     env = dict(os.environ, ROBOT_BUILD_DIR=str(ROOT/"build/rtos-network-v0_5_1"),
                ROBOT_NETWORK_SETTINGS=str(folder/"network_settings.h"),
                ROBOT_OUTPUT_NAME="robocar_rtos_network_v0_5_1.uf2",
-               ROBOT_COMPACT_ADC_STATE="OFF",ROBOT_COMPACT_CORE_STATE="OFF",
+               ROBOT_COMPACT_ADC_STATE="OFF",ROBOT_COMPACT_CORE_STATE="OFF",ROBOT_COMPACT_CONTROL_STATE="OFF",
                ROBOT_FIRST_FAILURE_CACHE="ON")
     log = folder / "build.log"
     with log.open("w") as output:

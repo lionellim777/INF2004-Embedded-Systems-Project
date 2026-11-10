@@ -283,10 +283,10 @@ def provisioning_preserves_default(settings,folder):
          patch.object(setup,'mac_wifi_ip',return_value=settings['broker_ip']), \
          patch('builtins.input',side_effect=['','']), \
          patch.object(setup.subprocess,'run',side_effect=fake_build), \
-         patch.dict(os.environ,{'ROBOT_COMPACT_ADC_STATE':'ON','ROBOT_COMPACT_CORE_STATE':'ON','ROBOT_FIRST_FAILURE_CACHE':'OFF'}):
+         patch.dict(os.environ,{'ROBOT_COMPACT_ADC_STATE':'ON','ROBOT_COMPACT_CORE_STATE':'ON','ROBOT_COMPACT_CONTROL_STATE':'ON','ROBOT_FIRST_FAILURE_CACHE':'OFF'}):
         setup.prepare(folder)
     assert len(calls)==1
-    assert calls[0]['ROBOT_COMPACT_ADC_STATE']==calls[0]['ROBOT_COMPACT_CORE_STATE']=='OFF'
+    assert calls[0]['ROBOT_COMPACT_ADC_STATE']==calls[0]['ROBOT_COMPACT_CORE_STATE']==calls[0]['ROBOT_COMPACT_CONTROL_STATE']=='OFF'
     assert calls[0]['ROBOT_FIRST_FAILURE_CACHE']=='ON'
     info=json.loads((folder/'firmware-info.json').read_text());assert info['firmware_version']=='0.5.1'
     print('PASS default provisioning overrides inherited experimental flags; fixture build only, no real firmware or hardware touched')

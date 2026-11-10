@@ -1,4 +1,4 @@
-# Remaining project work —9 November2026
+# Remaining project work —10 November2026
 
 Current accepted RTOS core: v0.5.1, implementation`924eefe`, branch
 `yixuan/rtos-barcode-recross`. [Two physical A/A/Z runs now have6/6 target
@@ -13,7 +13,9 @@ standalone-power startup is the demonstrated procedure. A5.93s telemetry pause
 in the latest session occurred while idle before motion; transport is not a
 hard-real-time channel.
 
-No further USB connection or track run is needed for the next software work.
+The current minimum-bit candidate's next deployment gate is a stationary USB
+check; [physical instructions](testing/rtos-minbits-stage3-check.md) require no
+track at first. Team-member contract/evidence work can continue independently.
 The [incremental minimum-bit conversion](minimum-bit-conversion.md) has started
 on `yixuan/rtos-minimum-bit-state`. Stage1 is an opt-in compact ADC/filter
 candidate with output equivalence tests; the installed v0.5.1 image and default
@@ -26,11 +28,20 @@ as the ADC filter, saving56B across these objects with full-diagnostic exports
 unchanged. An optional lean profile frees a further33664B by omitting duplicate
 first-failure raw evidence; that is separately classified as a diagnostic
 feature choice. Both candidates are built/software-tested and uninstalled.
-The default binary remains byte-identical to v0.5.1. A47-type/554-field ARM
+The default binary remains byte-identical to v0.5.1 when built with the same
+automatic build-date metadata. A47-type/554-field ARM
 declaration checklist now makes remaining range/access/precision review
 explicit; it does not establish full compliance. Next accept the candidate's
 hardware timing at an appropriate regression checkpoint and continue the
 unresolved-field and teammate-contract review. No teammate algorithm was changed.
+Stage3 now packs Motion-owned controller flags/state and saves a further120B:
+176B total representation reduction, full-diagnostic BSS207156B. All eight
+ADC/core/control option combinations pass the pipeline;560 motion/course
+scenarios match accepted source field for field. Both`0.6-dev3` profiles remain
+uninstalled. [Current report](testing/representation/20261110-rtos-minimum-bit-stage3.json)
+records layouts, hashes, unchanged defaults and remaining hardware timing/stack
+acceptance. This is progress toward Change Requirement1, not whole-application
+compliance. The original Tribunal1 document remains unchanged.
 The [current ARM layouts/linker/payload evidence](testing/representation/20261109-rtos-v0_5_1-after.json)
 has been refreshed. Next: finish application-owned range/lifetime/access
 decisions, prepare a lean diagnostic-memory profile without changing the

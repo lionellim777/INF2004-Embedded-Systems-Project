@@ -1,6 +1,7 @@
 #ifndef CENTER_SEARCH_H
 #define CENTER_SEARCH_H
 #include "line_check.h"
+#include "control_representation.h"
 /* Provisional bounded search for GP28 mounted over the line. The centre
  * argument must mean strong black, not merely the follow threshold. 120 counts
  * limits an uncommanded search; it is not a guarantee of barcode clearance.
@@ -11,11 +12,19 @@ typedef struct {
     int32_t origin_l,origin_r,peak_l,peak_r;
     int32_t confirm_l,confirm_r,settle_l,settle_r,coast_l,coast_r;
     uint64_t still_us,black_us,white_us;
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    bool black_tracking:1,reversed:1,confirming:1,found:1;
+    bool retry_confirmation:1,extended_recovery:1;
+#else
     bool black_tracking;
+#endif
     int direction;
     int32_t limit;
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool reversed,confirming,found;
-    bool retry_confirmation,extended_recovery; unsigned confirmation_retries,sweep;
+    bool retry_confirmation,extended_recovery;
+#endif
+    unsigned confirmation_retries,sweep;
 } center_search_t;
 static inline void center_search_begin(center_search_t *s,int direction,
                                       int32_t l,int32_t r,uint64_t now)

@@ -1,6 +1,9 @@
 #include "motion_runtime.h"
 #include "board.h"
 #include <string.h>
+#if ROBOCAR_COMPACT_CONTROL_STATE
+_Static_assert(MOTION_TRACK_FAULT<8,"Track fault no longer fits compact motion fault state");
+#endif
 enum { RAW = 1u, STABLE = 2u, PENDING = 4u };
 static int32_t delta(uint32_t now, uint32_t previous)
 {

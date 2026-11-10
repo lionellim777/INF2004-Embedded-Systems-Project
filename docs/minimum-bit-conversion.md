@@ -157,7 +157,7 @@ candidate. Keep the lean variant available for later integration RAM needs.
 Host tests verify the changed retention policy and that A/A/Z,12-event wrap,
 stopped partial and maximum-size exports otherwise match the full profile.
 
-## Current field inventory and remaining coverage
+## Stage 2 field inventory and remaining coverage at that checkpoint
 
 The [current field checklist](testing/representation/20261109-rtos-stage2-fields.csv)
 and [ARM measurement/source manifest](testing/representation/20261109-rtos-stage2-inventory.json)
@@ -186,3 +186,109 @@ Repeat runs match for fields and measurements. Source hashes and compiler
 sizes are saved. Normal network provisioning explicitly keeps the accepted
 options OFF/cache ON; candidate-aware console identity gates are prepared,
 with remote START still absent. Installed-image metadata remains v0.5.1.
+
+## Stage 3: Motion-owned state and flags
+
+The [10 November measured report](testing/representation/20261110-rtos-minimum-bit-stage3.json)
+records the new full-diagnostic `0.6-dev3` and optional `0.6-dev3-lean` builds.
+They are software-verified candidates, **not installed or physically accepted**.
+`ROBOT_COMPACT_CONTROL_STATE=ON` enables the additional conversion; it defaults
+OFF and normal network provisioning explicitly forces it OFF. The installed
+v0.5.1 image, its metadata and the teammate algorithms are preserved.
+
+This stage packs46 Boolean declarations across six controller types into
+one-bit fields. Motion kind0..8 uses4 bits, phase0..4 uses3, fault0..6 (including
+the RTOS track fault) uses3, and the stalled-wheel mask0..3 uses2. Together with
+four profile flags, the main motion state occupies16 application bits. Course
+phase0..7 and18 flags occupy21 bits in three bytes. Other controller numerical
+fields remain at their existing precision, range and time/encoder semantics.
+These declarations occur in nested/repeated allocations;46 is not a live-object
+count or a whole-application completion claim.
+
+| ARM object | Stage 2 bytes | Stage 3 bytes | Scope |
+| --- | ---: | ---: | --- |
+| `motion_wheel_t` |64 |56 |Two one-bit flags grouped; count/time/float fields unchanged |
+| `motion_control_t` |176 |152 |Includes two wheels; do not add their savings again |
+| `barcode_progress_t` |256 |248 |Twelve drive flags packed |
+| `center_search_t` |144 |136 |Six recovery flags packed |
+| `center_trim_t` |72 |72 |Four flags now use four bits; alignment prevents a size reduction |
+| `course_control_t` |1160 |1064 |Includes two motion controllers and the above helpers |
+| Whole `motion_runtime_t` |1432 |1312 |Includes course; net120B reduction for this stage |
+
+Total representation savings relative to accepted v0.5.1 are now176B of linked
+BSS: runtime152B (including the earlier baseline32B), ADC filter15B and capture
+coordination9B. Full-diagnostic BSS is207156B, versus207332B accepted. Lean BSS
+is173492B; its additional33664B reduction still represents removal of duplicate
+diagnostic evidence, not packing credit. MQTT schemas/payload sizes are unchanged.
+
+### Ownership and input validation
+
+The Motion task is the only writer of these controller objects. The ADC IRQ,
+Decoder and Network tasks do not update them. Observer reads the track status,
+read count/letter and recovery counter under local IRQ exclusion; it does not
+write the packed flags. The asynchronous stop guard still owns its separate
+gate through `board.c`; packing does not move stop authorization into a course
+flag. Thus no new word groups flags with separate task/IRQ writers. This is a
+single-core owner proof, not an SMP synchronization design. Internal C bitfield
+layout is measured with ARM GCC14.2 and never copied directly to a packet.
+
+External `motion_begin` kind and distance arguments retain their original wide
+types and rejection checks before internal storage. A kind17 request, for
+example, is rejected; it cannot truncate into kind1 and start a straight test.
+Boolean fields use `_Bool` semantics, so nonzero still means true. Enum growth
+has compile-time guards; new values require reviewing widths. Raw counters,
+absolute times, arithmetic temporaries and float control calculations have not
+been truncated to make an unsupported compliance claim.
+
+### Verification and next acceptance gate
+
+`tools/test_rtos_control_bits.py` compiles the actual accepted control source
+from`a4e15b5` and the candidate. A field-manifest check fails if a logical field
+would disappear from the comparison.320 motion and240 course scenarios produce
+90942938 identical canonical bytes, including exact float bit patterns, every
+logical state field and string contents; padding and pointer addresses are
+excluded. Invalid external kinds/distances, encoder wrap/faults, motor profiles,
+abort/stall/late/timeout and line/barcode recovery are exercised. Eight existing
+behaviour test programs add independently specified steering and safety checks.
+
+All eight independent ADC/core/control option combinations pass the actual
+mocked ADC-to-queue-to-decoder/course/PWM tests with identical A/A/Z, ring-wrap,
+partial, first-failure and maximum-size exports. The lean profile differs only
+in its documented retention policy. Host checks use ASan/UBSan; all three ARM
+builds pass warnings as errors. Console identity gates recognize the candidates
+while continuing to reject remote START. The normal provisioning test verifies
+that inherited experimental flags cannot alter the accepted default.
+
+An unchanged build made on10 November initially differed from the9 November
+reference by two bytes in the SDK's automatic `__DATE__` metadata. Rebuilding
+the default control with `SOURCE_DATE_EPOCH=1794225600` (9 November noon UTC)
+produces an **exact** v0.5.1 binary match; no binary bytes are patched. Repeating
+an exact-match build on another day requires the same date control.
+
+Compiler frames for the sample IRQ remain56B vs48B accepted; course step is
+192B vs184B, track begin136B unchanged, decoder service96B unchanged, Motion
+runtime step128B unchanged and motion poll152B unchanged. Individual frames do
+not establish task/IRQ stack bounds or loaded timing. The next gate is the
+[candidate hardware check](testing/rtos-minbits-stage3-check.md), before treating
+this representation as a deployed baseline or adding more scheduling changes.
+
+The [updated field checklist](testing/representation/20261110-rtos-stage3-fields.csv)
+and [ARM/source manifest](testing/representation/20261110-rtos-stage3-inventory.json)
+still cover47 selected types/554 declarations:62 have candidate software
+evidence,411 need range/precision/lifetime/ownership decisions,49 Boolean
+declarations need storage/access review, four preserve raw-counter contracts,
+and28 are containers requiring allocation review. Private state and automatic
+locals still need review. Do not turn these counts into a compliance percentage.
+
+Reproduce the software/measurement checks with:
+
+```sh
+build/dependencies/rtos-tools-venv/bin/python tools/test_rtos_minimum_bits.py
+build/dependencies/rtos-tools-venv/bin/python tools/audit_rtos_representation.py
+build/dependencies/rtos-tools-venv/bin/python tools/measure_rtos_minimum_bits.py
+```
+
+The last command reads the already-built private images and writes a public
+measurement report under`build/`; it does not deploy, start motors or print
+credentials. Team-member interface decisions can proceed independently of this
+hardware gate, as listed in the [handoff draft](rtos-module-handoff.md).

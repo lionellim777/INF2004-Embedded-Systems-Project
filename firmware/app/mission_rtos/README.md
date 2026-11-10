@@ -1,4 +1,10 @@
-# µT-Kernel barcode recross candidate v0.5.1
+# µT-Kernel accepted v0.5.1 and opt-in minimum-bit candidates
+
+10 November update: [minimum-bit stage3](../../../docs/minimum-bit-conversion.md#stage-3-motion-owned-state-and-flags)
+is built/software-verified as`0.6-dev3`, on a separate branch and with explicit
+default-OFF options. Full-diagnostic BSS is207156B (176B representation saving).
+It has not been flashed. Installed v0.5.1 remains the physical reference; the
+next candidate gate is the [stationary USB check](../../../docs/testing/rtos-minbits-stage3-check.md).
 
 [The latest physical run passes all three reads live over Wi-Fi](../../../docs/testing/rtos-v0_5_1-wireless-track-acceptance.json),
 with no Mac USB connection, fault0 and a checksum-verified capture. Full A

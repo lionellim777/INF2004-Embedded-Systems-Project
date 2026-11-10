@@ -139,7 +139,7 @@ def main():
         usb.command('t');assert writes[-1]==b't'
         capture.line('[RTOS_INFO] version=0.5.1 network_state=1 network_error=0 uptime_ms=7')
         usb.command('t');assert writes[-1]==b't'
-        for version in ('0.6-dev1','0.6-dev2','0.6-dev2-lean'):
+        for version in ('0.6-dev1','0.6-dev2','0.6-dev2-lean','0.6-dev3','0.6-dev3-lean'):
             capture.line(f'[RTOS_INFO] version={version} network_state=1 network_error=0 uptime_ms=8')
             usb.command('t');assert writes[-1]==b't'
         for key in ['start','go','s']:

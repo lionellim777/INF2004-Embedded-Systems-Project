@@ -12,7 +12,7 @@ from audit_data_representation import measure_layout
 
 ROOT=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--output',type=Path,default=ROOT/'build/rtos-representation-stage2')
+parser.add_argument('--output',type=Path,default=ROOT/'build/rtos-representation-stage3')
 args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
 toolchain=ROOT/'build/dependencies/arm-gnu-toolchain-14.2.rel1-darwin-arm64-arm-none-eabi'
 includes=['audit_config.h','adc12_filter.h','track_control.h','board.h','binary_protocol.h',
@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix='rtos-fields-') as name:
             if dest.exists():raise ValueError('Header-name collision: '+p.name)
             shutil.copyfile(p,dest);sources.append(p.name)
             hashes[str(p.relative_to(ROOT))]=hashlib.sha256(p.read_bytes()).hexdigest()
-    (folder/'audit_config.h').write_text('#define RTOS_TRACK 1\n#define RTOS_COMPACT_ADC_STATE 1\n#define RTOS_COMPACT_CORE_STATE 1\n#define CENTER_BASELINE_COMPACT 1\n#define BARCODE_WAVE_LAST_PASS 1\n#define BARCODE_WAVE_RECOVERY_OPTICS 1\n')
+    (folder/'audit_config.h').write_text('#define RTOS_TRACK 1\n#define RTOS_COMPACT_ADC_STATE 1\n#define RTOS_COMPACT_CORE_STATE 1\n#define CENTER_BASELINE_COMPACT 1\n#define ROBOCAR_COMPACT_CONTROL_STATE 1\n#define BARCODE_WAVE_LAST_PASS 1\n#define BARCODE_WAVE_RECOVERY_OPTICS 1\n')
     data,rows=measure_layout('rtos_candidate',folder,includes,sources,
         toolchain/'bin/arm-none-eabi-gcc',shutil.which('clang'),toolchain/'bin/arm-none-eabi-objcopy')
     for row in rows:
@@ -41,7 +41,16 @@ with tempfile.TemporaryDirectory(prefix='rtos-fields-') as name:
             ('adc12_filter_t','state'):('next0..11:4 bits; filled0..12:4 bits',8),
             ('center_baseline_t','packed'):('31 levels0..1000 x10 bits; count5 and next5',320),
             ('center_baseline_t','last_us'):('uint64 capture time; no new mission-duration cap',64),
+            ('motion_control_t','kind'):('Trusted internal enum0..8; wide API argument validated before storage',4),
+            ('motion_control_t','phase'):('Internal phase0..4',3),
+            ('motion_control_t','fault'):('Internal fault0..6 including RTOS track fault',3),
+            ('motion_control_t','stalled_wheels'):('Left/right bitmask0..3',2),
+            ('course_control_t','phase'):('Internal enum0..7',3),
         }
+        control_types={'motion_wheel_t','motion_control_t','course_control_t','barcode_progress_t','center_search_t','center_trim_t'}
+        if row['type'] in control_types and row['declared_type'] in ('bool','_Bool'):
+            assert row['current_storage_bits']==1,(key,'Flag not actually packed')
+            known[key]=('false/true; Motion-owned one-bit internal flag',1)
         if row['type']=='track_control_t':
             bounds={'head':(511,9),'tail':(511,9),'event_head':(7,3),'event_tail':(7,3),'enabled':(1,1),'divider':(3,2)}
             high,bits=bounds[row['field']];known[key]=(f'0..{high}',bits)
@@ -65,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix='rtos-fields-') as name:
             row.update(status='REFERENCE_DECLARATION',range_or_domain='Legacy general-purpose filter retained; candidate allocates adc12_filter_t',
                 required_or_proposed_bits='',next_action='Keep reference behavior; do not count this declaration as a simultaneous candidate allocation')
         row['source']='candidate header: '+row['source']
-    result=dict(recorded_utc=datetime.now(timezone.utc).isoformat(),scope='Selected current application header declarations, compact ADC/core enabled',
+    result=dict(recorded_utc=datetime.now(timezone.utc).isoformat(),scope='Selected current application header declarations, compact ADC/core/control enabled',
         types=data['types'],enums=data['enums'],field_rows=len(rows),status_counts=dict(Counter(r['status'] for r in rows)),
         source_sha256=hashes,limits=[
             'This is a declared-type checklist, not whole-application compliance or a count of allocated objects.',

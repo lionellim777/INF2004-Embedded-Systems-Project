@@ -76,3 +76,28 @@ Navigation and obstacle drive proposals need the arbitration policy first.
   course reliability remains a separate acceptance item.
 
 The car can remain powered off while these software/evidence tasks are prepared.
+
+## Minimum-bit handoff decisions to settle before merging
+
+These are integration-review questions, not new assignments or changes to a
+member's algorithm. No fixed height, range limit, precision or command mapping
+is being invented on the owner's behalf.
+
+| Owner/module | Required domain decision | Integration boundary |
+| --- | --- | --- |
+| Terrain member | Height units/resolution, signed vs unsigned, valid physical range, off-surface/failure/unavailable states and maximum age | Publish a timestamped observation; retain an explicit invalid state separate from zero. Validate a wide input before packing. |
+| Lionel/obstacle | Range units/resolution, no-echo vs clear vs fault, bypass states, request duration and cancellation | Submit a bounded proposal to Motion; preserve its latched STOP/token and keep scanner acquisition running. |
+| Barcode execution member | A–Z command mapping, repeated events, replace/defer/stop behavior and generation lifetime | Consume validated events; a same-letter later barcode is a new event. Do not start from network reconnect. |
+| Justin/integration | Final topic/schema version, availability/simulation bits, payload maximum and receive validation | One Network task, explicit encoding, no raw C structs or unchecked truncation. |
+
+For each field, record: valid range and number of states; required bits;
+representation; input validation and overflow policy; producer/consumer and
+locking; freshness; source commit and boundary tests. Keep a wider validation
+argument when needed to reject out-of-range values before writing a packed
+field. A bitfield cannot safely validate a value after it has already truncated.
+
+The `0.6-dev3` packing of course/drive/search/trim state relies on Motion being
+the sole writer on core0. An incoming module must not write those flags from
+another task/IRQ. Route the request through Motion or review synchronization
+first. The [current minimum-bit evidence](minimum-bit-conversion.md#stage-3-motion-owned-state-and-flags)
+does not establish minimum-bit compliance of an undelivered teammate module.
