@@ -1,4 +1,5 @@
 #include "terrain.h"
+#include "hump_roll.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -35,6 +36,9 @@ static acceleration_t samples[FILTER_SAMPLES];
 static uint sample_next;
 static uint sample_count;
 static float level_pitch;
+static float level_roll;
+static hump_roll_t roll_detector;
+static uint64_t last_roll_poll_ms;
 static uint64_t next_sample_ms;
 static hump_phase_t phase;
 static uint64_t event_start_ms;
@@ -74,6 +78,13 @@ static float pitch(const acceleration_t *reading)
 {
     return atan2f(reading->y,
                   sqrtf(reading->x * reading->x +
+                        reading->z * reading->z)) * 57.2957795f;
+}
+
+static float roll_of(const acceleration_t *reading)
+{
+    return atan2f(reading->x,
+                  sqrtf(reading->y * reading->y +
                         reading->z * reading->z)) * 57.2957795f;
 }
 
@@ -152,6 +163,13 @@ bool terrain_calibrate(void)
         return false;
     }
     level_pitch = pitch(&level);
+    level_roll = roll_of(&level);
+    hump_roll_reset(&roll_detector);
+    last_roll_poll_ms = 0;
+    status.roll_hump_count = 0;
+    status.last_roll_hump_mm = 0.0f;
+    status.highest_roll_hump_mm = 0.0f;
+    status.current_roll_change_deg = 0.0f;
     status.calibrated = true;
     status.hump_count = 0;
     status.highest_hump_number = 0;
@@ -162,6 +180,7 @@ bool terrain_calibrate(void)
     phase = HUMP_WAITING;
     level_since_ms = 0;
     printf("Terrain calibrated. Level pitch=%.1f degrees.\n", level_pitch);
+    printf("Terrain level roll=%.2f degrees (roll hump detector armed).\n", level_roll);
     return true;
 }
 
@@ -178,6 +197,11 @@ static void finish_hump(uint64_t now_ms)
            (unsigned long long)(now_ms - event_start_ms),
            (unsigned long)status.highest_hump_number,
            status.highest_peak_angle_deg);
+}
+
+void terrain_motion_go(void)
+{
+    hump_roll_motion_go(&roll_detector, (uint32_t)to_ms_since_boot(get_absolute_time()));
 }
 
 void terrain_poll(void)
@@ -223,6 +247,35 @@ void terrain_poll(void)
     status.current_pitch_deg = tilt;
     status.pitch_valid = true;
     ++status.pitch_sequence;
+    /* Roll detector: right wheel raised reads negative. Independent of the pitch detector below. */
+    /* terrain_poll() only runs during a run, so a long gap means a new run: re-converge the baseline. */
+    if (last_roll_poll_ms != 0u && now_ms - last_roll_poll_ms > 1000u) {
+        hump_roll_begin_run(&roll_detector);
+    }
+    last_roll_poll_ms = now_ms;
+    const float roll_change = roll_of(&average) - level_roll;
+    status.current_roll_change_deg = roll_change;
+    const hump_roll_event_t roll_event = hump_roll_update(&roll_detector, roll_change, (uint32_t)now_ms);
+    if (roll_event.result == HUMP_ROLL_COMPLETED) {
+        ++status.roll_hump_count;
+        status.last_roll_hump_mm = roll_event.height_mm;
+        if (roll_event.height_mm > status.highest_roll_hump_mm) {
+            status.highest_roll_hump_mm = roll_event.height_mm;
+        }
+        printf("ROLL HUMP %lu COMPLETE: side=%s peak_roll=%.1f deg mean_roll=%.1f deg height_est=%.1f mm duration=%lu ms baseline=%.2f deg; highest=%.1f mm\n",
+               (unsigned long)status.roll_hump_count, roll_event.sign < 0 ? "RIGHT" : "LEFT",
+               roll_event.peak_deg, roll_event.mean_deg, roll_event.height_mm, (unsigned long)roll_event.duration_ms,
+               roll_event.baseline_deg,
+               status.highest_roll_hump_mm);
+    } else if (roll_event.result == HUMP_ROLL_WRONG_SIDE) {
+        printf("ROLL LEFT ignored: peak_roll=%.1f deg duration=%lu ms (hump is under the right wheel only).\n",
+               roll_event.peak_deg, (unsigned long)roll_event.duration_ms);
+    } else if (roll_event.result == HUMP_ROLL_TOO_SHORT) {
+        printf("ROLL BUMP ignored: peak_roll=%.1f deg duration=%lu ms (a hump lasts at least %u ms).\n",
+               roll_event.peak_deg, (unsigned long)roll_event.duration_ms, (unsigned)HUMP_ROLL_MIN_MS);
+    } else if (roll_event.result == HUMP_ROLL_TIMED_OUT) {
+        printf("ROLL HUMP cancelled: still tilted after %u ms (car stopped on it?).\n", (unsigned)HUMP_ROLL_TIMEOUT_MS);
+    }
     const float threshold = 5.0f;
     const bool level = fabsf(tilt) < 2.0f;
 

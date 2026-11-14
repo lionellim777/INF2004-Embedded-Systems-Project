@@ -3,7 +3,10 @@
  */
 #include "calibration_wifi.h"
 #include "calibration_core.h"
-#ifdef ROBOCAR_STATIONARY_BARCODE
+#ifdef ROBOCAR_MEASUREMENT_DIAG
+#include "measurement_page.h"
+#define CAL_RESULT_TITLE "measurement dashboard v1 / motors OFF / encoder distance + IMU orientation"
+#elif defined(ROBOCAR_STATIONARY_BARCODE)
 #include "stationary_page.h"
 #define CAL_RESULT_TITLE "v5.7 stationary barcode / motors OFF / black>250 white<=220"
 #else
@@ -18,6 +21,24 @@
 #include "lwip/tcp.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef ROBOCAR_WIFI_STATION
+/* Opt-in: join an existing Wi-Fi network instead of hosting the access point.
+ * Credentials live in the git-ignored station_settings.local.h. */
+#include "lwip/ip4_addr.h"
+#include "lwip/netif.h"
+#include "station_settings.local.h"
+#ifndef STATION_WIFI_AUTH
+#define STATION_WIFI_AUTH CYW43_AUTH_WPA2_AES_PSK
+#endif
+#ifndef CYW43_HOST_NAME
+#define CYW43_HOST_NAME "aai10-car"
+#endif
+#define STATION_JOIN_TIMEOUT_MS 8000u
+#define STATION_RETRY_US 5000000u
+#define NETWORK_START_TIMEOUT_MS 25000u
+#else
+#define NETWORK_START_TIMEOUT_MS 10000u
+#endif
 #ifndef ROBOCAR_WIFI_CORE1
 #define ROBOCAR_WIFI_CORE1 0
 #endif
@@ -49,6 +70,9 @@ static void shared_exit(void){}
 #define BODY_CAPACITY 10240u
 _Static_assert(BODY_CAPACITY > 12u*CAL_LINE_CAPACITY+256u+sizeof(CAL_RESULT_TITLE)+180u, "retained results must fit HTTP body");
 #define CLIENT_TIMEOUT_US 5000000u
+#ifdef CAL_HAVE_MEAS
+_Static_assert(BODY_CAPACITY > CAL_MEAS_CAPACITY+sizeof(CAL_RESULT_TITLE)+128u+320u, "retained measurements must fit HTTP body");
+#endif
 
 typedef struct {
     struct tcp_pcb *pcb;
@@ -71,6 +95,13 @@ static dhcp_server_t dhcp;
 static bool ready;
 static uint32_t boot_id;
 static uint32_t max_poll_us;
+#ifdef ROBOCAR_WIFI_STATION
+static bool station_mode;        /* true: joined the configured network */
+static bool station_announce;    /* address changed; core 0 reprints it */
+static int station_join_result;  /* SDK error from the boot-time join */
+static int station_join_link;    /* radio link status when the join gave up */
+static char station_ip[16];
+#endif
 static const uint16_t *export_samples;
 static const char *export_details;
 static unsigned export_count;
@@ -104,6 +135,26 @@ void calibration_wifi_capture_init(void)
 void calibration_wifi_help(void)
 {
     shared_enter();bool available=ready;shared_exit();
+#ifdef ROBOCAR_WIFI_STATION
+    shared_enter();bool station=station_mode;int join=station_join_result;int link=station_join_link;
+    char ip[sizeof station_ip];memcpy(ip,station_ip,sizeof ip);shared_exit();
+    if(available && station){
+        printf("[WIFI] READY (station) | joined the configured network | open http://%s/ from a computer on the same network (host name %s)\n",
+               ip[0]?ip:"(address pending)",CYW43_HOST_NAME);
+        printf("[WIFI] Browser selects only; GP20 starts/aborts. Network loss does not restart motion.\n");
+        return;
+    }
+    if(available){
+        const char *why=link==CYW43_LINK_NONET?"network name not found (wrong name, 5 GHz only, or out of range)":
+            link==CYW43_LINK_BADAUTH?"wrong password or unsupported security":
+            link==CYW43_LINK_NOIP?"joined but never got an IP address (DHCP or client isolation)":
+            link==CYW43_LINK_JOIN?"association never completed (security mode or signal)":
+            link==CYW43_LINK_FAIL?"join failed":
+            link==CYW43_LINK_UP?"joined, but the web server could not start":
+            link==CYW43_LINK_DOWN?"radio never associated":"unknown";
+        printf("[WIFI] Could not join the configured network (SDK error %d, link status %d: %s); using the access point instead.\n",join,link,why);
+    }
+#endif
     printf("[WIFI] %s | network=%s password=%s | http://192.168.4.1\n",
            available ? "READY" : "OFFLINE (USB still available)", AP_NAME, AP_PASSWORD);
     printf("[WIFI] Browser selects only; GP20 starts/aborts. Network loss does not restart motion.\n");
@@ -232,6 +283,14 @@ static void handle_request(client_t *c)
         size_t n = calibration_read(&core, cursor, c->data, sizeof(c->data), &next, &gap);
         shared_exit();
         response(c, "200 OK", "text/plain", c->data, n, next, gap);
+#ifdef ROBOCAR_MEASUREMENTS
+    } else if (strcmp(method, "GET") == 0 && strcmp(path, "/measure") == 0) {
+        /* Live readout first, then every retained [MEAS RESULT] line. Read-only. */
+        shared_enter();
+        int n = snprintf(c->data, sizeof(c->data), "boot=%08lx\n%s%s", (unsigned long)boot_id, core.live, core.meas);
+        shared_exit();
+        response(c, "200 OK", "text/plain", c->data, (size_t)n, 0u, false);
+#endif
     } else if (strcmp(method,"GET")==0 && strncmp(path,"/waveform?offset=",17u)==0) {
         uint32_t offset;
         if(!calibration_parse_cursor(path+17u,&offset)){
@@ -248,6 +307,18 @@ static void handle_request(client_t *c)
         c->data[n++]='\n';c->data[n]=0;
         shared_exit();
         response(c,"200 OK","text/plain",c->data,(size_t)n,0u,false);
+#ifdef ROBOCAR_MEASUREMENT_DIAG
+    } else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0) {
+        shared_enter();
+        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n%s",
+                         (unsigned long)boot_id, core.meas);
+        if (core.meas[0] == '\0') {
+            n += snprintf(c->data + n, sizeof(c->data) - (size_t)n,
+                          "No measurement results retained in this boot yet.\n");
+        }
+        shared_exit();
+        response(c, "200 OK", "text/plain", c->data, (size_t)n, 0u, false);
+#endif
     } else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0) {
         shared_enter();
         int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n[PREVIOUS RUN]\n%s%s[CURRENT RUN]\n%s%s%s%s%s%s%s%s%s%s%s",
@@ -260,7 +331,7 @@ static void handle_request(client_t *c)
         response(c, "200 OK", "text/plain", c->data, (size_t)n, 0u, false);
     } else if (strcmp(method,"POST")==0 && strncmp(path,"/mission/",9u)==0) {
         if(!control_header(c->request)){plain(c,"403 Forbidden","Use the calibration page.\n");return;}
-#ifdef ROBOCAR_STATIONARY_BARCODE
+#if defined(ROBOCAR_STATIONARY_BARCODE) || defined(ROBOCAR_MEASUREMENT_DIAG)
         plain(c,"409 Conflict","Stationary build: course driving unavailable.\n");
 #else
         shared_enter();bool accepted=calibration_course_command(&core,path);shared_exit();
@@ -271,9 +342,16 @@ static void handle_request(client_t *c)
         if (!control_header(c->request)) { plain(c, "403 Forbidden", "Use the calibration page.\n"); return; }
         shared_enter();bool accepted=calibration_command(&core,path[9]);shared_exit();
         if (accepted) {
+#ifdef ROBOCAR_MEASUREMENT_DIAG
+            plain(c, "202 Accepted", "Command queued; watch the live readout.\n");
+#else
+#ifdef ROBOCAR_MEASUREMENTS
+            if (strchr("mepghw", path[9]) != NULL) { plain(c, "202 Accepted", "Measurement command queued.\n"); return; }
+#endif
             plain(c, "202 Accepted", path[9] == 'x' ? "Stop queued; check [STOP] in the log. GP20 aborts locally.\n" :
                   path[9]=='v' ? "Optical capture queued: motors stay off. Wait for [OPTICAL START], then slide paper for 5 seconds.\n" :
                   "Selection queued. Wait for [SELECT] in the log, then press GP20 on the car.\n");
+#endif
         } else {
             plain(c, "409 Conflict", "Selection rejected: running, settling, another request pending, or invalid command.\n");
         }
@@ -325,10 +403,80 @@ static err_t accept_client(void *arg, struct tcp_pcb *pcb, err_t err)
     tcp_abort(pcb);
     return ERR_ABRT;
 }
+#ifdef ROBOCAR_WIFI_STATION
+static bool station_listen(void)
+{
+    struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
+    if (pcb != NULL && tcp_bind(pcb, IP_ANY_TYPE, 80u) == ERR_OK) {
+        struct tcp_pcb *listener = tcp_listen_with_backlog(pcb, CLIENT_COUNT);
+        if (listener != NULL) {
+            tcp_accept(listener, accept_client);
+            return true;
+        }
+    }
+    if (pcb != NULL) { tcp_abort(pcb); }
+    return false;
+}
+/* Text form of the DHCP-assigned address; empty if there is none. */
+static void station_address_text(char *out, size_t size)
+{
+    const ip4_addr_t *address = netif_ip4_addr(&cyw43_state.netif[CYW43_ITF_STA]);
+    snprintf(out, size, "%s", ip4_addr_isany_val(*address) ? "" : ip4addr_ntoa(address));
+}
+/* Called from the network core. Re-joins after a drop (the radio does not do
+ * this on its own) and tells core 0 when the address changes. It never
+ * prints: printing stays on the application core. */
+static void station_maintain(void)
+{
+    static uint64_t next_us;
+    uint64_t now = time_us_64();
+    if (now < next_us) { return; }
+    next_us = now + STATION_RETRY_US;
+    int link = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+    if (link == CYW43_LINK_UP) {
+        char text[16];
+        station_address_text(text, sizeof text);
+        shared_enter();
+        if (strcmp(text, station_ip) != 0) {
+            memcpy(station_ip, text, sizeof station_ip);
+            station_announce = true;
+        }
+        shared_exit();
+        return;
+    }
+    shared_enter(); station_ip[0] = '\0'; shared_exit();
+    if (link == CYW43_LINK_JOIN || link == CYW43_LINK_NOIP) { return; } /* in progress */
+    (void)cyw43_arch_wifi_connect_async(STATION_WIFI_SSID, STATION_WIFI_PASSWORD, STATION_WIFI_AUTH);
+}
+#endif
 static bool network_init(void)
 {
     boot_id = get_rand_32();
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0) { return false; }
+#ifdef ROBOCAR_WIFI_STATION
+    cyw43_arch_enable_sta_mode();
+    (void)cyw43_wifi_pm(&cyw43_state, CYW43_NONE_PM);
+    int join = cyw43_arch_wifi_connect_timeout_ms(STATION_WIFI_SSID, STATION_WIFI_PASSWORD,
+                                                  STATION_WIFI_AUTH, STATION_JOIN_TIMEOUT_MS);
+    if (join == 0 && station_listen()) {
+        char text[16];
+        station_address_text(text, sizeof text);
+        shared_enter();
+        memcpy(station_ip, text, sizeof station_ip);
+        station_mode = true;
+        station_join_result = 0;
+        core.selection_allowed = true;
+        ready = true;
+        shared_exit();
+        return true;
+    }
+    int join_link = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+    shared_enter(); station_join_result = join != 0 ? join : -1; station_join_link = join_link; shared_exit();
+    /* Could not join (wrong password, out of range, 5 GHz only...): start
+     * from a clean radio and fall back to hosting the access point below. */
+    cyw43_arch_deinit();
+    if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0) { return false; }
+#endif
     /* SDK default channel 3 overlaps busy channels 1 and 6; 11 does not.
      * Init resets it, so set it here, before the AP starts. */
     cyw43_wifi_ap_set_channel(&cyw43_state, 11u);
@@ -360,6 +508,9 @@ static void network_poll(void)
     if (!ready) { return; }
     uint64_t start = time_us_64();
     cyw43_arch_poll();
+#ifdef ROBOCAR_WIFI_STATION
+    if (station_mode) { station_maintain(); }
+#endif
     /* One bounded chunk per connection per application iteration. */
     for (size_t i = 0; i < CLIENT_COUNT; ++i) {
         if (clients[i].pcb != NULL) {
@@ -386,7 +537,7 @@ bool calibration_wifi_init(void)
 #if ROBOCAR_WIFI_CORE1
     sem_init(&network_started,0,1);
     multicore_launch_core1_with_stack(network_main,network_stack,sizeof(network_stack));
-    if(!sem_acquire_timeout_ms(&network_started,10000))return false;
+    if(!sem_acquire_timeout_ms(&network_started,NETWORK_START_TIMEOUT_MS))return false;
     shared_enter();bool available=ready;shared_exit();return available;
 #else
     return network_init();
@@ -394,6 +545,10 @@ bool calibration_wifi_init(void)
 }
 void calibration_wifi_poll(bool selection_allowed)
 {
+#ifdef ROBOCAR_WIFI_STATION
+    shared_enter();bool announce=station_announce;station_announce=false;shared_exit();
+    if(announce)calibration_wifi_help();
+#endif
     shared_enter();core.selection_allowed=selection_allowed;shared_exit();
 #if !ROBOCAR_WIFI_CORE1
     network_poll();
@@ -405,5 +560,9 @@ uint32_t calibration_wifi_max_poll_us(void)
 {shared_enter();uint32_t n=max_poll_us;shared_exit();return n;}
 void calibration_wifi_reset_timing(void)
 {shared_enter();max_poll_us=0;shared_exit();}
+#ifdef ROBOCAR_MEASUREMENTS
+void calibration_wifi_set_measure_live(const char *text)
+{shared_enter();snprintf(core.live,sizeof core.live,"%s",text);shared_exit();}
+#endif
 course_config_t calibration_wifi_course_config(void)
 {shared_enter();course_config_t c=selected_course;shared_exit();return c;}

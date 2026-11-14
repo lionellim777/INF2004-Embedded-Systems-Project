@@ -2,6 +2,26 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef CAL_HAVE_MEAS
+/* Append the current completed line to the retained measurement results.
+ * Oldest whole lines are discarded to make room, so the buffer always holds
+ * complete lines and a terminating NUL. */
+static void meas_append(calibration_core_t *c)
+{
+    size_t n = c->line_length;
+    if (n == 0u || n >= CAL_MEAS_CAPACITY) { return; }
+    while (c->meas_length + n >= CAL_MEAS_CAPACITY) {
+        char *newline = memchr(c->meas, '\n', c->meas_length);
+        size_t drop = newline != NULL ? (size_t)(newline - c->meas) + 1u : c->meas_length;
+        memmove(c->meas, c->meas + drop, c->meas_length - drop);
+        c->meas_length -= drop;
+    }
+    memcpy(c->meas + c->meas_length, c->line, n);
+    c->meas_length += n;
+    c->meas[c->meas_length] = '\0';
+}
+#endif
+
 void calibration_capture(calibration_core_t *c, const char *data, size_t length)
 {
     for (size_t i = 0; i < length; ++i) {
@@ -17,6 +37,9 @@ void calibration_capture(calibration_core_t *c, const char *data, size_t length)
         if (ch == '\n') {
             c->line[c->line_length] = '\0';
             if (!c->line_overflow) {
+#ifdef CAL_HAVE_MEAS
+                if (strncmp(c->line, "[MEAS RESULT] ", 14u) == 0) { meas_append(c); }
+#endif
                 if (strncmp(c->line, "[OPTICAL START]", 15u)==0) {
                     c->optical_result[0]=0;
                 } else if(strncmp(c->line,"[OPTICAL RESULT]",16u)==0) {
@@ -78,8 +101,26 @@ size_t calibration_read(const calibration_core_t *c, uint32_t since,
 bool calibration_command(calibration_core_t *c, char command)
 {
     if (command == 'x') { c->pending = 'x'; return true; }
+#ifdef ROBOCAR_MEASUREMENT_DIAG
+    /* g=zero/start distance run, p=capture IMU pose, n=restart pose sequence,
+     * d/i=GP20 controls distance/IMU. Motors are off in this build. */
+    if (command == 'g' || command == 'p' || command == 'n' || command == 'd' || command == 'i') {
+        if (!c->selection_allowed || c->pending != 0) { return false; }
+        c->pending = command;
+        return true;
+    }
+#endif
+#ifdef ROBOCAR_MEASUREMENTS
+    /* Measurements tab (read-only, idle only): m=activate/keep-alive, e=off,
+     * g=zero/start distance run, h=latch run, p=capture IMU pose, w=restart poses. */
+    if (command == 'm' || command == 'e' || command == 'g' || command == 'h' || command == 'p' || command == 'w') {
+        if (!c->selection_allowed || c->pending != 0) { return false; }
+        c->pending = command;
+        return true;
+    }
+#endif
     if (!c->selection_allowed || c->pending != 0) { return false; }
-    if (command != 'f' && command != 'l' && command != 'r' && command != 'u' && command != 't' && command != 'b' && command != 'c' && command != 's' && command != 'v' && command != 'o') { return false; }
+    if (command != 'f' && command != 'k' && command != 'l' && command != 'r' && command != 'u' && command != 't' && command != 'b' && command != 'c' && command != 's' && command != 'v' && command != 'o') { return false; }
     c->pending = command;
     return true;
 }

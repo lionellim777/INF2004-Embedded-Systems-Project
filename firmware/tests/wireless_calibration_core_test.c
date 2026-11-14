@@ -70,6 +70,10 @@ int main(void)
     assert(calibration_take_command(&c)=='t');
     assert(calibration_command(&c,'f'));
     assert(!calibration_command(&c,'l'));
+    assert(calibration_take_command(&c)=='f');
+    assert(calibration_command(&c,'k'));assert(calibration_take_command(&c)=='k');
+    assert(calibration_command(&c,'f'));
+    assert(!calibration_command(&c,'l'));
     assert(calibration_command(&c,'x'));
     assert(!calibration_command(&c,'r'));
     assert(calibration_take_command(&c)=='x' && calibration_take_command(&c)==-1);

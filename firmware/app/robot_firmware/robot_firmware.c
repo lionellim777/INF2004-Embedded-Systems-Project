@@ -40,6 +40,7 @@
 #include "obstacle_bypass.h"
 #include "terrain.h"
 #include "calibration_wifi.h"
+#include "measurement.h"
 
 enum {
     LEFT_MOTOR_A_PIN = 8,
@@ -672,6 +673,7 @@ int main(void)
     if (terrain_init()) {
         terrain_calibrate();
     }
+    measurement_init();
 
     ir_timer_ready = add_repeating_timer_us(-(int64_t)BARCODE_SAMPLE_US, ir_sample_alarm, NULL, &ir_timer);
     sleep_ms(2);
@@ -695,6 +697,7 @@ int main(void)
     selected = MOTION_STRAIGHT_30CM;
 #endif
     course_config_t selected_course={'s','s',120};
+    bool straight_long = false; /* 'k': 50 cm hump-test move instead of the calibrated 30 cm one */
     static motion_control_t motion;
     motion_init(&motion);
     static run_diagnostics_t diagnostics = {0};
@@ -737,6 +740,8 @@ int main(void)
             if (ch < 0) { ch = getchar_timeout_us(0u); }
             if (ch == PICO_ERROR_TIMEOUT) { break; }
             if (ch >= 'A' && ch <= 'Z') { ch += 'a' - 'A'; }
+            /* Read-only Measurements tab: m e g h p w, idle only. Never moves motors. */
+            if (measurement_command(ch, !running && settling_until_us == 0u && !optical_pending, now_us)) { continue; }
             if (ch == 'x') {
                 motors_stop();
                 if(optical_pending)optical_finish(true,false);
@@ -777,10 +782,20 @@ int main(void)
                 print_controls();
             } else if (ROBOCAR_CENTER_LINE && (ch=='n'||ch=='t'||ch=='b'||ch=='c')) {
                 printf("[SELECT] Use Y/Z mission for GP28-centred tracking; legacy straddle diagnostics disabled.\n");
+            } else if (ch == 'k') {
+                if (running || settling_until_us != 0u) {
+                    printf("[SELECT] Rejected while running/settling. Stop first.\n");
+                } else {
+                    selected = MOTION_STRAIGHT_30CM;
+                    straight_long = true;
+                    printf("[SELECT] STRAIGHT_50CM (hump test, cutoff=%d counts, provisional). No movement until GP20.\n",
+                           MOTION_STRAIGHT_50CM_STOP_COUNTS);
+                }
             } else if (ch == 'f' || ch == 'l' || ch == 'r' || ch == 'u' || ch == 'n' || ch == 't' || ch == 'b' || ch == 'c') {
                 if (running || settling_until_us != 0u) {
                     printf("[SELECT] Rejected while running/settling. Stop first.\n");
                 } else {
+                    straight_long = false;
                     selected = ch == 'f' ? MOTION_STRAIGHT_30CM :
                         (ch == 'l' ? MOTION_LEFT_90 : (ch == 'r' ? MOTION_RIGHT_90 :
                         (ch == 'u' ? MOTION_RIGHT_180 : (ch == 'b' ? MOTION_BARCODE : (ch == 'c' ? MOTION_CONTINUOUS : MOTION_NONE)))));
@@ -838,6 +853,7 @@ int main(void)
         }
 
         if(optical_pending && (uint32_t)(time_us_32()-optical.start_us)>=OPTICAL_DURATION_US)optical_finish(false,false);
+        measurement_poll(!running && settling_until_us == 0u && !optical_pending, now_us);
 
         uint32_t ir_irq = save_and_disable_interrupts();
         uint16_t left_raw = ir_latest[0];
@@ -989,6 +1005,10 @@ int main(void)
                     }
                 } else { began = motion_begin(&motion, pending, enc, now_us); }
                 if (began) {
+                    if (pending == MOTION_STRAIGHT_30CM && straight_long) {
+                        motion.left.target = motion.right.target = MOTION_STRAIGHT_50CM_STOP_COUNTS;
+                    }
+                    terrain_motion_go();
                     terrain_status_t initial = terrain_get_status();
                     run_diagnostics_begin(&diagnostics, initial.hump_count, initial.read_errors,
                                           initial.pitch_sequence);
@@ -1297,6 +1317,9 @@ int main(void)
             }
             if(scan_kind(motion.kind))printf(" GP26Filtered=%u",barcode_filtered);
             terrain_status_t terrain = terrain_get_status();
+            printf(" RollHumps=%lu HighestRollHumpMm=%.1f LastRollHumpMm=%.1f RollChange=%.1f",
+                   (unsigned long)terrain.roll_hump_count, terrain.highest_roll_hump_mm,
+                   terrain.last_roll_hump_mm, terrain.current_roll_change_deg);
             printf(" Humps=%lu PeakPitch=%.1f Pitch=%.1f PitchValid=%u Terrain=%s",
                    (unsigned long)terrain.hump_count, terrain.highest_peak_angle_deg,
                    terrain.current_pitch_deg, terrain.pitch_valid && terrain.calibrated ? 1u : 0u,
