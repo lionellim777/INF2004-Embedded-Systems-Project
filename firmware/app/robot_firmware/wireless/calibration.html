@@ -201,10 +201,31 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
  .pause{margin-left:0}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Tabs and the Measurements tab (added; everything above is unchanged) */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 16px}
+.tab{min-height:44px;padding:8px 18px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--ink-2);font-family:var(--board);font-stretch:condensed;font-size:1.1rem;letter-spacing:.01em}
+.tab:hover{background:transparent;color:var(--ink)}
+.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--amber)}
+#m-head{grid-column:1/-1;background:var(--frame-2);border-color:var(--line-2)}
+#m-message{min-height:1.5em;margin:0 0 4px;font-weight:600;color:var(--ink)}
+.strip.s4{grid-template-columns:repeat(4,minmax(0,1fr))}
+#m-next{font-size:1.05rem;color:var(--ink);max-width:62ch;margin:0 0 12px}
+.mlead{color:var(--ink-2);max-width:66ch;margin:0 0 12px}
+.tablewrap{overflow-x:auto;margin-top:14px}
+.mt{width:100%;border-collapse:collapse;font-size:.92rem;font-variant-numeric:tabular-nums}
+.mt th{text-align:left;color:var(--ink-3);font-weight:400;padding:6px 10px 6px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.mt td{padding:7px 10px 7px 0;border-bottom:1px solid var(--face-2);overflow-wrap:anywhere;vertical-align:top}
+.mt tr.ok td:last-child{color:var(--green)}.mt tr.warn td:last-child{color:var(--amber)}.mt tr.bad td:last-child{color:var(--red)}
+#measure-tab .facts{margin-top:14px}
+#measure-tab .facts dd.use{color:var(--green);font-weight:600}
+#m-summary,#m-model-text{margin:12px 0 0}
+@media(max-width:640px){#measure-tab .strip.s4{grid-template-columns:repeat(2,minmax(0,1fr))}.tab{flex:1}}
 </style></head><body>
 <div class="wrap">
 <header class="top"><div><h1>Car testing<span class="version">AAI10 · v5.63-left-bypass-dev</span></h1></div><div class="link"><span id="age" class="num" aria-live="off">No data yet</span><span id="connection" role="status">Connecting…</span></div></header>
-<main class="grid">
+<nav class="tabs" role="tablist" aria-label="Dashboard sections"><button id="tab-test" class="tab" role="tab" aria-selected="true" aria-controls="test-tab">Testing</button><button id="tab-measure" class="tab" role="tab" aria-selected="false" aria-controls="measure-tab">Measurements</button></nav>
+<main id="test-tab" class="grid">
 
 <section id="controls" class="board" aria-label="Test controls">
 <div class="ctl">
@@ -213,7 +234,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 <option value="o">Follow track + avoid obstacle</option>
 <option value="v">Barcode sensor check · motors off</option>
 <option value="course" selected>Follow track + read barcodes</option>
-<option value="f">30 cm forward</option><option value="l">Left 90°</option><option value="r">Right 90°</option><option value="u">Right 180°</option>
+<option value="f">30 cm forward</option><option value="k">50 cm forward (hump test)</option><option value="l">Left 90°</option><option value="r">Right 90°</option><option value="u">Right 180°</option>
 </select></div>
 <button id="prepare" class="primary" disabled>Record sensor · 5 seconds</button><button id="stop" class="stop">Stop</button>
 </div>
@@ -310,6 +331,63 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font:12px/1.45 
 <div class="footer"><button id="download">Download log</button><small>One file includes every test. Save before switching off.</small></div>
 <details id="technical"><summary>Raw log &amp; technical details</summary><h3>Latest saved result</h3><pre id="result">Results are retrieved automatically when a test finishes or you download.</pre><h3>Live log</h3><pre id="log" aria-label="Robot diagnostic log"></pre><p><small>IR order: barcode GP26 / line centre GP28 / line right GP27. Keep GP28 directly over the black tape. The car cannot detect table edges. Web Stop needs Wi-Fi; GP20 is the local stop. Captured logs remain in this page; power resets clear results on the car.</small></p></details>
 </section>
+</main>
+<main id="measure-tab" class="grid" role="tabpanel" aria-labelledby="tab-measure" hidden>
+
+<section id="m-head" class="board" aria-label="Measurement status">
+<p id="m-message" role="status">Measurements are read-only. The motors stay off; push or tilt the car by hand.</p>
+<small id="m-state-help">Stop any test first. Starting a run with GP20 switches measurements off automatically.</small>
+</section>
+
+<div class="col">
+<section id="m-enc" class="board" aria-labelledby="m-enc-h">
+<header><h2 id="m-enc-h">Encoder counts per mm</h2><span class="meta">Push by hand · at least 5 runs</span></header>
+<p class="mlead">Mark START and END on a straight line, with the drive-axle line on each mark. Type the distance, put the car on START and press Zero &amp; start. Push slowly and straight to END, hold it still, then Latch. Carry it back and repeat.</p>
+<div class="ctl"><div class="field"><label for="m-dist">Marked distance (mm)</label><input id="m-dist" type="number" min="1" max="10000" step="1" value="1000"></div>
+<button class="primary mbtn" data-m="g">Zero &amp; start run</button><button class="mbtn" data-m="h">Latch run</button></div>
+<dl class="strip s4"><div><dt>Run</dt><dd id="m-dstate">—</dd></div><div><dt>Left counts</dt><dd id="m-dl">—</dd></div><div><dt>Right counts</dt><dd id="m-dr">—</dd></div><div><dt>Skipped L / R</dt><dd id="m-ds">—</dd></div></dl>
+<div class="tablewrap"><table class="mt" id="m-runs" aria-label="Distance runs"></table></div>
+<dl class="facts">
+<dt>Clean runs</dt><dd id="m-s-n">—</dd>
+<dt>Right wheel</dt><dd id="m-s-r" class="use">—</dd>
+<dt>Left wheel</dt><dd id="m-s-l">—</dd>
+<dt>Spread</dt><dd id="m-s-sp">—</dd>
+<dt>Left vs right</dt><dd id="m-s-d">—</dd>
+</dl>
+<small>Counts are forward-positive. A run is rejected if a wheel total is zero or negative, or if encoder transitions were skipped. The right-wheel value is the one the hump estimate needs.</small>
+</section>
+
+<section id="m-imu" class="board" aria-labelledby="m-imu-h">
+<header><h2 id="m-imu-h">IMU orientation &amp; level baseline</h2><span class="meta">Hold still for 1 second per pose</span></header>
+<p id="m-next">Waiting for the car.</p>
+<div class="ctl"><button class="primary mbtn" data-m="p">Capture pose</button><button class="mbtn" data-m="w">Restart sequence</button></div>
+<dl class="strip"><div><dt>Sensor</dt><dd id="m-i-s">—</dd></div><div><dt>Pitch</dt><dd id="m-i-p">—</dd></div><div><dt>Roll</dt><dd id="m-i-r">—</dd></div><div><dt>Tilt vs level</dt><dd id="m-i-t">—</dd></div><div><dt>Roll change</dt><dd id="m-i-c">—</dd></div></dl>
+<div class="tablewrap"><table class="mt" id="m-poses" aria-label="IMU poses"></table></div>
+<small>Front is the end that meets a hump first; left and right are seen from behind. Pose 1 must be on the flat floor with every wheel and the caster down. Poses 3 to 6 are whole-car tilts of about 5 to 10 degrees; only pose 7 uses the hump-height block.</small>
+</section>
+</div>
+
+<div class="col">
+<section id="m-model" class="board" aria-labelledby="m-model-h">
+<header><h2 id="m-model-h">Hump model · pose 7</h2><span class="meta">Right wheel only on the block</span></header>
+<p id="m-model-text" class="mlead">Appears after pose 7.</p>
+<dl class="facts">
+<dt>Expected roll / pitch</dt><dd id="m-e-exp">—</dd>
+<dt>Measured roll / tilt</dt><dd id="m-e-meas">—</dd>
+<dt>Caster end</dt><dd id="m-e-end">—</dd>
+<dt>Height from roll</dt><dd id="m-e-hr">—</dd>
+<dt>Height from pitch</dt><dd id="m-e-hp">—</dd>
+</dl>
+<small>Heights invert the rigid three-point model (track 110 mm, wheelbase 80 mm, caster on the centreline) and are only as good as those numbers and the level baseline.</small>
+</section>
+
+<section id="m-send" class="board" aria-labelledby="m-send-h">
+<header><h2 id="m-send-h">Results to send back</h2><button id="m-download">Download results</button></header>
+<pre id="m-summary" aria-label="Measurement summary">No results yet.</pre>
+<small>Results stay in this page and on the car until it loses power.</small>
+</section>
+</div>
+
 </main>
 </div>
 <script>
@@ -519,7 +597,7 @@ function sysOf(tag){
  return 'Motion';
 }
 function describe(tag,rest,kv){
- if(/^(OPTICAL DATA|SCAN EDGES|BARCODE DISCARD WIDTHS|RETAINED SNAPSHOT|PREVIOUS RUN|CURRENT RUN)/.test(tag))return null;
+ if(/^(OPTICAL DATA|SCAN EDGES|BARCODE DISCARD WIDTHS|RETAINED SNAPSHOT|PREVIOUS RUN|CURRENT RUN|MEAS RESULT|MEAS INFO)/.test(tag))return null;
  let sev='info',title=human(tag),sub=rest.length>140?rest.slice(0,140)+'…':rest,keys=null;
  const outcome=kv.outcome||kv.result;
  switch(tag){
@@ -686,4 +764,193 @@ updateMode();
 setPhase('IDLE','Choose a test and prepare it. The car starts only when GP20 is pressed.');
 flap(el('bc-letter'),'–');
 poll();
-</script></body></html>
+</script>
+<script id="measure-script">
+/* Measurements tab. Read-only: the car only counts encoder ticks and reads the accelerometer while it is idle.
+   It polls GET /measure while the tab is open and sends 'm' (activate / keep-alive) every 10 s; the car switches itself off after 30 s of silence. */
+(function(){'use strict';
+const NOMINAL_CPM=2543/(Math.PI*60),TRACK_MM=110,WHEELBASE_MM=80,RAD=Math.PI/180;
+const $=id=>document.getElementById(id);
+const fmt=(v,d)=>Number.isFinite(v)?v.toFixed(d):'—';
+let active=false,online=false,carIdle=false,busy=false,cmdBusy=false,boot='',events=new Map(),live=null,lastText='',pollTimer=0,keepTimer=0;
+function parseFields(text){const out={};const re=/([A-Za-z_]+)=(\S*)/g;let m;while((m=re.exec(text))!==null)out[m[1]]=m[2];return out;}
+function parseResult(line){
+ const m=/^\[MEAS RESULT\] seq=(\d+) ([A-Z_]+)(.*)$/.exec(line);if(!m)return null;
+ let rest=m[3],tail='';const t=/ (verdict|text)=(.*)$/.exec(rest);
+ if(t){tail=t[2];rest=rest.slice(0,t.index);}
+ return{seq:Number(m[1]),kind:m[2],f:parseFields(rest),tail:tail};
+}
+function ingestLine(line){
+ line=line.replace(/\r$/,'');
+ if(line.indexOf('[MEAS LIVE] ')===0){live=parseFields(line.slice(12));return true;}
+ const ev=parseResult(line);if(ev){events.set(ev.seq,ev);return true;}return false;
+}
+function ingestText(text){live=null;text.split('\n').forEach(ingestLine);}
+function analyseRun(e,dist){
+ const l=Number(e.f.left),r=Number(e.f.right),il=Number(e.f.inv_left),ir=Number(e.f.inv_right);
+ let status='Clean';
+ if(!(l>0)||!(r>0))status='Rejected: zero or negative wheel total';
+ else if(il>0||ir>0)status='Rejected: skipped encoder transitions';
+ const clean=status==='Clean';
+ const cl=l/dist,cr=r/dist;
+ const far=clean&&dist>0&&(cl<NOMINAL_CPM*0.85||cl>NOMINAL_CPM*1.15||cr<NOMINAL_CPM*0.85||cr>NOMINAL_CPM*1.15);
+ return{run:Number(e.f.run),l:l,r:r,il:il,ir:ir,status:status,clean:clean,cl:cl,cr:cr,far:far,diffPct:100*(l-r)/((l+r)/2)};
+}
+function summarise(rows){
+ const clean=rows.filter(r=>r.clean);if(!clean.length)return null;
+ const stat=key=>{const v=clean.map(r=>r[key]);const mean=v.reduce((a,b)=>a+b,0)/v.length;const min=Math.min.apply(null,v),max=Math.max.apply(null,v);return{mean:mean,min:min,max:max,spreadPct:100*(max-min)/mean};};
+ const l=stat('cl'),r=stat('cr');
+ return{n:clean.length,l:l,r:r,both:(l.mean+r.mean)/2,lrDiffPct:100*(l.mean-r.mean)/((l.mean+r.mean)/2)};
+}
+function derive(){
+ const evs=Array.from(events.values()).sort((a,b)=>a.seq-b.seq);
+ const runs=[];let poses={},rejects=0,lastReject=null,next=null,level=null;
+ evs.forEach(e=>{
+  if(e.kind==='DIST_RUN')runs.push(e);
+  else if(e.kind==='IMU_RESTART'){poses={};rejects=0;lastReject=null;level=null;}
+  else if(e.kind==='IMU_POSE')poses[e.f.pose]=e;
+  else if(e.kind==='IMU_REJECT'){rejects++;lastReject=e;}
+  else if(e.kind==='IMU_LEVEL')level=e;
+  else if(e.kind==='IMU_NEXT')next=e;
+ });
+ return{runs:runs,poses:poses,rejects:rejects,lastReject:lastReject,next:next,level:level};
+}
+function verdictClass(v){if(v.indexOf('PASS')===0)return'ok';if(v.indexOf('FAIL')===0)return'bad';if(v.indexOf('WARN')===0||v.indexOf('TOO SMALL')===0)return'warn';return'';}
+/* Invert the rigid three-point model: up-vector components are sin(pitch), sin(roll), sqrt(1-sin^2-sin^2). */
+function impliedHeights(roll,tilt){
+ const sr=Math.sin(Math.abs(roll)*RAD),sp=Math.sin(Math.abs(tilt)*RAD),d=1-sr*sr-sp*sp;
+ if(!(d>0))return null;const k=1/Math.sqrt(d);
+ return{fromRoll:TRACK_MM*sr*k,fromPitch:2*WHEELBASE_MM*sp*k};
+}
+function distanceText(rows,dist){
+ if(!(dist>0))return'Enter the marked distance (mm).';
+ if(!rows.length)return'No runs latched yet.';
+ const lines=['Marked distance '+fmt(dist,1)+' mm (nominal reference '+fmt(NOMINAL_CPM,3)+' counts/mm, not a measurement)'];
+ rows.forEach(r=>lines.push('run '+r.run+': left '+r.l+' right '+r.r+' counts | '+(r.clean?'left '+fmt(r.cl,4)+' right '+fmt(r.cr,4)+' counts/mm, L-R '+fmt(r.diffPct,2)+'%':r.status)+(r.far?' | CHECK: >15% from nominal':'')));
+ const s=summarise(rows);
+ if(!s){lines.push('No clean runs yet.');return lines.join('\n');}
+ lines.push('clean runs: '+s.n);
+ lines.push('MEAN left '+fmt(s.l.mean,4)+' ('+fmt(1/s.l.mean,5)+' mm/count)  right '+fmt(s.r.mean,4)+' ('+fmt(1/s.r.mean,5)+' mm/count)');
+ lines.push('SPREAD left '+fmt(s.l.min,4)+'..'+fmt(s.l.max,4)+' ('+fmt(s.l.spreadPct,2)+'% of mean)  right '+fmt(s.r.min,4)+'..'+fmt(s.r.max,4)+' ('+fmt(s.r.spreadPct,2)+'% of mean)');
+ lines.push('both-wheel mean '+fmt(s.both,4)+' counts/mm; left/right means differ by '+fmt(s.lrDiffPct,2)+'%');
+ lines.push('USE FOR THE HUMP (right wheel): '+fmt(s.r.mean,4)+' counts/mm = '+fmt(1/s.r.mean,5)+' mm/count');
+ if(s.n<5)lines.push('NOTE: fewer than 5 clean runs; repeatability not yet established.');
+ return lines.join('\n');
+}
+function poseText(e){const f=e.f;return'pose '+f.pose+': X='+f.x+' Y='+f.y+' Z='+f.z+' pitch='+f.pitch+' roll='+f.roll+' tilt_fw='+f.tilt+' roll_chg='+f.roll_chg+' axis='+f.axis+' | '+e.tail;}
+function modelText(e){
+ if(!e)return'Pose 7 model comparison appears after pose 7.';
+ const f=e.f,roll=Math.abs(Number(f.roll_chg)),tilt=Number(f.tilt),er=Number(f.exp_roll),ep=Number(f.exp_pitch),h=impliedHeights(roll,tilt);
+ return'Model for the hump (right wheel only): expected |roll| '+fmt(er,3)+' deg, |pitch| '+fmt(ep,3)+' deg.\n'
+  +'Measured: |roll| '+fmt(roll,3)+' (error '+fmt(roll-er,3)+'), |tilt| '+fmt(Math.abs(tilt),3)+' (error '+fmt(Math.abs(tilt)-ep,3)+'); tilt is '+(tilt<0?'NEGATIVE (front lowered: caster at the FRONT)':'POSITIVE (front raised: caster at the REAR)')+'.\n'
+  +(h?'Implied block height: '+fmt(h.fromRoll,2)+' mm from roll, '+fmt(h.fromPitch,2)+' mm from pitch (track '+TRACK_MM+' mm, wheelbase '+WHEELBASE_MM+' mm, caster centred).\n':'')+e.tail;
+}
+function imuText(d){
+ const lines=[];
+ for(let k=1;k<=7;k++)if(d.poses[k])lines.push(poseText(d.poses[k]));
+ if(d.level)lines.push('level: vertical axis '+d.level.f.vertical+' reads '+d.level.f.value+'; level pitch '+d.level.f.level_pitch+' roll '+d.level.f.level_roll+(d.level.f.warn!=='NONE'?' | WARN '+d.level.f.warn:''));
+ if(d.rejects)lines.push('rejected captures: '+d.rejects+(d.lastReject?' (last: '+d.lastReject.f.reason+')':''));
+ return lines.length?lines.join('\n'):'No IMU poses captured yet.';
+}
+function summaryText(){
+ const d=derive(),dist=Number($('m-dist').value);
+ return'=== ENCODER DISTANCE ===\n'+distanceText(d.runs.map(e=>analyseRun(e,dist)),dist)+'\n\n=== IMU ORIENTATION ===\n'+imuText(d)+'\n'+modelText(d.poses[7]);
+}
+function makeTable(id,head,rows){
+ const t=$(id);t.textContent='';
+ const thead=document.createElement('thead'),hr=document.createElement('tr');
+ head.forEach(h=>{const th=document.createElement('th');th.textContent=h;hr.appendChild(th);});thead.appendChild(hr);t.appendChild(thead);
+ const tb=document.createElement('tbody');
+ rows.forEach(r=>{const tr=document.createElement('tr');if(r.cls)tr.className=r.cls;r.cells.forEach(c=>{const td=document.createElement('td');td.textContent=c;tr.appendChild(td);});tb.appendChild(tr);});
+ t.appendChild(tb);
+}
+function setMessage(text){$('m-message').textContent=text;}
+function refreshButtons(){document.querySelectorAll('.mbtn').forEach(b=>{b.disabled=!active||!online||!carIdle||cmdBusy;});}
+function renderLive(){
+ const lv=live;
+ $('m-dstate').textContent=lv?(lv.dist==='COUNTING'?'Counting':'Idle'):'—';
+ $('m-dl').textContent=lv&&lv.dist==='COUNTING'?lv.left:'—';
+ $('m-dr').textContent=lv&&lv.dist==='COUNTING'?lv.right:'—';
+ $('m-ds').textContent=lv&&lv.dist==='COUNTING'?lv.inv_left+' / '+lv.inv_right:'—';
+ const ok=lv&&lv.imu==='OK';
+ $('m-i-s').textContent=!lv?'—':!ok?'Not responding':lv.capturing==='1'?'Capturing…':'Ready';
+ $('m-i-p').textContent=ok&&lv.pitch!=='-'?lv.pitch+'°':'—';
+ $('m-i-r').textContent=ok&&lv.roll!=='-'?lv.roll+'°':'—';
+ $('m-i-t').textContent=ok&&lv.tilt!=='-'?lv.tilt+'°':'—';
+ $('m-i-c').textContent=ok&&lv.roll_chg!=='-'?lv.roll_chg+'°':'—';
+}
+function render(){
+ const d=derive(),dist=Number($('m-dist').value),rows=d.runs.map(e=>analyseRun(e,dist));
+ makeTable('m-runs',['Run','Left','Right','Left c/mm','Right c/mm','L−R %','Status'],rows.map(r=>({cls:r.clean?(r.far?'warn':'ok'):'bad',cells:[String(r.run),String(r.l),String(r.r),dist>0?fmt(r.cl,4):'—',dist>0?fmt(r.cr,4):'—',fmt(r.diffPct,2),r.status+(r.far?' (check: >15% from nominal)':'')]})));
+ const s=summarise(rows);
+ $('m-s-n').textContent=s?String(s.n)+(s.n<5?' (need at least 5)':''):'—';
+ $('m-s-r').textContent=s?fmt(s.r.mean,4)+' counts/mm · '+fmt(1/s.r.mean,5)+' mm/count':'—';
+ $('m-s-l').textContent=s?fmt(s.l.mean,4)+' counts/mm · '+fmt(1/s.l.mean,5)+' mm/count':'—';
+ $('m-s-sp').textContent=s?'L '+fmt(s.l.spreadPct,2)+'% · R '+fmt(s.r.spreadPct,2)+'%':'—';
+ $('m-s-d').textContent=s?fmt(s.lrDiffPct,2)+'%':'—';
+ const prow=[];
+ for(let k=1;k<=7;k++){const e=d.poses[k];prow.push(e?{cls:verdictClass(e.tail),cells:[String(k),e.f.tilt,e.f.roll_chg,e.f.axis,e.tail]}:{cells:[String(k),'—','—','—','Not captured yet']});}
+ makeTable('m-poses',['Pose','Tilt (front +)','Roll change','Largest axis','Verdict'],prow);
+ $('m-next').textContent=d.next?'Next pose · '+d.next.tail:'Waiting for the car.';
+ const e7=d.poses[7];
+ $('m-model-text').textContent=e7?e7.tail:'Appears after pose 7.';
+ if(e7){
+  const f=e7.f,roll=Math.abs(Number(f.roll_chg)),tilt=Number(f.tilt),h=impliedHeights(roll,tilt);
+  $('m-e-exp').textContent=fmt(Number(f.exp_roll),2)+'° / '+fmt(Number(f.exp_pitch),2)+'°';
+  $('m-e-meas').textContent=fmt(roll,2)+'° / '+fmt(Math.abs(tilt),2)+'°';
+  $('m-e-end').textContent=tilt<0?'Front (front lowered)':'Rear (front raised)';
+  $('m-e-hr').textContent=h?fmt(h.fromRoll,2)+' mm':'—';
+  $('m-e-hp').textContent=h?fmt(h.fromPitch,2)+' mm':'—';
+ }else{['m-e-exp','m-e-meas','m-e-end','m-e-hr','m-e-hp'].forEach(i=>{$(i).textContent='—';});}
+ $('m-summary').textContent=summaryText();
+ renderLive();refreshButtons();
+}
+async function request(path,options){options=options||{};const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),3500);try{return await fetch(path,Object.assign({cache:'no-store',signal:ctl.signal},options));}finally{clearTimeout(timer);}}
+async function sendCommand(ch,quiet){
+ cmdBusy=true;refreshButtons();
+ try{const r=await request('/command/'+ch,{method:'POST',headers:{'X-Calibrate':'1'}});const reply=await r.text();
+  if(!r.ok)throw Error(reply);if(!quiet)setMessage('Sent. Watch the live readout.');return true;}
+ catch(e){if(!quiet)setMessage('Not accepted. The car may be busy or another request is waiting; try again.');return false;}
+ finally{cmdBusy=false;refreshButtons();}
+}
+async function poll(){
+ if(!active||busy)return;busy=true;
+ try{
+  const r=await request('/measure');if(!r.ok)throw Error('HTTP '+r.status);
+  const text=await r.text();const newBoot=r.headers.get('X-Boot');
+  if(boot&&newBoot&&newBoot!==boot){events=new Map();live=null;setMessage('The car restarted; earlier measurements were cleared.');sendCommand('m',true);}
+  if(newBoot)boot=newBoot;
+  carIdle=r.headers.get('X-Idle')==='1';online=true;lastText=text;ingestText(text);
+  if(!carIdle)setMessage('The car is running or settling. Measurements pause until it is stopped.');
+  render();
+ }catch(e){online=false;carIdle=false;setMessage('No answer from the car. Check this computer is on the car’s Wi-Fi.');refreshButtons();}
+ finally{busy=false;if(active)pollTimer=setTimeout(poll,700);}
+}
+function startMeasuring(){
+ if(active)return;active=true;setMessage('Connecting…');refreshButtons();
+ sendCommand('m',true).then(()=>{if(active)poll();});
+ keepTimer=setInterval(()=>{if(active&&carIdle)sendCommand('m',true);},10000);
+}
+function stopMeasuring(){
+ if(!active)return;active=false;clearTimeout(pollTimer);clearInterval(keepTimer);refreshButtons();
+ sendCommand('e',true);
+}
+function selectTab(name){
+ const measure=name==='measure';
+ $('test-tab').hidden=measure;$('measure-tab').hidden=!measure;
+ $('tab-test').setAttribute('aria-selected',measure?'false':'true');$('tab-measure').setAttribute('aria-selected',measure?'true':'false');
+ if(measure)startMeasuring();else{stopMeasuring();window.dispatchEvent(new Event('resize'));}
+}
+$('tab-test').onclick=()=>selectTab('test');
+$('tab-measure').onclick=()=>selectTab('measure');
+document.querySelectorAll('.mbtn').forEach(b=>{b.onclick=()=>sendCommand(b.dataset.m);});
+$('m-dist').oninput=render;
+$('m-download').onclick=()=>{
+ const metadata='AAI10 measurements (dashboard Measurements tab)\nSaved: '+new Date().toISOString()+'\nCar boot: '+boot+'\nPhysical observations supplied separately in chat.\n\n';
+ const blob=new Blob([metadata,summaryText(),'\n\nCAR RESULTS (raw):\n',lastText],{type:'text/plain'});
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='AAI10-measurements-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+render();
+})();
+</script>
+</body></html>

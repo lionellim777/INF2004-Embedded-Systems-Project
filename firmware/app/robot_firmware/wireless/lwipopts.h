@@ -13,7 +13,12 @@
 #define LWIP_ETHERNET 1
 #define LWIP_ICMP 1
 #define LWIP_RAW 0
+#ifdef ROBOCAR_WIFI_STATION
+/* Station builds join an existing network and need lwIP's DHCP client. */
+#define LWIP_DHCP 1
+#else
 #define LWIP_DHCP 0
+#endif
 /* We run a DHCP SERVER, not lwIP's DHCP client. Without this hook, lwIP's
  * IPv4 input rejects source 0.0.0.0 as a broadcast source before our UDP/67
  * handler sees a new client's DISCOVER/REQUEST. Argument is network order. */

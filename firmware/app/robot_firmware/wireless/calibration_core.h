@@ -9,6 +9,11 @@
  * Never call from an ISR. */
 #define CAL_LOG_CAPACITY 16384u
 #define CAL_LINE_CAPACITY 768u
+/* Retained measurement results (measurement dashboard / Measurements tab). */
+#define CAL_MEAS_CAPACITY 8192u
+#if defined(ROBOCAR_MEASUREMENT_DIAG) || defined(ROBOCAR_MEASUREMENTS)
+#define CAL_HAVE_MEAS 1
+#endif
 typedef struct {
     char log[CAL_LOG_CAPACITY];
     uint32_t written;
@@ -26,6 +31,11 @@ typedef struct {
     char waveform[CAL_LINE_CAPACITY];
     char trace[2][CAL_LINE_CAPACITY];
     char optical_result[256];
+#ifdef CAL_HAVE_MEAS
+    char meas[CAL_MEAS_CAPACITY];
+    size_t meas_length;
+    char live[320]; /* latest live readout; never enters the log */
+#endif
     char pending;
     course_config_t course;
     char course_result[CAL_LINE_CAPACITY];

@@ -71,7 +71,9 @@ int main(void)
     c.drive.left_progress=c.drive.right_progress=now-c.segment_us;
     o=step(false,false,100,100,10000);assert(!o.stop);
     reset('s',1);o=step(false,false,COURSE_LIMIT_COUNTS,0,1000);assert(o.stop&&!strcmp(o.state,"COURSE_TRAVEL_LIMIT"));
-    reset('s',1);encoder_sample_t e=enc();e.left_invalid=1;
+    reset('s',1);encoder_sample_t e=enc();e.left_invalid=MOTION_ENCODER_INVALID_TOLERANCE;
+    assert(!course_step(&c,(ir_roles_t){0},e,now).stop); /* isolated missed edges tolerated */
+    reset('s',1);e=enc();e.left_invalid=MOTION_ENCODER_INVALID_TOLERANCE+1u;
     assert(course_step(&c,(ir_roles_t){0},e,now).stop);
     reset('s',1);for(unsigned i=0;i<9;i++)assert(!step(false,false,0,0,100000).stop);
     assert(step(false,false,0,0,100000).stop); /* no forward encoder progress */

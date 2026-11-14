@@ -201,9 +201,9 @@ void calibration_wifi_set_waveform(const uint16_t *samples,unsigned count,const 
 {(void)id;(void)hash;exported_samples=count;if(count){assert(samples&&details&&strstr(details,"[WAVEFORM PROFILE]"));}}
 void encoders_init(void){}encoder_sample_t encoders_snapshot(void){
     if((scenario==42||scenario==43)&&avoidance.phase==AVOID_TURN_OUT&&motion_left_position(&avoidance.leg,(encoder_sample_t){(uint32_t)-(int32_t)left_count,(uint32_t)(int32_t)right_count,0,0})>400)injected_right_invalid=scenario==42?1:3;
-    return (encoder_sample_t){(uint32_t)-(int32_t)left_count,(uint32_t)(int32_t)right_count,scenario==5&&start_us&&clock_us-start_us>500000,injected_right_invalid};}
+    return (encoder_sample_t){(uint32_t)-(int32_t)left_count,(uint32_t)(int32_t)right_count,(scenario==5&&start_us&&clock_us-start_us>500000)?MOTION_ENCODER_INVALID_TOLERANCE+1u:0u,injected_right_invalid};}
 int32_t encoder_left_count(void){return -(int32_t)left_count;}int32_t encoder_right_count(void){return (int32_t)right_count;}
-bool terrain_init(void){return false;}bool terrain_calibrate(void){return false;}void terrain_poll(void){}terrain_status_t terrain_get_status(void){return (terrain_status_t){0};}
+bool terrain_init(void){return false;}bool terrain_calibrate(void){return false;}void terrain_poll(void){}void terrain_motion_go(void){}terrain_status_t terrain_get_status(void){return (terrain_status_t){0};}
 #if ROBOCAR_CENTER_LINE
 static void independent_phase_level(bool black,unsigned duration)
 {
