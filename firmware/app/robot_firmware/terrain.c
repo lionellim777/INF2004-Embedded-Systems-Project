@@ -1,5 +1,6 @@
 #include "terrain.h"
 #include "hump_roll.h"
+#include "tilt_alert.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -38,7 +39,16 @@ static uint sample_count;
 static float level_pitch;
 static float level_roll;
 static hump_roll_t roll_detector;
+static tilt_alert_t tilt_detector;
 static uint64_t last_roll_poll_ms;
+/* Roll trace for tuning: every detector input sample of a run, kept in RAM and printed after the
+ * stop. filtered = the 8-sample average the detector sees, raw = the single newest sample, both as
+ * roll change from the level calibration in 0.1 degree. */
+enum { ROLL_TRACE_SAMPLES = 600 }; /* about 16 s: covers the slow 50 cm move */
+static struct { uint16_t ms; int16_t filtered; int16_t raw; } roll_trace[ROLL_TRACE_SAMPLES];
+static unsigned roll_trace_count;
+static uint64_t roll_trace_start_ms;
+static bool roll_trace_started;
 static uint64_t next_sample_ms;
 static hump_phase_t phase;
 static uint64_t event_start_ms;
@@ -135,7 +145,10 @@ bool terrain_init(void)
 
 bool terrain_calibrate(void)
 {
-    if (!status.available) {
+    /* The sensor may have missed its one probe at boot (loose Grove lead, slow power-up): probe
+     * again here instead of staying silently unavailable until the next power cycle. */
+    if (!status.available && !terrain_init()) {
+        printf("[TERRAIN] Accelerometer NOT FOUND on GP4/GP5: hump detection is OFF. Check the Grove lead, then press GP21 again.\n");
         return false;
     }
     status.calibrated = false;
@@ -165,6 +178,10 @@ bool terrain_calibrate(void)
     level_pitch = pitch(&level);
     level_roll = roll_of(&level);
     hump_roll_reset(&roll_detector);
+    tilt_alert_reset(&tilt_detector);
+    status.tilt_alert_active = false;
+    status.tilt_alert_count = 0;
+    status.max_tilt_deg = 0.0f;
     last_roll_poll_ms = 0;
     status.roll_hump_count = 0;
     status.last_roll_hump_mm = 0.0f;
@@ -199,9 +216,111 @@ static void finish_hump(uint64_t now_ms)
            status.highest_peak_angle_deg);
 }
 
+static void report_tilt_event(tilt_alert_event_t tilt_event)
+{
+    if (tilt_event.result == TILT_ALERT_RAISED) {
+        status.tilt_alert_active = true;
+        ++status.tilt_alert_count;
+        printf("[TILT ALERT] count=%lu tilt=%.1f pitch=%.1f roll=%.1f threshold=%.0f hold_ms=%u.\n",
+               (unsigned long)status.tilt_alert_count, tilt_event.tilt_deg, tilt_event.pitch_deg, tilt_event.roll_deg,
+               (double)TILT_ALERT_ENTER_DEG, (unsigned)TILT_ALERT_ENTER_MS);
+    } else if (tilt_event.result == TILT_ALERT_CLEARED) {
+        status.tilt_alert_active = false;
+        printf("[TILT CLEARED] peak=%.1f pitch=%.1f roll=%.1f lasted_ms=%lu.\n",
+               tilt_event.tilt_deg, tilt_event.pitch_deg, tilt_event.roll_deg, (unsigned long)tilt_event.duration_ms);
+    }
+}
+
+static void report_roll_event(hump_roll_event_t roll_event)
+{
+    if (roll_event.result == HUMP_ROLL_COMPLETED) {
+        ++status.roll_hump_count;
+        status.last_roll_hump_mm = roll_event.height_mm;
+        if (roll_event.height_mm > status.highest_roll_hump_mm) {
+            status.highest_roll_hump_mm = roll_event.height_mm;
+        }
+        printf("[HUMP] n=%lu side=%s height_mm=%.1f peak_roll=%.1f mean_roll=%.1f duration_ms=%lu baseline=%.2f highest_mm=%.1f.\n",
+               (unsigned long)status.roll_hump_count, roll_event.sign < 0 ? "RIGHT" : "LEFT",
+               roll_event.height_mm, roll_event.peak_deg, roll_event.mean_deg, (unsigned long)roll_event.duration_ms,
+               roll_event.baseline_deg,
+               status.highest_roll_hump_mm);
+    } else if (roll_event.result == HUMP_ROLL_WRONG_SIDE) {
+        printf("[HUMP IGNORED] reason=LEFT_SIDE peak_roll=%.1f duration_ms=%lu.\n",
+               roll_event.peak_deg, (unsigned long)roll_event.duration_ms);
+    } else if (roll_event.result == HUMP_ROLL_TOO_SHORT) {
+        printf("[HUMP IGNORED] reason=TOO_SHORT peak_roll=%.1f duration_ms=%lu min_ms=%u.\n",
+               roll_event.peak_deg, (unsigned long)roll_event.duration_ms, (unsigned)HUMP_ROLL_MIN_MS);
+    } else if (roll_event.result == HUMP_ROLL_TIMED_OUT) {
+        printf("[HUMP IGNORED] reason=STILL_TILTED timeout_ms=%u.\n", (unsigned)HUMP_ROLL_TIMEOUT_MS);
+    }
+}
+
+void terrain_run_start(void)
+{
+    if (!status.calibrated) {
+        printf("[TERRAIN] WARNING: %s. Hump detection is OFF for this run; press GP21 with the car level and still.\n",
+               status.available ? "level calibration missing or lost" : "accelerometer not found");
+    }
+    hump_roll_begin_run(&roll_detector);
+    last_roll_poll_ms = 0;
+    roll_trace_count = 0;
+    roll_trace_started = false;
+    tilt_alert_reset(&tilt_detector);
+    /* The brief asks for the highest hump "during the run", and the dashboard labels these "this run":
+     * start every run from zero instead of carrying the totals over from earlier runs. */
+    status.tilt_alert_active = false;
+    status.tilt_alert_count = 0;
+    status.max_tilt_deg = 0.0f;
+    status.roll_hump_count = 0;
+    status.last_roll_hump_mm = 0.0f;
+    status.highest_roll_hump_mm = 0.0f;
+}
+
+static int16_t tenths(float degrees)
+{
+    const float scaled = degrees * 10.0f;
+    return (int16_t)(scaled > 3000.0f ? 3000.0f : (scaled < -3000.0f ? -3000.0f : scaled));
+}
+
+void terrain_run_end(void)
+{
+    if (status.calibrated && tilt_detector.active) {
+        printf("[TILT END] still_active=1 peak=%.1f pitch=%.1f roll=%.1f.\n",
+               tilt_detector.peak_deg, tilt_detector.peak_pitch_deg, tilt_detector.peak_roll_deg);
+    }
+    if (status.calibrated) {
+        report_roll_event(hump_roll_finish(&roll_detector, (uint32_t)to_ms_since_boot(get_absolute_time())));
+    }
+}
+
+void terrain_print_roll_trace(void)
+{
+    if (roll_trace_count == 0u) {
+        return;
+    }
+    printf("[ROLL TRACE] samples=%u unit=0.1deg format=ms_since_go:filtered/raw baseline=%.2f deg; "
+           "right wheel raised is negative.\n", roll_trace_count, roll_detector.baseline_deg);
+    for (unsigned i = 0; i < roll_trace_count; ++i) {
+        if (i % 25u == 0u) {
+            printf("%s[ROLL TRACE %u]", i ? "\n" : "", i / 25u);
+        }
+        printf(" %u:%d/%d", roll_trace[i].ms, roll_trace[i].filtered, roll_trace[i].raw);
+    }
+    printf("\n");
+    roll_trace_count = 0;
+    roll_trace_started = false;
+}
+
 void terrain_motion_go(void)
 {
-    hump_roll_motion_go(&roll_detector, (uint32_t)to_ms_since_boot(get_absolute_time()));
+    const uint64_t now_ms = to_ms_since_boot(get_absolute_time());
+    hump_roll_motion_go(&roll_detector, (uint32_t)now_ms);
+    /* The trace covers the first GO of a run only; later calls (course turns) do not restart it. */
+    if (!roll_trace_started) {
+        roll_trace_started = true;
+        roll_trace_start_ms = now_ms;
+        roll_trace_count = 0;
+    }
 }
 
 void terrain_poll(void)
@@ -248,36 +367,33 @@ void terrain_poll(void)
     status.pitch_valid = true;
     ++status.pitch_sequence;
     /* Roll detector: right wheel raised reads negative. Independent of the pitch detector below. */
-    /* terrain_poll() only runs during a run, so a long gap means a new run: re-converge the baseline. */
+    /* terrain_run_start() is the normal run-start hook. This gap check is only a fallback for a
+     * caller that polls without it: terrain_poll() only runs during a run, so a long gap means a new run. */
     if (last_roll_poll_ms != 0u && now_ms - last_roll_poll_ms > 1000u) {
         hump_roll_begin_run(&roll_detector);
     }
     last_roll_poll_ms = now_ms;
     const float roll_change = roll_of(&average) - level_roll;
     status.current_roll_change_deg = roll_change;
-    const hump_roll_event_t roll_event = hump_roll_update(&roll_detector, roll_change, (uint32_t)now_ms);
-    if (roll_event.result == HUMP_ROLL_COMPLETED) {
-        ++status.roll_hump_count;
-        status.last_roll_hump_mm = roll_event.height_mm;
-        if (roll_event.height_mm > status.highest_roll_hump_mm) {
-            status.highest_roll_hump_mm = roll_event.height_mm;
+    if (roll_trace_started && roll_trace_count < ROLL_TRACE_SAMPLES) {
+        roll_trace[roll_trace_count].ms = (uint16_t)(now_ms - roll_trace_start_ms);
+        roll_trace[roll_trace_count].filtered = tenths(roll_change);
+        roll_trace[roll_trace_count].raw = tenths(roll_of(&reading) - level_roll);
+        ++roll_trace_count;
+    }
+    report_roll_event(hump_roll_update(&roll_detector, roll_change, (uint32_t)now_ms));
+    /* Tilt alert: skip the launch/turn hold-off, when acceleration reads as tilt. The roll detector
+     * clears its hold-off flag lazily inside the update call above, so it is current here. */
+    if (!roll_detector.holdoff_active) {
+        const float tilt_now = tilt_alert_magnitude(tilt, roll_change);
+        if (tilt_now > status.max_tilt_deg) {
+            status.max_tilt_deg = tilt_now;
         }
-        printf("ROLL HUMP %lu COMPLETE: side=%s peak_roll=%.1f deg mean_roll=%.1f deg height_est=%.1f mm duration=%lu ms baseline=%.2f deg; highest=%.1f mm\n",
-               (unsigned long)status.roll_hump_count, roll_event.sign < 0 ? "RIGHT" : "LEFT",
-               roll_event.peak_deg, roll_event.mean_deg, roll_event.height_mm, (unsigned long)roll_event.duration_ms,
-               roll_event.baseline_deg,
-               status.highest_roll_hump_mm);
-    } else if (roll_event.result == HUMP_ROLL_WRONG_SIDE) {
-        printf("ROLL LEFT ignored: peak_roll=%.1f deg duration=%lu ms (hump is under the right wheel only).\n",
-               roll_event.peak_deg, (unsigned long)roll_event.duration_ms);
-    } else if (roll_event.result == HUMP_ROLL_TOO_SHORT) {
-        printf("ROLL BUMP ignored: peak_roll=%.1f deg duration=%lu ms (a hump lasts at least %u ms).\n",
-               roll_event.peak_deg, (unsigned long)roll_event.duration_ms, (unsigned)HUMP_ROLL_MIN_MS);
-    } else if (roll_event.result == HUMP_ROLL_TIMED_OUT) {
-        printf("ROLL HUMP cancelled: still tilted after %u ms (car stopped on it?).\n", (unsigned)HUMP_ROLL_TIMEOUT_MS);
+        report_tilt_event(tilt_alert_update(&tilt_detector, tilt, roll_change, (uint32_t)now_ms));
     }
     const float threshold = 5.0f;
     const bool level = fabsf(tilt) < 2.0f;
+
 
     if (phase == HUMP_WAITING) {
         if (tilt > threshold) {

@@ -34,9 +34,12 @@
 #define HUMP_ROLL_BASELINE_FAST 0.06f  /* per 20 ms sample: 0.33 s time constant */
 #define HUMP_ROLL_BASELINE_SLOW 0.002f /* per 20 ms sample: 10 s time constant */
 #define HUMP_ROLL_FAST_SAMPLES 100u    /* 2 s at the start of every run */
-/* A real moving hump read about 26% high against the paper-stack table (14 runs, 2026-11-14:
- * mean 12.6 mm, with the hump fixed down 12.7 mm, true 10 mm), so the logged height is scaled. */
-#define HUMP_ROLL_HEIGHT_SCALE 0.80f
+/* A real moving hump reads high against the paper-stack table, and by more the faster the car
+ * crosses it. At 2800-3000 cps (the 'k' move) it read about 26% high (14 runs, 2026-11-14: mean
+ * 12.6 mm, true 10 mm), which is where 0.80 came from. At the 600 cps course cruise speed (the 'j'
+ * move, 5 runs, 2026-11-17, logged with 0.80: 9.3 8.2 9.1 8.8 8.7 mm, so about 11.0 mm unscaled) it
+ * reads only about 10% high. The course runs at the slow speed, so the scale is set from those runs. */
+#define HUMP_ROLL_HEIGHT_SCALE 0.91f
 #define HUMP_ROLL_LAUNCH_HOLDOFF_MS 600u /* ignore roll after GO: launch acceleration reads as roll */
 
 typedef enum {
@@ -256,6 +259,22 @@ static inline hump_roll_event_t hump_roll_update(hump_roll_t *h, float calibrate
         }
         break;
     }
+    return event;
+}
+
+/* Call when sampling stops (the run has ended and settled). An event still ACTIVE would otherwise
+ * be dropped silently: in the 50 cm hump test the car stops about 56 mm after the hump, and the
+ * stop rocks it for up to 0.4 s, so the event can still be open when polling ends. Close it at
+ * the last time the roll fell below EXIT, or now if it never did. A CANDIDATE is discarded. */
+static inline hump_roll_event_t hump_roll_finish(hump_roll_t *h, uint32_t now_ms)
+{
+    hump_roll_event_t event = {HUMP_ROLL_NO_EVENT, 0, 0.0f, 0.0f, 0.0f, 0u, 0.0f};
+    if (h->phase == HUMP_ROLL_ACTIVE) {
+        const uint32_t end_ms = h->below ? h->below_ms : now_ms;
+        hump_roll_fill(&event, hump_roll_classify(h, end_ms - h->start_ms), h, end_ms);
+    }
+    h->phase = HUMP_ROLL_WAITING;
+    h->below = false;
     return event;
 }
 #endif
