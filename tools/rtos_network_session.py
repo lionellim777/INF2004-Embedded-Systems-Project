@@ -46,13 +46,17 @@ class Telemetry:
         self.last_valid_motion_at=None
         self.last_source_ms=None
         self.recovery_pending=False
+        self.outage_started_at=None
+        self.last_hump_index=None
         self.started_at=time.monotonic()
         self.waiting_reported=False
         self.motion_silent=False
         self.last_health_at=None
 
     def interruption(self,reason):
-        with self.lock:self.recovery_pending=True
+        with self.lock:
+            self.recovery_pending=True
+            if self.outage_started_at is None:self.outage_started_at=time.monotonic()
         self.event('telemetry_interruption',reason=reason)
 
     def event(self, event_type, **values):
@@ -95,7 +99,7 @@ class Telemetry:
             self.event('rejected',topic=topic,error=str(error),payload_hex=payload.hex())
             return
         self.event('packet',topic=topic,payload_hex=payload.hex(),retained=bool(retained),**value)
-        message=None;delay=None;controller_message=None;scan_messages=[]
+        message=None;delay=None;controller_message=None;scan_messages=[];recovered=None
         with self.lock:
             self.summary['packets']+=1
             if value['type']=='motion':
@@ -110,6 +114,10 @@ class Telemetry:
                     elif self.recovery_pending:
                         self.summary['reconnections_confirmed']+=1
                         message='MQTT: motion telemetry resumed after the interruption.'
+                        if self.outage_started_at is not None:
+                            recovered=round(now-self.outage_started_at,6);self.outage_started_at=None
+                            self.summary.setdefault('recovery_seconds',[]).append(recovered)
+                            self.summary['max_recovery_seconds']=max(self.summary['recovery_seconds'])
                     elif self.last_valid_motion_at is not None and now-self.last_valid_motion_at>1:
                         gap=now-self.last_valid_motion_at
                         self.summary['motion_delay_events']+=1
@@ -149,10 +157,22 @@ class Telemetry:
                 self.summary['last_barcode']=value
             elif value['type']=='link' and value['state']=='offline':
                 self.recovery_pending=True
+                if self.outage_started_at is None:self.outage_started_at=time.monotonic()
+            elif value['type']=='hump_event':
+                # QoS1 may deliver an event twice; a forward jump means events were lost.
+                index=value['index'];last=self.last_hump_index
+                step=1 if last is None else (index-last)&255
+                if step==0 or step>=128:self.summary['hump_replays']=self.summary.get('hump_replays',0)+1
+                else:
+                    self.summary['hump_events_received']=self.summary.get('hump_events_received',0)+1
+                    self.summary.setdefault('hump_missing',[]).extend((last+k)&255 for k in range(1,step))
+                    self.last_hump_index=index
+                self.summary['hump_dropped_reported']=max(self.summary.get('hump_dropped_reported',0),value['dropped'])
             elif value['type']=='command_result' and value['accepted'] and value['command']==3:
                 self.summary['mqtt_stop_acks']+=1
                 message='MQTT: Pico acknowledged STOP. Check USB reports aborted/stop latched.'
         if delay is not None:self.event('motion_delivery_delay',**delay)
+        if recovered is not None:self.event('telemetry_recovered',seconds=recovered)
         if message: print(message,flush=True)
         if controller_message:print(controller_message,flush=True)
         for text in scan_messages:print(text,flush=True)

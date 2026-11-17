@@ -63,8 +63,17 @@ static volatile int8_t wifi_pm_result=INT8_MIN; /* not attempted, then SDK resul
 static uint32_t state_ms, status_ms, motion_ms, online_ms, boot_id;
 static uint8_t barcode_latest[BARCODE_RECORD_BYTES],line_latest[LINE_RECORD_BYTES], result;
 #ifdef RTOS_TERRAIN
+#include "terrain_telemetry.h"
 static uint8_t terrain_latest[TERRAIN_RECORD_BYTES];
 static const char terrain_topic[]=RTOS_TOPIC_PREFIX "terrain";
+static const char hump_topic[]=RTOS_TOPIC_PREFIX "hump_event";
+static hump_queue_t humps; /* producer task pushes, network task pops; IRQ lock */
+static bool hump_pending;
+static uint8_t hump_flight_index;
+#endif
+#ifdef RTOS_OBSTACLE
+static uint8_t obstacle_latest[OBSTACLE_RECORD_BYTES];
+static const char obstacle_topic[]=RTOS_TOPIC_PREFIX "obstacle";
 #endif
 static binary_command_frame_t command_frame;
 static struct mqtt_connect_client_info_t info;
@@ -126,6 +135,49 @@ static void read_terrain(uint8_t b[TERRAIN_RECORD_BYTES])
     uint32_t irq=save_and_disable_interrupts();memcpy(b,terrain_latest,TERRAIN_RECORD_BYTES);
     restore_interrupts(irq);
 }
+bool network_hump_event(uint32_t ms,uint8_t index,uint16_t height_dmm)
+{
+    uint32_t irq=save_and_disable_interrupts();
+    bool queued=hump_queue_push(&humps,ms,index,height_dmm);
+    restore_interrupts(irq);return queued;
+}
+static void hump_ack(void *context,err_t error)
+{
+    (void)context;
+    uint8_t head[HUMP_EVENT_BYTES];
+    uint32_t irq=save_and_disable_interrupts();
+    /* Overflow during flight may have replaced the head; pop only the event
+     * the broker actually acknowledged, otherwise send the new head. */
+    if(hump_pending && error==ERR_OK && hump_queue_peek(&humps,head) && head[4]==hump_flight_index)
+        hump_queue_pop(&humps);
+    restore_interrupts(irq);
+    hump_pending=false;
+}
+static void hump_export(void)
+{
+    if(hump_pending)return;
+    uint8_t b[HUMP_EVENT_BYTES];
+    uint32_t irq=save_and_disable_interrupts();
+    bool any=hump_queue_peek(&humps,b);
+    restore_interrupts(irq);
+    if(!any)return;
+    hump_flight_index=b[4];hump_pending=true;
+    if(mqtt_publish(client,hump_topic,b,sizeof b,1,0,hump_ack,NULL)!=ERR_OK)hump_pending=false;
+}
+#endif
+#ifdef RTOS_OBSTACLE
+bool network_obstacle(const obstacle_reading_t *reading)
+{
+    uint8_t b[OBSTACLE_RECORD_BYTES];
+    if(!obstacle_record_encode(reading,b))return false;
+    uint32_t irq=save_and_disable_interrupts();memcpy(obstacle_latest,b,sizeof b);
+    restore_interrupts(irq);return true;
+}
+static void read_obstacle(uint8_t b[OBSTACLE_RECORD_BYTES])
+{
+    uint32_t irq=save_and_disable_interrupts();memcpy(b,obstacle_latest,OBSTACLE_RECORD_BYTES);
+    restore_interrupts(irq);
+}
 #endif
 static void fail(uint32_t now,uint8_t code)
 {
@@ -136,6 +188,9 @@ static void fail(uint32_t now,uint8_t code)
     state(NETWORK_RETRYING,now);
 #ifdef RTOS_TRACK
     scan_pending=false;scan_index=0;
+#endif
+#ifdef RTOS_TERRAIN
+    hump_pending=false;
 #endif
 }
 static void connection(mqtt_client_t *c,void *context,mqtt_connection_status_t result_code)
@@ -265,6 +320,10 @@ static void step(uint32_t now)
             uint8_t terrain[TERRAIN_RECORD_BYTES];read_terrain(terrain);
             if(terrain[4]&1u)available|=8u;
 #endif
+#ifdef RTOS_OBSTACLE
+            uint8_t obstacle[OBSTACLE_RECORD_BYTES];read_obstacle(obstacle);
+            if(obstacle[4]&1u)available|=16u;
+#endif
             uint8_t simulated=(barcode[4]&64u)?2u:0u;
             (void)status_record_encode(now,boot_id,available,simulated,NETWORK_ONLINE,status_bytes);
             uint8_t online_code=2;
@@ -290,12 +349,19 @@ static void step(uint32_t now)
             uint8_t terrain[TERRAIN_RECORD_BYTES];read_terrain(terrain);
             (void)publish(terrain_topic,terrain,sizeof terrain,0);
 #endif
+#ifdef RTOS_OBSTACLE
+            uint8_t obstacle[OBSTACLE_RECORD_BYTES];read_obstacle(obstacle);
+            if(obstacle[4]&1u)(void)publish(obstacle_topic,obstacle,sizeof obstacle,0);
+#endif
         }
 #ifdef RTOS_RUNTIME_EVIDENCE
         runtime_publish(now);
 #endif
 #ifdef RTOS_TRACK
         scan_export();
+#endif
+#ifdef RTOS_TERRAIN
+        hump_export();
 #endif
     } else if (current==NETWORK_RETRYING) {
         unsigned shift=(flags&RETRY_MASK)>>RETRY_SHIFT;

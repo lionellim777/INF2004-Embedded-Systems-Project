@@ -5,8 +5,20 @@
 #ifdef RTOS_OBSTACLE
 #include "obstacle_bypass.h"
 #include "obstacle_io.h"
+#include "binary_protocol.h"
 /* The Motion task alone reads and writes the controller. */
 static obstacle_bypass_t obstacle;
+static obstacle_range_t last_echo; /* last fresh range, for telemetry only */
+static uint8_t count8(unsigned n){return n>255u?255u:(uint8_t)n;}
+static void report_obstacle(bool active,uint64_t now)
+{
+    bool ranged=active && last_echo.valid && last_echo.cm>=0.0f && last_echo.cm<409.5f;
+    obstacle_reading_t r={.ms=(uint32_t)(now/1000u),.active=active,.phase=(uint8_t)obstacle.phase,
+        .servo_deg=(uint8_t)obstacle.servo_angle,.range_valid=ranged,
+        .range_mm=ranged?(uint16_t)(last_echo.cm*10.0f+0.5f):0u,
+        .detected=count8(obstacle.detected),.completed=count8(obstacle.completed)};
+    (void)network_obstacle(&r);
+}
 #endif
 
 static int32_t level(uint16_t raw,int white,int black)
@@ -52,6 +64,7 @@ bool track_runtime_begin_obstacle(track_runtime_t *t,uint16_t token,encoder_samp
 {
     if(!track_runtime_begin(t,token,enc,now))return false;
     obstacle_bypass_begin(&obstacle,enc,now,t->course.center_reference);
+    last_echo=(obstacle_range_t){0};
     obstacle_io_begin();
     t->obstacle_enabled=true;
     return true;
@@ -82,6 +95,8 @@ line_check_output_t track_runtime_step(track_runtime_t *t,encoder_sample_t enc,u
         line_check_output_t out=obstacle_bypass_guarded_step(&obstacle,ir_roles(levels),levels[1],
             enc,now,range.fresh,range.valid,range.cm,range.error,range.no_return);
         obstacle_io_angle(obstacle.servo_angle);
+        if(range.fresh)last_echo=range;
+        report_obstacle(true,now);
         track_recoveries(obstacle.line.recoveries);
         t->status=out.state;
         return out;
@@ -96,6 +111,7 @@ void track_runtime_end(void)
 {
 #ifdef RTOS_OBSTACLE
     obstacle_io_end();
+    report_obstacle(false,0);
 #endif
     track_stop();
 }

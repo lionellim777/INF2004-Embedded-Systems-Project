@@ -26,6 +26,22 @@ typedef struct terrain_reading {
     bool valid, calibrated;
 } terrain_reading_t;
 bool terrain_record_encode(const terrain_reading_t *reading, uint8_t out[TERRAIN_RECORD_BYTES]);
+/* Hump event: completion time32, then LSB-first hump number8, height9
+ * (0.1 mm, 0..511), events dropped so far8 (saturating), padding7. */
+#define HUMP_EVENT_BYTES 8u
+bool hump_event_record_encode(uint32_t ms, uint8_t index, uint16_t height_dmm,
+                              uint8_t dropped, uint8_t out[HUMP_EVENT_BYTES]);
+/* Obstacle: time32, then LSB-first active1, bypass phase5, servo angle7 (deg),
+ * range valid1, range12 (mm), episodes detected8 and completed8, padding6.
+ * Inactive records zero every field after time; invalid range zeroes range. */
+#define OBSTACLE_RECORD_BYTES 10u
+typedef struct obstacle_reading {
+    uint32_t ms;
+    uint16_t range_mm;
+    uint8_t phase, servo_deg, detected, completed;
+    bool active, range_valid;
+} obstacle_reading_t;
+bool obstacle_record_encode(const obstacle_reading_t *reading, uint8_t out[OBSTACLE_RECORD_BYTES]);
 bool barcode_record_encode(uint32_t ms, char letter, bool valid, bool simulated,
                            uint8_t out[BARCODE_RECORD_BYTES]);
 bool barcode_record_valid(const uint8_t *bytes, size_t size);

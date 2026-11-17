@@ -76,7 +76,7 @@ def broker_config(settings, folder):
                 # amqtt0.11.3 Config calls the subscribe ACL 'acl'.
                 "amqtt.plugins.topic_checking.TopicAccessControlListPlugin": {
                     "acl": {robot: [prefix+"command/#"], operator: [prefix+"+"]},
-                    "publish_acl": {robot: [prefix+name for name in ("motion","line","terrain","barcode","status","link","command_result","scan_diag","runtime_diag")],
+                    "publish_acl": {robot: [prefix+name for name in ("motion","line","terrain","hump_event","obstacle","barcode","status","link","command_result","scan_diag","runtime_diag")],
                                     operator: [prefix+"command/#"]}}}}
 
 

@@ -11,6 +11,15 @@ import time
 from decode_motion_record import decode as decode_motion
 
 
+# avoid_phase_t order in firmware/app/robot_firmware/obstacle_bypass.h.
+OBSTACLE_PHASES=("AVOID_FOLLOW","AVOID_WAIT","AVOID_TURN_OUT","AVOID_SCAN_OUT","AVOID_MOVE_OUT",
+    "AVOID_TURN_FORWARD","AVOID_SCAN_FORWARD","AVOID_MOVE_ALONG","AVOID_TURN_LOOK","AVOID_SCAN_SIDE",
+    "AVOID_TURN_ALONG","AVOID_RETURN_LINE","AVOID_VERIFY","AVOID_CHECK_TAPE","AVOID_TAPE_PROBE",
+    "AVOID_AXLE_ADVANCE","AVOID_ALIGN_TURN","AVOID_ALIGN_CONFIRM","AVOID_SCAN_INITIAL","AVOID_CHECK_LEFT",
+    "AVOID_CLEAR_TAIL","AVOID_TURN_RETURN","AVOID_SCAN_RETURN","AVOID_TURN_CLEARANCE","AVOID_TURN_TO_LINE",
+    "AVOID_FAILED")
+
+
 def decode(topic, payload):
     if "/v1/" not in topic:
         raise ValueError("Unknown schema version")
@@ -40,6 +49,24 @@ def decode(topic, payload):
         if not valid and (roll or humps or last or highest):raise ValueError('Invalid terrain record has numeric values')
         return dict(type=kind,captured_ms=int.from_bytes(payload[:4],'little'),valid=valid,calibrated=calibrated,
                     roll_decideg=roll,humps=humps,last_height_dmm=last,highest_height_dmm=highest)
+    if kind=='hump_event':
+        if len(payload)!=8:raise ValueError('Invalid hump event length')
+        fields=int.from_bytes(payload[4:],'little')
+        if fields>>25:raise ValueError('Invalid hump event padding')
+        return dict(type=kind,completed_ms=int.from_bytes(payload[:4],'little'),index=fields&255,
+                    height_dmm=(fields>>8)&511,dropped=(fields>>17)&255)
+    if kind=='obstacle':
+        if len(payload)!=10:raise ValueError('Invalid obstacle record length')
+        fields=int.from_bytes(payload[4:],'little')
+        if fields>>42:raise ValueError('Invalid obstacle padding')
+        active,phase,servo=bool(fields&1),(fields>>1)&31,(fields>>6)&127
+        range_valid,range_mm=bool(fields&(1<<13)),(fields>>14)&4095
+        if not active and fields:raise ValueError('Inactive obstacle record has values')
+        if not range_valid and range_mm:raise ValueError('Invalid obstacle range has a value')
+        if phase>=len(OBSTACLE_PHASES):raise ValueError('Unknown obstacle phase')
+        return dict(type=kind,captured_ms=int.from_bytes(payload[:4],'little'),active=active,phase=phase,
+                    phase_name=OBSTACLE_PHASES[phase],servo_deg=servo,range_valid=range_valid,range_mm=range_mm,
+                    detected=(fields>>26)&255,completed=(fields>>34)&255)
     if kind == "barcode":
         if len(payload) != 5 or payload[4] & 128:
             raise ValueError("Invalid barcode length/padding")

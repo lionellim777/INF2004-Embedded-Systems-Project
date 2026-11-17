@@ -35,6 +35,25 @@ bool terrain_record_encode(const terrain_reading_t *r,uint8_t out[TERRAIN_RECORD
     for(unsigned i=0;i<5;i++)b[4+i]=(uint8_t)(fields>>(8u*i));
     memcpy(out,b,sizeof b);return true;
 }
+bool hump_event_record_encode(uint32_t ms,uint8_t index,uint16_t height_dmm,uint8_t dropped,uint8_t out[HUMP_EVENT_BYTES])
+{
+    if(out==NULL || height_dmm>511)return false;
+    uint32_t fields=(uint32_t)index | ((uint32_t)height_dmm<<8u) | ((uint32_t)dropped<<17u);
+    put32(out,ms);put32(out+4,fields);return true;
+}
+bool obstacle_record_encode(const obstacle_reading_t *r,uint8_t out[OBSTACLE_RECORD_BYTES])
+{
+    if(out==NULL || r==NULL || r->phase>31 || r->servo_deg>127 || r->range_mm>4095)return false;
+    uint8_t b[10]={0};put32(b,r->ms);
+    uint64_t fields=0;
+    if(r->active){
+        fields=1u | (uint64_t)r->phase<<1u | (uint64_t)r->servo_deg<<6u |
+            (uint64_t)r->detected<<26u | (uint64_t)r->completed<<34u;
+        if(r->range_valid)fields|=UINT64_C(1)<<13u | (uint64_t)r->range_mm<<14u;
+    }
+    for(unsigned i=0;i<6;i++)b[4+i]=(uint8_t)(fields>>(8u*i));
+    memcpy(out,b,sizeof b);return true;
+}
 bool barcode_record_encode(uint32_t ms, char letter, bool valid, bool simulated, uint8_t out[BARCODE_RECORD_BYTES])
 {
     if (out==NULL || (!valid && (letter!=0 || simulated))) return false;

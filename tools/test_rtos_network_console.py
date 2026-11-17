@@ -19,7 +19,7 @@ def delays_and_command_input():
     with tempfile.TemporaryDirectory(prefix='rtos-delays-') as name:
         folder=Path(name);t=Telemetry(folder/'mqtt.jsonl');output=io.StringIO()
         payload=bytes.fromhex('00000000000000000000000001')
-        with patch('rtos_network_session.time.monotonic',side_effect=[10,12,14,15]),contextlib.redirect_stdout(output):
+        with patch('rtos_network_session.time.monotonic',side_effect=[10,12,14,14.5,15]),contextlib.redirect_stdout(output):
             t.packet(PREFIX+'motion',payload)
             t.packet(PREFIX+'motion',payload)
             t.packet(PREFIX+'motion',payload)
@@ -112,6 +112,34 @@ def telemetry_health():
     print('PASS telemetry health: waiting, periodic live data, one silence warning/recovery, no false reconnect claim or motor command')
 
 
+def hump(index,dropped=0,ms=0):
+    return ms.to_bytes(4,'little')+(index|(50<<8)|(dropped<<17)).to_bytes(4,'little')
+
+
+def outage_evidence():
+    with tempfile.TemporaryDirectory(prefix='rtos-outage-') as name:
+        folder=Path(name);t=Telemetry(folder/'mqtt.jsonl')
+        motion=bytes.fromhex('00000000000000000000000001')
+        with contextlib.redirect_stdout(io.StringIO()):
+            with patch('rtos_network_session.time.monotonic',return_value=10):t.packet(PREFIX+'motion',motion)
+            with patch('rtos_network_session.time.monotonic',return_value=20):t.interruption('broker test')
+            with patch('rtos_network_session.time.monotonic',return_value=23.5):t.packet(PREFIX+'motion',motion)
+            with patch('rtos_network_session.time.monotonic',return_value=30):t.packet(PREFIX+'link',bytes([1]))
+            with patch('rtos_network_session.time.monotonic',return_value=31):t.interruption('second restart')
+            with patch('rtos_network_session.time.monotonic',return_value=36):t.packet(PREFIX+'motion',motion)
+            for packet in [hump(1),hump(2),hump(2),hump(5,dropped=2)]:
+                t.packet(PREFIX+'hump_event',packet)
+        s=t.summary
+        assert s['recovery_seconds']==[3.5,6],s.get('recovery_seconds') # outage starts at the first sign
+        assert s['max_recovery_seconds']==6
+        assert s['hump_events_received']==3 and s['hump_replays']==1 # QoS1 may deliver twice
+        assert s['hump_missing']==[3,4] and s['hump_dropped_reported']==2
+        t.save(folder/'summary.json')
+        events=[json.loads(l) for l in (folder/'mqtt.jsonl').read_text().splitlines()]
+        assert [e['seconds'] for e in events if e['event']=='telemetry_recovered']==[3.5,6]
+    print('PASS outage evidence: recovery time per interruption, hump replays, gaps and firmware-reported drops')
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix='rtos-console-') as name:
         folder=Path(name)
@@ -180,6 +208,7 @@ def main():
     reuse_address_guard()
     delays_and_command_input()
     telemetry_health()
+    outage_evidence()
 
 
 if __name__=='__main__':main()

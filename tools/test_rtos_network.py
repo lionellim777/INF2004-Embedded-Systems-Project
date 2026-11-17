@@ -2,13 +2,14 @@
 """Production MQTT service under SDK mocks, independent decoder, local broker E2E."""
 import asyncio
 import json
+import re
 from pathlib import Path
 import shutil
 import socket
 import subprocess
 import tempfile
 
-from rtos_mqtt_observer import decode
+from rtos_mqtt_observer import OBSTACLE_PHASES,decode
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "firmware/app/mission_rtos"
@@ -93,8 +94,40 @@ def check_terrain_decoder():
     print("PASS terrain decoder: hand-packed fixture, invalid zeroing, length/padding/value rejection")
 
 
+def check_hump_decoder():
+    topic="inf2004/aai10/robot1/v1/hump_event"
+    # Same hand-packed fixture as network_test.c hump_events().
+    assert decode(topic,bytes.fromhex("0d0c0b0a037e0400"))==dict(
+        type="hump_event",completed_ms=0x0A0B0C0D,index=3,height_dmm=126,dropped=2)
+    for bad in ["0d0c0b0a037e04","0d0c0b0a037e040000","0d0c0b0a037e0402"]:
+        try: decode(topic,bytes.fromhex(bad))
+        except ValueError: pass
+        else: raise AssertionError(f"Malformed hump event accepted: {bad}")
+    print("PASS hump event decoder: hand-packed fixture, length/padding rejection")
+
+
+def check_obstacle_decoder():
+    topic="inf2004/aai10/robot1/v1/obstacle"
+    # Same hand-packed fixture as network_test.c obstacle_protocol().
+    assert decode(topic,bytes.fromhex("4433221153bf34090400"))==dict(
+        type="obstacle",captured_ms=0x11223344,active=True,phase=9,phase_name="AVOID_SCAN_SIDE",servo_deg=125,
+        range_valid=True,range_mm=1234,detected=2,completed=1)
+    assert decode(topic,bytes.fromhex("44332211000000000000"))["active"] is False
+    for bad in ["4433221153bf340904","4433221153bf3409040000","4433221153bf34090440",
+                "44332211020000000000","4433221153df00080400"]:
+        try: decode(topic,bytes.fromhex(bad))
+        except ValueError: pass
+        else: raise AssertionError(f"Malformed obstacle packet accepted: {bad}")
+    header=(ROOT/"firmware/app/robot_firmware/obstacle_bypass.h").read_text()
+    enum=header[header.index("typedef enum {"):header.index("} avoid_phase_t;")]
+    assert tuple(re.findall(r"AVOID_[A-Z_]+",enum))==OBSTACLE_PHASES,"observer phase names drifted from obstacle_bypass.h"
+    print("PASS obstacle decoder: hand-packed fixture, phase names, length/padding/inactive/range rejection")
+
+
 def main():
     check_terrain_decoder()
+    check_hump_decoder()
+    check_obstacle_decoder()
     with tempfile.TemporaryDirectory(prefix="rtos-network-") as directory:
         temp=Path(directory)
         headers=["hardware/sync.h","pico/cyw43_arch.h","pico/rand.h","pico/stdlib.h",
@@ -103,10 +136,10 @@ def main():
             file=temp/path;file.parent.mkdir(parents=True,exist_ok=True)
             file.write_text('#include "network_test_sdk.h"\n')
         (temp/"network_settings.h").write_text((APP/"network_settings.example.h").read_text())
-        subprocess.run([shutil.which("clang"),"-std=c11","-g","-O1","-Wall","-Wextra","-Werror","-DRTOS_TRACK=1","-DRTOS_RUNTIME_EVIDENCE=1","-DRTOS_TERRAIN=1",
+        subprocess.run([shutil.which("clang"),"-std=c11","-g","-O1","-Wall","-Wextra","-Werror","-DRTOS_TRACK=1","-DRTOS_RUNTIME_EVIDENCE=1","-DRTOS_TERRAIN=1","-DRTOS_OBSTACLE=1",
                         "-fsanitize=address,undefined","-fno-omit-frame-pointer",
                         "-I",str(APP),"-I",str(ROOT/'firmware/app/robot_firmware'),"-I",str(TEST),"-I",str(temp),str(TEST/"network_test.c"),
-                        str(APP/"binary_protocol.c"),str(APP/"motion_record.c"),str(APP/'scan_diagnostic.c'),str(APP/'runtime_measure.c'),"-o",str(temp/"test")],check=True)
+                        str(APP/"binary_protocol.c"),str(APP/"terrain_telemetry.c"),str(APP/"motion_record.c"),str(APP/'scan_diagnostic.c'),str(APP/'runtime_measure.c'),"-o",str(temp/"test")],check=True)
         output=subprocess.check_output([str(temp/"test")],text=True)
         print("\n".join(line for line in output.splitlines() if line.startswith("PASS")))
         packets=[]
@@ -135,7 +168,7 @@ def main():
                     local_broker_binary_roundtrip_packets=count,hardware_network_tested=False,
                     local_broker_restart_cycles=1,
                     packet_sizes={kind:sorted({len(p) for t,p in packets if t.endswith('/'+kind)})
-                                  for kind in ["motion","line","terrain","barcode","status","link","command_result","scan_diag","runtime_diag"]})
+                                  for kind in ["motion","line","terrain","hump_event","obstacle","barcode","status","link","command_result","scan_diag","runtime_diag"]})
         (ROOT/"build/rtos-network-tests.json").write_text(json.dumps(result,indent=2)+"\n")
         print(f"PASS local MQTT broker: {count} binary packets retained byte-for-byte, including Z and zero bytes")
 

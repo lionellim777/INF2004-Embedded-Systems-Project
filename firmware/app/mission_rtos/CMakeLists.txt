@@ -96,6 +96,7 @@ target_link_libraries(robocar_rtos_motion PRIVATE mtkernel pico_stdlib
     hardware_adc hardware_clocks hardware_exception hardware_pwm pico_rand pico_cyw43_arch_lwip_poll pico_lwip_mqtt m)
 if(RTOS_TERRAIN)
     target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_TERRAIN=1)
+    target_sources(robocar_rtos_motion PRIVATE terrain_telemetry.c)
 endif()
 if(RTOS_OBSTACLE)
     target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_OBSTACLE=1)

@@ -295,7 +295,9 @@ def provisioning_preserves_default(settings,folder):
 def robot_may_publish_terrain(settings,folder):
     plugin=broker_config(settings,folder)['plugins']['amqtt.plugins.topic_checking.TopicAccessControlListPlugin']
     assert PREFIX+'terrain' in plugin['publish_acl'][settings['robot_user']]
-    print('PASS robot publish ACL includes terrain telemetry')
+    assert PREFIX+'hump_event' in plugin['publish_acl'][settings['robot_user']]
+    assert PREFIX+'obstacle' in plugin['publish_acl'][settings['robot_user']]
+    print('PASS robot publish ACL includes terrain, hump event and obstacle telemetry')
 
 
 def main():

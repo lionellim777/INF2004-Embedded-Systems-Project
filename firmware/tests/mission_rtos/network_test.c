@@ -5,6 +5,7 @@
 /* Include the real translation unit so its async state steps can be driven
  * deterministically without replacing the implementation with a test model. */
 #include "network_service.c"
+#include "terrain_telemetry.h"
 cyw43_t cyw43_state;
 static mqtt_client_t fake_client;
 static int link=CYW43_LINK_UP;
@@ -15,6 +16,9 @@ static bool limited_requests;
 static unsigned request_budget;
 static uint16_t mock_scan_run=1;
 static mqtt_request_cb_t pending_ack;static void *pending_context;
+#ifdef RTOS_TERRAIN
+static mqtt_request_cb_t hump_puback;static void *hump_puback_context; /* second QoS1 flight */
+#endif
 static bool mock_scan_stopped;
 static int init_result,pm_result;
 static unsigned sta_calls,pm_calls;
@@ -44,7 +48,11 @@ void cyw43_arch_poll(void) {}
 int cyw43_arch_wifi_connect_async(const char *s,const char *p,uint32_t auth) { (void)s;(void)p;(void)auth;return 0; }
 int cyw43_tcpip_link_status(cyw43_t *c,int itf) { (void)c;(void)itf;return link; }
 mqtt_client_t *mqtt_client_new(void) { return &fake_client; }
-void mqtt_disconnect(mqtt_client_t *c) { (void)c;client_connected=false;if(pending_ack){mqtt_request_cb_t cb=pending_ack;pending_ack=NULL;cb(pending_context,ERR_ARG);} }
+void mqtt_disconnect(mqtt_client_t *c) { (void)c;client_connected=false;if(pending_ack){mqtt_request_cb_t cb=pending_ack;pending_ack=NULL;cb(pending_context,ERR_ARG);}
+#ifdef RTOS_TERRAIN
+ hump_puback=NULL; /* lwIP mqtt_close frees requests without callbacks */
+#endif
+}
 bool mqtt_client_is_connected(mqtt_client_t *c) { (void)c;return client_connected; }
 void mqtt_set_inpub_callback(mqtt_client_t *c,void (*a)(void *,const char *,u32_t),void (*b)(void *,const u8_t *,u16_t,u8_t),void *ctx)
 { (void)c;(void)a;(void)b;(void)ctx; }
@@ -63,6 +71,10 @@ err_t mqtt_publish(mqtt_client_t *c,const char *t,const void *p,u16_t n,u8_t qos
  if(limited_requests){if(!request_budget)return ERR_ARG;request_budget--;}
  assert(transmitted<256);snprintf(sent[transmitted].topic,128,"%s",t);
  memcpy(sent[transmitted].bytes,p,n);sent[transmitted].length=n;++transmitted;
+#ifdef RTOS_TERRAIN
+ if(qos && strstr(t,"/hump_event")){assert(cb && !hump_puback);hump_puback=cb;hump_puback_context=ctx;}
+ else
+#endif
  if(qos){assert(cb && !pending_ack);pending_ack=cb;pending_context=ctx;}
  return ERR_OK;
 }
@@ -131,6 +143,128 @@ static void terrain_protocol(void)
  assert(!memcmp(b,invalid,sizeof b));
  puts("PASS terrain record: hand-packed signed roll, hump count and heights");
 }
+static void terrain_converter(void)
+{
+ terrain_source_t s={.available=true,.calibrated=true,.sample_valid=true,.roll_change_deg=-2.46f,
+                     .humps=3,.last_height_mm=10.04f,.highest_height_mm=12.66f};
+ terrain_reading_t r;
+ assert(terrain_reading_from(500,&s,&r));
+ assert(r.ms==500 && r.valid && r.calibrated && r.roll_decideg==-25 && r.humps==3 &&
+        r.last_height_dmm==100 && r.highest_height_dmm==127);
+ terrain_source_t off=s;off.available=false;assert(terrain_reading_from(1,&off,&r) && !r.valid && r.calibrated);
+ off=s;off.calibrated=false;assert(terrain_reading_from(1,&off,&r) && !r.valid && !r.calibrated);
+ off=s;off.sample_valid=false;assert(terrain_reading_from(1,&off,&r) && !r.valid && r.calibrated);
+ const terrain_reading_t kept=r;
+ terrain_source_t bad[]={s,s,s,s,s,s,s};
+ bad[0].roll_change_deg=0.0f/0.0f;bad[1].roll_change_deg=25.56f;bad[2].roll_change_deg=-25.56f;
+ bad[3].humps=256;bad[4].last_height_mm=-0.06f;bad[5].highest_height_mm=51.16f;bad[6].last_height_mm=1e30f;
+ for(unsigned i=0;i<sizeof bad/sizeof bad[0];i++){
+  assert(!terrain_reading_from(2,&bad[i],&r));assert(!memcmp(&r,&kept,sizeof r));
+ }
+ terrain_source_t edge=s;edge.roll_change_deg=-25.54f;edge.humps=255;edge.highest_height_mm=51.14f;
+ assert(terrain_reading_from(3,&edge,&r) && r.roll_decideg==-255 && r.highest_height_dmm==511);
+ puts("PASS terrain converter: rounds Ezra's float status to 0.1 deg / 0.1 mm");
+}
+static void obstacle_protocol(void)
+{
+ /* Hand-packed: active, phase 9 (AVOID_SCAN_SIDE), servo 125, range valid
+  * 1234 mm, detected 2, completed 1. */
+ const uint8_t expected[OBSTACLE_RECORD_BYTES]={0x44,0x33,0x22,0x11,0x53,0xbf,0x34,0x09,0x04,0x00};
+ obstacle_reading_t r={.ms=0x11223344u,.active=true,.phase=9,.servo_deg=125,.range_valid=true,
+                       .range_mm=1234,.detected=2,.completed=1};
+ uint8_t b[OBSTACLE_RECORD_BYTES];
+ assert(obstacle_record_encode(&r,b) && !memcmp(b,expected,sizeof b));
+ obstacle_reading_t bad=r;bad.phase=32;assert(!obstacle_record_encode(&bad,b));
+ bad=r;bad.servo_deg=128;assert(!obstacle_record_encode(&bad,b));
+ bad=r;bad.range_mm=4096;assert(!obstacle_record_encode(&bad,b));
+ obstacle_reading_t edge=r;edge.phase=31;edge.servo_deg=127;edge.range_mm=4095;assert(obstacle_record_encode(&edge,b));
+ r.range_valid=false;assert(obstacle_record_encode(&r,b) && b[5]==0x1f && b[6]==0x00 && b[7]==0x08);
+ r.active=false;assert(obstacle_record_encode(&r,b));
+ for(unsigned i=4;i<OBSTACLE_RECORD_BYTES;i++)assert(b[i]==0);
+ puts("PASS obstacle record: hand-packed phase, servo, range and episode counts");
+}
+static void hump_events(void)
+{
+ const uint8_t expected[HUMP_EVENT_BYTES]={0x0d,0x0c,0x0b,0x0a,0x03,0x7e,0x04,0x00};
+ uint8_t b[HUMP_EVENT_BYTES];
+ assert(hump_event_record_encode(0x0A0B0C0Du,3,126,2,b) && !memcmp(b,expected,sizeof b));
+ puts("PASS hump event record: hand-packed index, height and dropped count");
+ hump_queue_t q={0};
+ assert(!hump_queue_peek(&q,b));
+ assert(hump_queue_push(&q,100,1,50) && hump_queue_push(&q,200,2,60));
+ assert(hump_queue_peek(&q,b) && b[0]==100 && b[4]==1);
+ assert(hump_queue_peek(&q,b) && b[4]==1);
+ hump_queue_pop(&q);
+ assert(hump_queue_peek(&q,b) && b[0]==200 && b[4]==2);
+ hump_queue_pop(&q);
+ assert(!hump_queue_peek(&q,b));
+ hump_queue_pop(&q);
+ assert(!hump_queue_peek(&q,b));
+ puts("PASS hump queue: first in, first out; peek repeats until pop");
+ assert(!hump_queue_push(&q,1,1,512) && !hump_queue_peek(&q,b));
+ for(uint8_t i=1;i<=10;i++)assert(hump_queue_push(&q,i,i,i));
+ for(uint8_t i=3;i<=10;i++){
+  assert(hump_queue_peek(&q,b) && b[4]==i && (b[6]>>1)==2);
+  hump_queue_pop(&q);
+ }
+ assert(!hump_queue_peek(&q,b));
+ for(unsigned i=0;i<300;i++)assert(hump_queue_push(&q,i,(uint8_t)i,0));
+ assert(hump_queue_peek(&q,b) && b[4]==(uint8_t)292 && ((b[6]>>1)|((b[7]&1)<<7))==255);
+ puts("PASS hump queue overflow: oldest dropped, loss count kept and saturates at 255");
+}
+#ifdef RTOS_TERRAIN
+static unsigned hump_sends(unsigned from,uint8_t *last)
+{
+ unsigned n=0;
+ for(unsigned i=from;i<transmitted;++i) if(strstr(sent[i].topic,"/hump_event")) {
+  assert(sent[i].length==HUMP_EVENT_BYTES);memcpy(last,sent[i].bytes,HUMP_EVENT_BYTES);++n;
+ }
+ return n;
+}
+static void ack_hump(err_t e){mqtt_request_cb_t cb=hump_puback;assert(cb);hump_puback=NULL;cb(hump_puback_context,e);}
+static void hump_network(void)
+{
+ uint8_t b[HUMP_EVENT_BYTES];online(60000);
+ assert(network_hump_event(10,1,50) && network_hump_event(20,2,60));
+ unsigned from=transmitted;step(60001);
+ assert(hump_sends(from,b)==1 && b[0]==10 && b[4]==1 && hump_puback);
+ from=transmitted;step(60006);assert(hump_sends(from,b)==0); /* one in flight */
+ ack_hump(ERR_OK);from=transmitted;step(60011);
+ assert(hump_sends(from,b)==1 && b[4]==2);
+ client_connected=false;step(60016);assert(network_state()==NETWORK_RETRYING && !hump_puback);
+ online(61000);from=transmitted;step(61001);
+ assert(hump_sends(from,b)==1 && b[4]==2); /* unacknowledged event replayed */
+ for(uint8_t i=3;i<=10;i++)assert(network_hump_event(i*10u,i,0)); /* overwrites 2 */
+ ack_hump(ERR_OK);from=transmitted;step(61006);
+ assert(hump_sends(from,b)==1 && b[4]==3 && (b[6]>>1)==1); /* stale ACK popped nothing */
+ ack_hump(ERR_ARG);from=transmitted;step(61011);
+ assert(hump_sends(from,b)==1 && b[4]==3); /* failed PUBACK retried */
+ ack_hump(ERR_OK);
+ puts("PASS hump events: QoS1 one at a time, advance on PUBACK, replay after reconnect, stale ACK ignored");
+}
+#endif
+#ifdef RTOS_OBSTACLE
+static void obstacle_network(void)
+{
+ online(70000);unsigned from=transmitted;step(70001);
+ for(unsigned i=from;i<transmitted;++i){
+  assert(!strstr(sent[i].topic,"/obstacle")); /* nothing until Motion reports */
+  if(strstr(sent[i].topic,"/status"))assert(!(sent[i].bytes[8]&16u));
+ }
+ obstacle_reading_t r={.ms=70002,.active=true,.phase=9,.servo_deg=125,.range_valid=true,.range_mm=1234,.detected=1};
+ uint8_t expected[OBSTACLE_RECORD_BYTES];assert(obstacle_record_encode(&r,expected));
+ assert(network_obstacle(&r));
+ obstacle_reading_t bad=r;bad.servo_deg=200;assert(!network_obstacle(&bad));
+ flags|=FORCE_STATUS;from=transmitted;step(70300);
+ bool seen=false,status=false;
+ for(unsigned i=from;i<transmitted;++i){
+  if(strstr(sent[i].topic,"/obstacle")){seen=true;assert(sent[i].length==OBSTACLE_RECORD_BYTES && !memcmp(sent[i].bytes,expected,sizeof expected));}
+  if(strstr(sent[i].topic,"/status")){status=true;assert(sent[i].bytes[8]&16u);}
+ }
+ assert(seen && status);
+ puts("PASS obstacle network: snapshot published with motion, rejected reading kept previous, status bit4");
+}
+#endif
 int main(void)
 {
  assert(network_wifi_pm_result()==INT8_MIN);
@@ -138,7 +272,7 @@ int main(void)
  init_result=0;assert(initialize_radio() && network_wifi_pm_result()==0 && pm_calls==1);
  pm_result=-1;assert(initialize_radio() && network_wifi_pm_result()==-1 && pm_calls==2);
  pm_result=0;
- protocols();terrain_protocol();uint16_t raw[3]={191,2908,141};assert(network_line(0,raw,2,true));
+ protocols();terrain_protocol();terrain_converter();hump_events();obstacle_protocol();uint16_t raw[3]={191,2908,141};assert(network_line(0,raw,2,true));
  online(UINT32_MAX-500);step(0);
  bool motion_seen=false;
  for(unsigned i=0;i<transmitted;++i) if(strstr(sent[i].topic,"/motion")) {
@@ -222,6 +356,14 @@ int main(void)
  }
  assert(seen==31u);limited_requests=false;
  puts("PASS four-handle MQTT budget: blocked runtime row retained; paced summary and all four tasks eventually delivered after motion/status traffic");
+#ifdef RTOS_TERRAIN
+ hump_network();
+#endif
+#ifdef RTOS_OBSTACLE
+ obstacle_network();
+#else
+ for(unsigned i=0;i<transmitted;++i) assert(!strstr(sent[i].topic,"/obstacle"));
+#endif
  puts("PASS actual MQTT service: explicit byte lengths, Z preservation, STOP-only commands, no start topic, period changes, backpressure, reconnect, subscription failure, clock wrap, signed Wi-Fi diagnostics");
  for(unsigned i=0;i<transmitted;++i) {
   printf("PACKET %s ",sent[i].topic);

@@ -8,6 +8,8 @@
 #include <string.h>
 #ifdef RTOS_OBSTACLE
 #include "obstacle_io.h"
+#include "obstacle_bypass.h"
+#include "binary_protocol.h"
 #endif
 
 static uint64_t clock_us;
@@ -68,6 +70,11 @@ void busy_wait_us_32(uint32_t us){assert(us==5);}
 encoder_sample_t encoders_snapshot(void){return enc;}
 bool network_line(uint32_t ms,const uint16_t values[3],uint8_t pattern,bool valid)
 {(void)ms;(void)values;assert(pattern<=7);(void)valid;return true;}
+#ifdef RTOS_OBSTACLE
+static obstacle_reading_t obstacle_sent;static unsigned obstacle_reports;
+bool network_obstacle(const obstacle_reading_t *r)
+{obstacle_sent=*r;++obstacle_reports;return true;}
+#endif
 bool network_barcode(uint32_t ms,char letter,bool valid,bool simulated)
 {
     assert(!simulated);assert(ms==(uint32_t)(clock_us/1000u) || valid);
@@ -285,14 +292,21 @@ static void obstacle_stop_during_turn(void)
         advance(10000);
     assert(armed() && pwm[4][1] && pwm[5][0]);
     assert(!strcmp(runtime.track.status,"TURN_LEFT_OUT"));
+    /* Motion reports the bypass state it just stepped, with the last fresh echo
+     * (the fake returns 20 cm ahead at 90 degrees, 100 cm elsewhere). */
+    assert(obstacle_reports && obstacle_sent.active && obstacle_sent.phase==AVOID_TURN_OUT);
+    assert(obstacle_sent.detected==1 && obstacle_sent.completed==0 && obstacle_sent.servo_deg<=125);
+    assert(obstacle_sent.range_valid && (obstacle_sent.range_mm==200 || obstacle_sent.range_mm==1000));
+    assert(obstacle_sent.ms==(uint32_t)(clock_us/1000u));
     uint16_t token=runtime.token;
     board_stop(STOP_BUTTON);
     stopped();
     advance(30000);
-    assert(!obstacle_active);
+    assert(!obstacle_active && !obstacle_sent.active);
     assert(!board_apply(token,-0.3f,0.3f));
     stopped();
     puts("PASS RTOS obstacle detection and left turn through Motion, STOP cancels sonar and rejects stale drive token");
+    puts("PASS obstacle telemetry: Motion reports phase, servo, last echo and episode count; inactive after stop");
 }
 #endif
 int main(void)
