@@ -109,6 +109,28 @@ static void protocols(void)
  period[0]=0xc7;assert(binary_command_begin(&f,2,2));assert(!binary_command_append(&f,period,2,true,&out));
  puts("PASS binary protocol: A-Z, unavailable/simulated states, signed motion, fragmented and rejected commands");
 }
+static void terrain_protocol(void)
+{
+ /* Hand-packed: valid1,calibrated1, roll -25 (0.1 deg) as signed9, humps 2,
+  * last 100 and highest 126 (0.1 mm) as 9 bits each -> 0x7E320179F. */
+ terrain_reading_t r={.ms=0x01020304u,.valid=true,.calibrated=true,.roll_decideg=-25,
+                      .humps=2,.last_height_dmm=100,.highest_height_dmm=126};
+ const uint8_t expected[TERRAIN_RECORD_BYTES]={4,3,2,1,0x9f,0x17,0x20,0xe3,0x07};
+ uint8_t b[TERRAIN_RECORD_BYTES];
+ assert(terrain_record_encode(&r,b) && !memcmp(b,expected,sizeof b));
+ terrain_reading_t edge={.valid=true,.roll_decideg=-255,.humps=255,.last_height_dmm=511,.highest_height_dmm=511};
+ assert(terrain_record_encode(&edge,b));
+ edge.roll_decideg=255;assert(terrain_record_encode(&edge,b));
+ terrain_reading_t bad=edge;bad.roll_decideg=256;assert(!terrain_record_encode(&bad,b));
+ bad=edge;bad.roll_decideg=-256;assert(!terrain_record_encode(&bad,b));
+ bad=edge;bad.humps=256;assert(!terrain_record_encode(&bad,b));
+ bad=edge;bad.last_height_dmm=512;assert(!terrain_record_encode(&bad,b));
+ bad=edge;bad.highest_height_dmm=512;assert(!terrain_record_encode(&bad,b));
+ r.valid=false;assert(terrain_record_encode(&r,b));
+ const uint8_t invalid[TERRAIN_RECORD_BYTES]={4,3,2,1,2,0,0,0,0};
+ assert(!memcmp(b,invalid,sizeof b));
+ puts("PASS terrain record: hand-packed signed roll, hump count and heights");
+}
 int main(void)
 {
  assert(network_wifi_pm_result()==INT8_MIN);
@@ -116,17 +138,46 @@ int main(void)
  init_result=0;assert(initialize_radio() && network_wifi_pm_result()==0 && pm_calls==1);
  pm_result=-1;assert(initialize_radio() && network_wifi_pm_result()==-1 && pm_calls==2);
  pm_result=0;
- protocols();uint16_t raw[3]={191,2908,141};assert(network_line(0,raw,2,true));
+ protocols();terrain_protocol();uint16_t raw[3]={191,2908,141};assert(network_line(0,raw,2,true));
  online(UINT32_MAX-500);step(0);
  bool motion_seen=false;
  for(unsigned i=0;i<transmitted;++i) if(strstr(sent[i].topic,"/motion")) {
   motion_seen=true;assert(sent[i].length==13 && sent[i].bytes[0]==0 && sent[i].bytes[12]==1);
  }
  assert(motion_seen); /* strlen would have sent zero bytes */
+#ifdef RTOS_TERRAIN
+ terrain_reading_t hump={.ms=7,.valid=true,.calibrated=true,.roll_decideg=-25,.humps=1,
+                         .last_height_dmm=100,.highest_height_dmm=100};
+ uint8_t hump_bytes[TERRAIN_RECORD_BYTES];assert(terrain_record_encode(&hump,hump_bytes));
+ assert(network_terrain(&hump));unsigned terrain_from=transmitted;step(300);
+ bool terrain_seen=false;
+ for(unsigned i=terrain_from;i<transmitted;++i) if(strstr(sent[i].topic,"/terrain")) {
+  terrain_seen=true;assert(sent[i].length==TERRAIN_RECORD_BYTES && !memcmp(sent[i].bytes,hump_bytes,TERRAIN_RECORD_BYTES));
+ }
+ assert(terrain_seen);
+ terrain_reading_t rejected=hump;rejected.roll_decideg=300;assert(!network_terrain(&rejected));
+ unsigned kept_from=transmitted;step(600);terrain_seen=false;
+ for(unsigned i=kept_from;i<transmitted;++i) if(strstr(sent[i].topic,"/terrain")) {
+  terrain_seen=true;assert(!memcmp(sent[i].bytes,hump_bytes,TERRAIN_RECORD_BYTES));
+ }
+ assert(terrain_seen); /* a rejected reading keeps the previous snapshot */
+#endif
  assert(network_barcode(0,'Z',true,false));step(1000);
  bool z_seen=false;
  for(unsigned i=0;i<transmitted;++i) if(strstr(sent[i].topic,"/barcode") && sent[i].bytes[4]==58) z_seen=true;
  assert(z_seen);
+#ifndef RTOS_TERRAIN
+ for(unsigned i=0;i<transmitted;++i) assert(!strstr(sent[i].topic,"/terrain"));
+ puts("PASS default build: no terrain topic");
+#else
+ unsigned status_before=0,status_after=0;
+ for(unsigned i=0;i<transmitted;++i) if(strstr(sent[i].topic,"/status")) {
+  if(i<terrain_from){assert(!(sent[i].bytes[8]&8u));++status_before;}
+  else {assert(sent[i].bytes[8]&8u);++status_after;}
+ }
+ assert(status_before && status_after); /* bit3: terrain available */
+ puts("PASS terrain network: snapshot published with motion, rejected reading kept previous, status bit3");
+#endif
  unsigned before=stops;incoming(NULL,stop_command,0);data(NULL,NULL,0,MQTT_DATA_FLAG_LAST);assert(stops==before+1);
  incoming(NULL,RTOS_TOPIC_PREFIX "command/start",0);data(NULL,NULL,0,1);assert(stops==before+1);
  incoming(NULL,period_command,2);uint8_t p[]={0xe8,3};data(NULL,p,1,0);assert((policy&8191)==200);

@@ -292,12 +292,19 @@ def provisioning_preserves_default(settings,folder):
     print('PASS default provisioning overrides inherited experimental flags; fixture build only, no real firmware or hardware touched')
 
 
+def robot_may_publish_terrain(settings,folder):
+    plugin=broker_config(settings,folder)['plugins']['amqtt.plugins.topic_checking.TopicAccessControlListPlugin']
+    assert PREFIX+'terrain' in plugin['publish_acl'][settings['robot_user']]
+    print('PASS robot publish ACL includes terrain telemetry')
+
+
 def main():
     logging.basicConfig(level=logging.CRITICAL)
     settings=dict(broker_ip='192.168.1.9',port=1883,ssid='test "WiFi" \\ 网络',wifi_password='fixture\\"password',
                   prefix=PREFIX,robot_user='robot',robot_password='fixture-robot-password',
                   operator_user='observer',operator_password='fixture-observer-password')
     validate(settings)
+    robot_may_publish_terrain(settings,Path(tempfile.gettempdir()))
     for changes in [dict(broker_ip='8.8.8.8'),dict(broker_ip='127.0.0.1'),dict(port=0),
                     dict(ssid='x'*33),dict(ssid='x\0'),dict(wifi_password='short')]:
         try:validate(dict(settings,**changes))

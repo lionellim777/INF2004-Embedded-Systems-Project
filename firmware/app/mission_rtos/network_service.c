@@ -62,6 +62,10 @@ static volatile int8_t wifi_link; /* SDK states -3..3; USB diagnostic only */
 static volatile int8_t wifi_pm_result=INT8_MIN; /* not attempted, then SDK result */
 static uint32_t state_ms, status_ms, motion_ms, online_ms, boot_id;
 static uint8_t barcode_latest[BARCODE_RECORD_BYTES],line_latest[LINE_RECORD_BYTES], result;
+#ifdef RTOS_TERRAIN
+static uint8_t terrain_latest[TERRAIN_RECORD_BYTES];
+static const char terrain_topic[]=RTOS_TOPIC_PREFIX "terrain";
+#endif
 static binary_command_frame_t command_frame;
 static struct mqtt_connect_client_info_t info;
 static ip_addr_t address;
@@ -109,6 +113,20 @@ static void read_line(uint8_t b[LINE_RECORD_BYTES])
     uint32_t irq=save_and_disable_interrupts();memcpy(b,line_latest,LINE_RECORD_BYTES);
     restore_interrupts(irq);
 }
+#ifdef RTOS_TERRAIN
+bool network_terrain(const terrain_reading_t *reading)
+{
+    uint8_t b[TERRAIN_RECORD_BYTES];
+    if(!terrain_record_encode(reading,b))return false;
+    uint32_t irq=save_and_disable_interrupts();memcpy(terrain_latest,b,sizeof b);
+    restore_interrupts(irq);return true;
+}
+static void read_terrain(uint8_t b[TERRAIN_RECORD_BYTES])
+{
+    uint32_t irq=save_and_disable_interrupts();memcpy(b,terrain_latest,TERRAIN_RECORD_BYTES);
+    restore_interrupts(irq);
+}
+#endif
 static void fail(uint32_t now,uint8_t code)
 {
     if (client!=NULL) mqtt_disconnect(client);
@@ -243,6 +261,10 @@ static void step(uint32_t now)
             uint8_t barcode[5],status_bytes[10],motion[MOTION_RECORD_BYTES],line[LINE_RECORD_BYTES]; read_barcode(barcode);read_line(line);
             board_read(motion);
             uint8_t available=(uint8_t)((motion[12]&1u) | ((barcode[4]&32u)?2u:0u) | ((line[8]&128u)?4u:0u));
+#ifdef RTOS_TERRAIN
+            uint8_t terrain[TERRAIN_RECORD_BYTES];read_terrain(terrain);
+            if(terrain[4]&1u)available|=8u;
+#endif
             uint8_t simulated=(barcode[4]&64u)?2u:0u;
             (void)status_record_encode(now,boot_id,available,simulated,NETWORK_ONLINE,status_bytes);
             uint8_t online_code=2;
@@ -264,6 +286,10 @@ static void step(uint32_t now)
             if (publish(motion_topic,motion,sizeof motion,0)) motion_ms=now;
             uint8_t line[LINE_RECORD_BYTES];read_line(line);
             (void)publish(line_topic,line,sizeof line,0);
+#ifdef RTOS_TERRAIN
+            uint8_t terrain[TERRAIN_RECORD_BYTES];read_terrain(terrain);
+            (void)publish(terrain_topic,terrain,sizeof terrain,0);
+#endif
         }
 #ifdef RTOS_RUNTIME_EVIDENCE
         runtime_publish(now);

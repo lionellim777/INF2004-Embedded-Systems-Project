@@ -316,6 +316,7 @@ It replaces JSON/sample stores with compact latest-value messages:
 | --- | ---: | --- |
 | `motion` | 13 | Schema above; real encoder/controller data |
 | `line` | 9 | Capture ms32, ADC12x3 in GP26/28/27 order, black pattern3, valid1 |
+| `terrain` | 9 | Capture ms32, valid1, calibrated1, roll change signed9 (0.1°, ±25.5°), humps8, last/highest hump height9 each (0.1 mm, 0–51.1 mm), zero tail3. Only with `-DRTOS_TERRAIN=ON` (default OFF). Latest value, sent with motion/line; status mask bit3. No producer task is connected yet. |
 | `barcode` | 5 | Capture ms32, code5 (none/A–Z/unreadable), valid1, simulated1, zero tail1 |
 | `status` | 10 | Capture ms32, boot ID32, valid-source mask5, simulated-source mask5, connection state3, zero tail3 |
 | `link` | 1 | Numeric 0 unknown / 1 offline / 2 online; zero upper bits |

@@ -79,7 +79,22 @@ async def broker_roundtrip(packets):
     return len(received)
 
 
+def check_terrain_decoder():
+    topic="inf2004/aai10/robot1/v1/terrain"
+    # Same hand-packed fixture as network_test.c terrain_protocol().
+    assert decode(topic,bytes.fromhex("040302019f1720e307"))==dict(
+        type="terrain",captured_ms=0x01020304,valid=True,calibrated=True,roll_decideg=-25,
+        humps=2,last_height_dmm=100,highest_height_dmm=126)
+    assert decode(topic,bytes.fromhex("040302010200000000"))["valid"] is False
+    for bad in ["040302019f1720e3","040302019f1720e30700","040302019f1720e327","04030201000000e000","040302010400000000","040302010104000000"]:
+        try: decode(topic,bytes.fromhex(bad))
+        except ValueError: pass
+        else: raise AssertionError(f"Malformed terrain packet accepted: {bad}")
+    print("PASS terrain decoder: hand-packed fixture, invalid zeroing, length/padding/value rejection")
+
+
 def main():
+    check_terrain_decoder()
     with tempfile.TemporaryDirectory(prefix="rtos-network-") as directory:
         temp=Path(directory)
         headers=["hardware/sync.h","pico/cyw43_arch.h","pico/rand.h","pico/stdlib.h",
@@ -88,7 +103,7 @@ def main():
             file=temp/path;file.parent.mkdir(parents=True,exist_ok=True)
             file.write_text('#include "network_test_sdk.h"\n')
         (temp/"network_settings.h").write_text((APP/"network_settings.example.h").read_text())
-        subprocess.run([shutil.which("clang"),"-std=c11","-g","-O1","-Wall","-Wextra","-Werror","-DRTOS_TRACK=1","-DRTOS_RUNTIME_EVIDENCE=1",
+        subprocess.run([shutil.which("clang"),"-std=c11","-g","-O1","-Wall","-Wextra","-Werror","-DRTOS_TRACK=1","-DRTOS_RUNTIME_EVIDENCE=1","-DRTOS_TERRAIN=1",
                         "-fsanitize=address,undefined","-fno-omit-frame-pointer",
                         "-I",str(APP),"-I",str(ROOT/'firmware/app/robot_firmware'),"-I",str(TEST),"-I",str(temp),str(TEST/"network_test.c"),
                         str(APP/"binary_protocol.c"),str(APP/"motion_record.c"),str(APP/'scan_diagnostic.c'),str(APP/'runtime_measure.c'),"-o",str(temp/"test")],check=True)
@@ -120,7 +135,7 @@ def main():
                     local_broker_binary_roundtrip_packets=count,hardware_network_tested=False,
                     local_broker_restart_cycles=1,
                     packet_sizes={kind:sorted({len(p) for t,p in packets if t.endswith('/'+kind)})
-                                  for kind in ["motion","line","barcode","status","link","command_result","scan_diag","runtime_diag"]})
+                                  for kind in ["motion","line","terrain","barcode","status","link","command_result","scan_diag","runtime_diag"]})
         (ROOT/"build/rtos-network-tests.json").write_text(json.dumps(result,indent=2)+"\n")
         print(f"PASS local MQTT broker: {count} binary packets retained byte-for-byte, including Z and zero bytes")
 

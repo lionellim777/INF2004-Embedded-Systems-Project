@@ -29,6 +29,17 @@ def decode(topic, payload):
         raw=[(fields>>(12*i))&4095 for i in range(3)];pattern=(fields>>36)&7
         if not valid and (any(raw) or pattern):raise ValueError('Invalid line record has numeric values')
         return dict(type=kind,captured_ms=int.from_bytes(payload[:4],'little'),raw_adc=raw,pattern=pattern,valid=valid)
+    if kind=='terrain':
+        if len(payload)!=9:raise ValueError('Invalid terrain record length')
+        fields=int.from_bytes(payload[4:],'little')
+        if fields>>37:raise ValueError('Invalid terrain padding')
+        valid,calibrated=bool(fields&1),bool(fields&2)
+        roll=(fields>>2)&511;roll=roll-512 if roll&256 else roll
+        humps,last,highest=(fields>>11)&255,(fields>>19)&511,(fields>>28)&511
+        if roll==-256:raise ValueError('Invalid terrain roll')
+        if not valid and (roll or humps or last or highest):raise ValueError('Invalid terrain record has numeric values')
+        return dict(type=kind,captured_ms=int.from_bytes(payload[:4],'little'),valid=valid,calibrated=calibrated,
+                    roll_decideg=roll,humps=humps,last_height_dmm=last,highest_height_dmm=highest)
     if kind == "barcode":
         if len(payload) != 5 or payload[4] & 128:
             raise ValueError("Invalid barcode length/padding")

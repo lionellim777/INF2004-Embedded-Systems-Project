@@ -14,4 +14,9 @@ bool network_line(uint32_t ms,const uint16_t raw[3],uint8_t pattern,bool valid);
 /* Latest barcode snapshot, not an unbounded/offline event queue. Thread-safe
  * on core0; rejected writes leave the previous snapshot unchanged. */
 bool network_barcode(uint32_t ms,char letter,bool valid,bool simulated);
+/* RTOS_TERRAIN builds only (default OFF). Latest terrain snapshot, sent with
+ * motion/line at the motion period; status mask bit3 while valid. Same core0
+ * rule: rejected readings leave the previous snapshot unchanged. */
+typedef struct terrain_reading terrain_reading_t;
+bool network_terrain(const terrain_reading_t *reading);
 #endif

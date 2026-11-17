@@ -19,6 +19,22 @@ bool line_record_encode(uint32_t ms,const uint16_t raw[3],uint8_t pattern,bool v
     for(unsigned i=0;i<5;i++)b[4+i]=(uint8_t)(fields>>(8u*i));
     memcpy(out,b,sizeof b);return true;
 }
+bool terrain_record_encode(const terrain_reading_t *r,uint8_t out[TERRAIN_RECORD_BYTES])
+{
+    if(out==NULL || r==NULL || r->roll_decideg<-255 || r->roll_decideg>255 || r->humps>255 ||
+       r->last_height_dmm>511 || r->highest_height_dmm>511)return false;
+    uint8_t b[9]={0};put32(b,r->ms);
+    uint64_t fields=r->calibrated?2u:0u;
+    if(r->valid){
+        fields|=1u;
+        fields|=(uint64_t)((uint16_t)r->roll_decideg&511u)<<2u;
+        fields|=(uint64_t)r->humps<<11u;
+        fields|=(uint64_t)r->last_height_dmm<<19u;
+        fields|=(uint64_t)r->highest_height_dmm<<28u;
+    }
+    for(unsigned i=0;i<5;i++)b[4+i]=(uint8_t)(fields>>(8u*i));
+    memcpy(out,b,sizeof b);return true;
+}
 bool barcode_record_encode(uint32_t ms, char letter, bool valid, bool simulated, uint8_t out[BARCODE_RECORD_BYTES])
 {
     if (out==NULL || (!valid && (letter!=0 || simulated))) return false;
