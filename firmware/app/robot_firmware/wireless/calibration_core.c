@@ -120,7 +120,7 @@ bool calibration_command(calibration_core_t *c, char command)
     }
 #endif
     if (!c->selection_allowed || c->pending != 0) { return false; }
-    if (command != 'f' && command != 'k' && command != 'l' && command != 'r' && command != 'u' && command != 't' && command != 'b' && command != 'c' && command != 's' && command != 'v' && command != 'o') { return false; }
+    if (command != 'f' && command != 'k' && command != 'j' && command != 'l' && command != 'r' && command != 'u' && command != 't' && command != 'b' && command != 'c' && command != 's' && command != 'v' && command != 'o') { return false; }
     c->pending = command;
     return true;
 }
