@@ -131,6 +131,15 @@ class Detector:
                 self.phase, self.need_clear = self.WAITING, True
         return ev
 
+    def finish(self, now):
+        """Port of hump_roll_finish(): close an event that is still ACTIVE when sampling stops."""
+        ev = None
+        if self.phase == self.ACTIVE:
+            end = self.below_ms if self.below else now
+            ev = self._fill(self._classify(end - self.start), end)
+        self.phase, self.below = self.WAITING, False
+        return ev
+
 
 # Roll change measured with the right wheel on stacks (stack mm -> deg), baseline 0.60 deg.
 TRANSFER = [(h, r) for r, h in POINTS]
@@ -290,6 +299,16 @@ check("hump after a tilted run reads right side, ~10 mm", len(ev) == 1 and ev[0]
 det = Detector()
 run([0.0] * 300, baseline_error=-3.0, det=det)
 check("tilt of 3 deg is not absorbed by the baseline", abs(det.baseline) < 0.05, f"baseline={det.baseline:.3f}")
+
+# Sampling stops while the car is still tilted (stopped just after the hump): the open event must
+# be reported by finish(), not dropped.
+det = Detector()
+det.fast_left = 0
+open_event = [det.update(-5.0, t) for t in range(0, 600, 20)]
+ev = det.finish(600)
+check("finish() reports an event still open when sampling stops",
+      not any(open_event) and ev is not None and ev[0] == "completed" and ev[4] == 600, str(ev))
+check("finish() with nothing open reports nothing", Detector().finish(100) is None)
 
 print("PASSED" if not failures else "FAILED: " + ", ".join(failures))
 raise SystemExit(1 if failures else 0)
