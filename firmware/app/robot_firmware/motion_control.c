@@ -31,9 +31,17 @@ enum { STRAIGHT_30CM_STOP_COUNTS = 3537 };
  * START_RAMP_PWM_PER_S. Decreases are never limited, so overspeed still cuts power at once.
  * Applies to straight moves only; turns and the slow/bypass paths are untouched. */
 static const float START_FLOOR_PWM = 0.30f;
-/* Flat-floor logs: the left wheel led the right by about 52 counts in the first 650 counts of
- * every run (car veered right). The left wheel starts slightly lower to cancel it. */
-static const float START_FLOOR_LEFT_PWM = 0.28f;
+/* A lower left floor (0.28) was tried against the right veer at launch and reverted: the
+ * [LAUNCH] traces of 2026-11-17 showed it only made the RIGHT wheel lead by 15-50 counts in the
+ * first 350 ms, while the left lead (peak 43-61 counts at 650-750 ms) was unchanged. That lead
+ * comes from the feedforward, see STRAIGHT_RIGHT_FEEDFORWARD. */
+static const float START_FLOOR_LEFT_PWM = 0.30f;
+/* Right-wheel feedforward scale. 0.95 is the batch 5 calibration and stays for turns. On straight
+ * moves it gave about 40% left / 37% right PWM while accelerating, and the left wheel then ran
+ * about 7% faster (5 traces, 2026-11-17); at cruise the wheels match only with the right about
+ * 2 points ABOVE the left. Straight moves therefore use equal feedforward. */
+static const float TURN_RIGHT_FEEDFORWARD = 0.95f;
+static const float STRAIGHT_RIGHT_FEEDFORWARD = 1.0f;
 static const float START_RAMP_PWM_PER_S = 0.9f;
 
 static float clamp(float value, float low, float high)
@@ -153,7 +161,7 @@ void motion_abort(motion_control_t *motion)
 }
 
 static bool wheel_update(motion_wheel_t *wheel, int32_t position, float dt,
-                          uint64_t now_us, bool right, float adjustment, bool slow, bool slow_turn, bool alignment, bool transit)
+                          uint64_t now_us, bool right, float adjustment, bool slow, bool slow_turn, bool alignment, bool transit, bool straight)
 {
     int direction = wheel->target < 0 ? -1 : 1;
     int64_t progress = (int64_t)position * direction;
@@ -207,7 +215,7 @@ static bool wheel_update(motion_wheel_t *wheel, int32_t position, float dt,
     wheel->integral = clamp(wheel->integral + error * dt, -2500.0f, 2500.0f);
     float feedforward = 0.30f + 0.000055f * target_cps;
     if (right) {
-        feedforward *= 0.95f;
+        feedforward *= straight ? STRAIGHT_RIGHT_FEEDFORWARD : TURN_RIGHT_FEEDFORWARD;
     }
     wheel->throttle = clamp(feedforward + KP * error + KI * wheel->integral,
                              0.25f, 0.65f) * direction;
@@ -286,8 +294,8 @@ void motion_poll(motion_control_t *motion, encoder_sample_t sample, uint64_t now
     bool slow=motion->slow_distance||motion->slow_turn;
     const float previous_left_throttle = motion->left.throttle;
     const float previous_right_throttle = motion->right.throttle;
-    bool left_ok=wheel_update(&motion->left, left, dt, now_us, false, -sync, slow, motion->slow_turn, motion->alignment_drive, motion->transit_drive);
-    bool right_ok=wheel_update(&motion->right, right, dt, now_us, true, sync, slow, motion->slow_turn, motion->alignment_drive, motion->transit_drive);
+    bool left_ok=wheel_update(&motion->left, left, dt, now_us, false, -sync, slow, motion->slow_turn, motion->alignment_drive, motion->transit_drive, motion->kind == MOTION_STRAIGHT_30CM);
+    bool right_ok=wheel_update(&motion->right, right, dt, now_us, true, sync, slow, motion->slow_turn, motion->alignment_drive, motion->transit_drive, motion->kind == MOTION_STRAIGHT_30CM);
     if (!left_ok || !right_ok) {
         motion->stalled_wheels=(!left_ok?1u:0u)|(!right_ok?2u:0u);
         fail(motion, MOTION_STALLED);

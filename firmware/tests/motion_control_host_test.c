@@ -64,12 +64,12 @@ int main(void)
 
     motion_control_t motion = start(MOTION_STRAIGHT_30CM);
     motion_poll(&motion, motion.start, 100000u);
-    /* The Batch 5 first PI update is 0.4647/0.44475 (1800cps, dt=.1s), but the straight launch
-     * ramp limits the first tick to the breakaway floor (left 0.28, right 0.30), then +0.09 per 100 ms tick. */
-    assert(fabsf(motion.left.throttle - 0.28f) < 0.000001f);
+    /* The Batch 5 first PI update is 0.4647/0.44475 (1800cps, dt=.1s; right 0.4647 on straights since 2026-11-17), but the straight launch
+     * ramp limits the first tick to the breakaway floor (0.30 both wheels), then +0.09 per 100 ms tick. */
+    assert(fabsf(motion.left.throttle - 0.30f) < 0.000001f);
     assert(fabsf(motion.right.throttle - 0.30f) < 0.000001f);
     motion_poll(&motion, motion.start, 200000u);
-    assert(fabsf(motion.left.throttle - 0.37f) < 0.00001f);
+    assert(fabsf(motion.left.throttle - 0.39f) < 0.00001f);
     assert(fabsf(motion.right.throttle - 0.39f) < 0.00001f);
     motion_poll(&motion, motion.start, 300000u);
     assert(motion.left.throttle > 0.44f && motion.left.throttle <= 0.65f); /* reaches the PI value */
@@ -119,11 +119,11 @@ int main(void)
     motion_poll(&motion, at(&motion, 100, 0), 100000u);
     /* Unramped PI+balance values were 0.38722/0.4854 here and 0.50568/0.3676 below; the launch
      * ramp caps the first tick of both at the 0.30 breakaway floor. */
-    assert(fabsf(motion.left.throttle - 0.28f) < 0.000001f);
+    assert(fabsf(motion.left.throttle - 0.30f) < 0.000001f);
     assert(fabsf(motion.right.throttle - 0.30f) < 0.000001f);
     motion = start(MOTION_STRAIGHT_30CM);
     motion_poll(&motion, at(&motion, 0, 100), 100000u);
-    assert(fabsf(motion.left.throttle - 0.28f) < 0.000001f);
+    assert(fabsf(motion.left.throttle - 0.30f) < 0.000001f);
     assert(fabsf(motion.right.throttle - 0.30f) < 0.000001f);
     /* Near endpoint both old PI outputs clamp to .25. Position feedback must
      * still be able to slow the leading wheel, and must not accumulate at
