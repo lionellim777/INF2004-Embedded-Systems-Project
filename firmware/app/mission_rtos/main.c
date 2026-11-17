@@ -92,9 +92,21 @@ static void observer_task(int start_code, void *context)
 #ifdef RTOS_OBSTACLE
         if(command=='o')selected=BOARD_OBSTACLE_SELECT;
 #endif
+#ifdef RTOS_TERRAIN
+        /* j = 50 cm straight move at the 600 counts/s cruise speed, the hump height test (same as the
+         * dashboard firmware's j). Any other selection clears it. */
+        if (command == 'j') selected = MOTION_STRAIGHT_30CM;
+#endif
         if (command == 'x') board_stop(STOP_BUTTON);
-        if (selected != MOTION_NONE && board_select(selected))
+        if (selected != MOTION_NONE && board_select(selected)) {
+#ifdef RTOS_TERRAIN
+            runtime.long_straight = (command == 'j');
+#endif
             printf("SELECT=%u; physical GP20 required\n", selected);
+#ifdef RTOS_TERRAIN
+            if (command == 'j') puts("SELECT j: 50 cm slow move (600 counts/s) for the hump test.");
+#endif
+        }
         uint32_t now = to_ms_since_boot(get_absolute_time());
         board_stop_trace_t trace; board_stop_trace(&trace);
         if (trace.sequence!=last_stop) {

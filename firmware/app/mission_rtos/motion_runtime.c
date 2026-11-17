@@ -79,6 +79,11 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
                         if(!began){motion_abort(&r->motion);track_runtime_end();}
                     }else
 #endif
+#ifdef RTOS_TERRAIN
+                    if(r->long_straight && board_selected()==MOTION_STRAIGHT_30CM)
+                        began=motion_begin_distance(&r->motion,500u,enc,now);
+                    else
+#endif
                     began=motion_begin(&r->motion,(motion_kind_t)board_selected(),enc,now);
                     if(!began)board_stop(STOP_MOTION);
                 }

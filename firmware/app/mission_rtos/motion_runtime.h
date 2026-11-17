@@ -10,6 +10,9 @@ typedef struct {
     volatile uint32_t max_gap_us; /* one writer; atomic aligned diagnostic read */
     uint16_t token;
     uint8_t buttons; /* raw:0, stable:1, pending start:2; one task owns all bits */
+#ifdef RTOS_TERRAIN
+    volatile bool long_straight; /* hump test: next straight move is 500 mm at the slow profile; set by Observer, read by Motion */
+#endif
 #ifdef RTOS_TRACK
     track_runtime_t track;
 #endif
