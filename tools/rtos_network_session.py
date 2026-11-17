@@ -48,6 +48,7 @@ class Telemetry:
         self.recovery_pending=False
         self.outage_started_at=None
         self.last_hump_index=None
+        self.humps_seen=set()
         self.started_at=time.monotonic()
         self.waiting_reported=False
         self.motion_silent=False
@@ -137,6 +138,8 @@ class Telemetry:
                 if value['fault'] not in self.summary['fault_codes']: self.summary['fault_codes'].append(value['fault'])
                 self.summary['last_motion']=value
             elif value['type']=='status':
+                if value['boot_id']!=self.summary.get('last_status',{}).get('boot_id'):
+                    self.last_hump_index=None;self.humps_seen.clear() # hump numbers restart on reboot
                 if value['boot_id'] not in self.summary['boot_ids']: self.summary['boot_ids'].append(value['boot_id'])
                 self.summary['last_status']=value
                 self.scan.boot_id(value['boot_id'])
@@ -159,13 +162,15 @@ class Telemetry:
                 self.recovery_pending=True
                 if self.outage_started_at is None:self.outage_started_at=time.monotonic()
             elif value['type']=='hump_event':
-                # QoS1 may deliver an event twice; a forward jump means events were lost.
-                index=value['index'];last=self.last_hump_index
-                step=1 if last is None else (index-last)&255
-                if step==0 or step>=128:self.summary['hump_replays']=self.summary.get('hump_replays',0)+1
+                # QoS1 may deliver an event twice. A small forward jump in the hump
+                # number means events were lost; a reset (recalibration) is not a loss.
+                index=value['index'];last=self.last_hump_index;key=(value['completed_ms'],index)
+                if key in self.humps_seen:self.summary['hump_replays']=self.summary.get('hump_replays',0)+1
                 else:
+                    self.humps_seen.add(key)
                     self.summary['hump_events_received']=self.summary.get('hump_events_received',0)+1
-                    self.summary.setdefault('hump_missing',[]).extend((last+k)&255 for k in range(1,step))
+                    step=0 if last is None else (index-last)&255
+                    if 1<step<128:self.summary.setdefault('hump_missing',[]).extend((last+k)&255 for k in range(1,step))
                     self.last_hump_index=index
                 self.summary['hump_dropped_reported']=max(self.summary.get('hump_dropped_reported',0),value['dropped'])
             elif value['type']=='command_result' and value['accepted'] and value['command']==3:
@@ -262,10 +267,11 @@ class Link:
     async def restart(self):
         with self.telemetry.lock:self.telemetry.summary['broker_restarts_requested']+=1
         self.telemetry.event('broker_restart_begin')
-        self.telemetry.interruption('requested broker restart')
         print('Pausing the broker for two seconds. GP20 and USB stop remain available.',flush=True)
         try:
             await self.stop_broker()
+            # After the broker is down, so an in-flight packet cannot end the outage early.
+            self.telemetry.interruption('requested broker restart')
             await asyncio.sleep(2)
             await self.start_broker()
             self.telemetry.event('broker_restart_complete')

@@ -136,12 +136,16 @@ def main():
             file=temp/path;file.parent.mkdir(parents=True,exist_ok=True)
             file.write_text('#include "network_test_sdk.h"\n')
         (temp/"network_settings.h").write_text((APP/"network_settings.example.h").read_text())
-        subprocess.run([shutil.which("clang"),"-std=c11","-g","-O1","-Wall","-Wextra","-Werror","-DRTOS_TRACK=1","-DRTOS_RUNTIME_EVIDENCE=1","-DRTOS_TERRAIN=1","-DRTOS_OBSTACLE=1",
-                        "-fsanitize=address,undefined","-fno-omit-frame-pointer",
-                        "-I",str(APP),"-I",str(ROOT/'firmware/app/robot_firmware'),"-I",str(TEST),"-I",str(temp),str(TEST/"network_test.c"),
-                        str(APP/"binary_protocol.c"),str(APP/"terrain_telemetry.c"),str(APP/"motion_record.c"),str(APP/'scan_diagnostic.c'),str(APP/'runtime_measure.c'),"-o",str(temp/"test")],check=True)
-        output=subprocess.check_output([str(temp/"test")],text=True)
-        print("\n".join(line for line in output.splitlines() if line.startswith("PASS")))
+        # Default (accepted v0.5.1 topics) and every opt-in combination; the
+        # packets checked below come from the last, fully enabled build.
+        for options in [[],["-DRTOS_TERRAIN=1"],["-DRTOS_OBSTACLE=1"],["-DRTOS_TERRAIN=1","-DRTOS_OBSTACLE=1"]]:
+            subprocess.run([shutil.which("clang"),"-std=c11","-g","-O1","-Wall","-Wextra","-Werror","-DRTOS_TRACK=1","-DRTOS_RUNTIME_EVIDENCE=1",*options,
+                            "-fsanitize=address,undefined","-fno-omit-frame-pointer",
+                            "-I",str(APP),"-I",str(ROOT/'firmware/app/robot_firmware'),"-I",str(TEST),"-I",str(temp),str(TEST/"network_test.c"),
+                            str(APP/"binary_protocol.c"),str(APP/"terrain_telemetry.c"),str(APP/"motion_record.c"),str(APP/'scan_diagnostic.c'),str(APP/'runtime_measure.c'),"-o",str(temp/"test")],check=True)
+            output=subprocess.check_output([str(temp/"test")],text=True)
+            print(f"build options {options or 'default'}:")
+            print("\n".join(line for line in output.splitlines() if line.startswith("PASS")))
         packets=[]
         for line in output.splitlines():
             if line.startswith("PACKET "):

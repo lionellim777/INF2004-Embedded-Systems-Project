@@ -116,7 +116,8 @@ def prepare(folder=PRIVATE):
         sha256=hashlib.sha256(image.read_bytes()).hexdigest(),broker_ip=settings["broker_ip"],
         settings_sha256=hashlib.sha256(json.dumps(settings,sort_keys=True).encode()).hexdigest(),
         port=settings["port"],network_configured=True,credentials_embedded=True,
-        firmware_version='0.5.1',track_integration=True,scan_diagnostics=True,runtime_measurements=True,requires_usb_logger=False,
+        firmware_version='0.5.1',track_integration=True,
+        options=dict(obstacle=env.get('ROBOT_OBSTACLE','OFF'),terrain=env.get('ROBOT_TERRAIN','OFF')),scan_diagnostics=True,runtime_measurements=True,requires_usb_logger=False,
         default_selection='track_scan'), indent=2)+'\n')
     print("Firmware ready:", image)
     return settings, image

@@ -47,12 +47,19 @@ terrain_source_t src={.available=st.available,.calibrated=st.calibrated,.sample_
 terrain_reading_t r;
 if(terrain_reading_from(now,&src,&r)){
     (void)network_terrain(&r);
-    if(st.roll_hump_count!=humps_seen && r.valid)
+    /* '>' not '!=': terrain_calibrate() resets roll_hump_count to 0. */
+    if(st.roll_hump_count>humps_seen && r.valid)
         (void)network_hump_event(now,(uint8_t)r.humps,r.last_height_dmm);
 }
 humps_seen=st.roll_hump_count;
 #endif
 ```
+
+What I checked in your `terrain.c` (`68822af`):
+- It includes `hardware/i2c.h` and `pico/stdlib.h`.
+- `hump_roll.h` is header-only, so `terrain.c` plus `hardware_i2c` is all the build needs.
+- `terrain_init()` and `terrain_calibrate()` block with `sleep_ms` (about 2 s for calibration). That is fine only at the lowest priority, which is another reason to use Observer.
+- `terrain_calibrate()` zeroes `roll_hump_count`, so hump numbers restart at 1 after every calibration. The laptop log handles this: it treats events as duplicates only when both time and number repeat.
 
 4. Decide where `terrain_init()`/`terrain_calibrate()` run (calibration takes ~2 s with the car still and level; it must not run while Motion is driving). Also decide where `terrain_motion_go()` is called when GP20 starts a run. I left both open because they depend on how you want the start sequence to behave.
 5. `terrain.c` prints over USB. Check that this doesn't flood the Observer's `[RTOS_INFO]` and `[MOTION_V1]` lines that the laptop parses.
@@ -65,15 +72,31 @@ Please confirm the record ranges fit what you see on the car:
 
 ## Your part 2: tests that need the car
 
-Build with the build script (macOS toolchain paths are the defaults):
+Build and provision through the session console, so the image gets your Wi-Fi and broker settings. `prepare()` passes `ROBOT_TERRAIN`/`ROBOT_OBSTACLE` through to the build. **Don't use `--reuse` when switching flags**: it reuses the last image.
 
 ```bash
-ROBOT_TERRAIN=ON ROBOT_OBSTACLE=ON ROBOT_BUILD_DIR=build/rtos-telemetry ROBOT_OUTPUT_NAME=robocar_rtos_telemetry.uf2 sh tools/build_rtos_motion.sh
+ROBOT_TERRAIN=ON ROBOT_OBSTACLE=ON sh tools/run_rtos_network.sh
 ```
 
-Also build once with both OFF and confirm it still compiles cleanly. The default image must stay unchanged.
+Check `build/rtos-network-local/firmware-info.json`: `options` should read `{"obstacle": "ON", "terrain": "ON"}`. The image name and `firmware_version` still say 0.5.1, so `options` is how you tell the images apart. Put it in your test notes.
 
-Then, with `sh tools/run_rtos_network.sh`:
+Also build once with both OFF and confirm it still compiles cleanly. The default image must stay unchanged:
+
+```bash
+sh tools/build_rtos_motion.sh
+```
+
+Run the representation audits against the new state (`humps` queue, `terrain_latest`, `obstacle_latest`, `last_echo`) and compare with `main`. I couldn't run them: they need the macOS ARM toolchain and the preserved ELF (see `docs/representation-audit.md`).
+
+```bash
+python3 tools/audit_rtos_representation.py
+```
+
+```bash
+python3 tools/bit_budget.py
+```
+
+Then run the car tests with that console:
 
 1. **Normal run:** in the MQTT log, check that `terrain`, `obstacle` (obstacle mode `o`) and `hump_event` appear and decode. The status mask should show bit3 when terrain is valid and bit4 when obstacle mode is active.
 2. **Network loss:** during a supervised run, press `b` (broker restart) at least 3 times, including once while driving over a hump. In `mqtt-summary.json` record:
@@ -88,15 +111,18 @@ Write results into `docs/testing/` as usual. Please include the commit hash and 
 ## Host test status (Windows machine, 2026-11-17)
 
 Run with clang/LLVM 23. All of these pass:
-- `firmware/tests/mission_rtos/network_test.c` in all four variants: default, `RTOS_TERRAIN`, `RTOS_OBSTACLE`, and both. ASan/UBSan on.
+- `firmware/tests/mission_rtos/network_test.c` in all four variants: default, `RTOS_TERRAIN`, `RTOS_OBSTACLE`, and both. ASan/UBSan on. `tools/test_rtos_network.py` now builds and runs all four itself.
+- `provisioning_preserves_default` (opt-in flags pass through and are recorded in `firmware-info.json`).
+- `restart_and_recalibration`: a packet still in flight during `b` is not counted as a recovery, and a hump-number reset or reboot is not counted as a replay.
 - `RTOS_TEST_OBSTACLE=1 python tools/test_rtos_track.py` and the default `tools/test_rtos_track.py`.
 - The decoder checks in `tools/test_rtos_network.py`, and the ACL check in `tools/test_rtos_network_setup.py`.
 - `outage_evidence`, `telemetry_health` and the telemetry part of `delays_and_command_input` in `tools/test_rtos_network_console.py`.
 
 These could not run fully on that machine, for environment reasons only (they fail the same way without these changes):
 - `test_rtos_network.py` needs `test_rtos_runtime.py` fixtures first, and that script expects the macOS ARM toolchain.
-- `test_rtos_network_setup.py` needs `amqtt`.
-- `test_rtos_network_console.py` needs `paho`, and on Windows its pipe/select step fails.
+- `test_rtos_network_setup.py` fails on Windows at its POSIX file-mode check.
+- `test_rtos_network_console.py` fails on Windows at its pipe/select step.
+- The representation audits need the macOS ARM toolchain.
 
 On your Mac, please run the full set in order:
 

@@ -289,6 +289,13 @@ def provisioning_preserves_default(settings,folder):
     assert calls[0]['ROBOT_COMPACT_ADC_STATE']==calls[0]['ROBOT_COMPACT_CORE_STATE']==calls[0]['ROBOT_COMPACT_CONTROL_STATE']=='OFF'
     assert calls[0]['ROBOT_FIRST_FAILURE_CACHE']=='ON'
     info=json.loads((folder/'firmware-info.json').read_text());assert info['firmware_version']=='0.5.1'
+    assert info['options']==dict(obstacle='OFF',terrain='OFF')
+    calls.clear()
+    with patch.object(setup,'ROOT',folder/'default-build-fixture'),          patch.object(setup,'mac_wifi_ip',return_value=settings['broker_ip']),          patch('builtins.input',side_effect=['','']),          patch.object(setup.subprocess,'run',side_effect=fake_build),          patch.dict(os.environ,{'ROBOT_TERRAIN':'ON','ROBOT_OBSTACLE':'ON'}):
+        setup.prepare(folder)
+    assert calls[0]['ROBOT_TERRAIN']==calls[0]['ROBOT_OBSTACLE']=='ON' # opt-in passes through
+    info=json.loads((folder/'firmware-info.json').read_text())
+    assert info['options']==dict(obstacle='ON',terrain='ON'),'evidence must name the opt-in image'
     print('PASS default provisioning overrides inherited experimental flags; fixture build only, no real firmware or hardware touched')
 
 

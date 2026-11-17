@@ -140,6 +140,31 @@ def outage_evidence():
     print('PASS outage evidence: recovery time per interruption, hump replays, gaps and firmware-reported drops')
 
 
+def restart_and_recalibration():
+    import asyncio
+    with tempfile.TemporaryDirectory(prefix='rtos-restart-') as name:
+        folder=Path(name);t=Telemetry(folder/'mqtt.jsonl')
+        motion=bytes.fromhex('00000000000000000000000001')
+        link=Link.__new__(Link);link.telemetry=t
+        async def stop_broker():t.packet(PREFIX+'motion',motion) # last packet before the broker dies
+        async def start_broker():pass
+        async def no_wait(seconds):pass
+        link.stop_broker,link.start_broker=stop_broker,start_broker
+        with contextlib.redirect_stdout(io.StringIO()):
+            t.packet(PREFIX+'motion',motion)
+            with patch('rtos_network_session.asyncio.sleep',no_wait):asyncio.run(link.restart())
+            assert 'recovery_seconds' not in t.summary,'packet sent before the outage is not a recovery'
+            # Calibration resets Ezra's hump count; a reboot changes boot_id. Neither is a replay.
+            for packet in [hump(1,ms=100),hump(2,ms=200),hump(2,ms=200),hump(1,ms=900),hump(2,ms=950)]:
+                t.packet(PREFIX+'hump_event',packet)
+            t.packet(PREFIX+'status',bytes.fromhex('00000000'+'07000000'+'0000'))
+            t.packet(PREFIX+'hump_event',hump(1,ms=100))
+        s=t.summary
+        assert s['hump_replays']==1 and s['hump_events_received']==5 and s.get('hump_missing',[])==[],s
+        t.save(folder/'summary.json')
+    print('PASS restart/recalibration: no false recovery from in-flight packets; hump count reset and reboot are not replays')
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix='rtos-console-') as name:
         folder=Path(name)
@@ -209,6 +234,7 @@ def main():
     delays_and_command_input()
     telemetry_health()
     outage_evidence()
+    restart_and_recalibration()
 
 
 if __name__=='__main__':main()
