@@ -40,6 +40,9 @@ static void motion_task(int start_code, void *context)
 {
     (void)start_code; (void)context;
     motion_runtime_init(&runtime, encoders_snapshot(), time_us_32(), board_button_down());
+#ifdef RTOS_HUMP_TEST_BOOT
+    runtime.long_straight = true; /* matches the boot selection below: 50 cm slow move */
+#endif
     for (;;) {
         bool armed;uint8_t reason;board_gate_snapshot(&armed,&reason);
         runtime_measure_run(runtime.token,armed);
@@ -242,7 +245,12 @@ int main(void)
     }
     /* Autonomous power-bank boot selects the tested scan route, never starts
      * it. Motion still requires a fresh debounced physical GP20 gesture. */
+#ifdef RTOS_HUMP_TEST_BOOT
+    /* Test-only: boot with the 50 cm slow hump move selected so a USB-free run needs only GP20. */
+    (void)board_select(MOTION_STRAIGHT_30CM);
+#else
     (void)board_select(MOTION_COURSE);
+#endif
     knl_lowmem_top = kernel_pool;
     knl_lowmem_limit = kernel_pool + sizeof kernel_pool;
     (void)exception_set_exclusive_handler(PENDSV_EXCEPTION, knl_dispatch_entry);

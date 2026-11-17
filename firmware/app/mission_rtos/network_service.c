@@ -14,6 +14,10 @@
 #include "lwip/apps/mqtt.h"
 #include "lwip/ip_addr.h"
 #include <string.h>
+#ifdef RTOS_HUMP_TEST_BOOT
+#include <stdio.h>
+#include "lwip/netif.h"
+#endif
 #ifdef RTOS_RUNTIME_EVIDENCE
 #include "runtime_report.h"
 static const char runtime_topic[]=RTOS_TOPIC_PREFIX "runtime_diag";
@@ -271,13 +275,21 @@ static void connect_broker(uint32_t now)
      * link code avoids embedded-NUL truncation without modifying the SDK:
      * 0 unknown, 1 offline, 2 online. Numeric code, not an ASCII digit. */
     info=(struct mqtt_connect_client_info_t){.client_id="aai10-rtos-motion",
-        .client_user=RTOS_BROKER_USER,.client_pass=RTOS_BROKER_PASSWORD,
+        /* lwIP rejects empty credential strings (ERR_VAL); NULL means an anonymous broker. */
+        .client_user=RTOS_BROKER_USER[0]?RTOS_BROKER_USER:NULL,
+        .client_pass=RTOS_BROKER_PASSWORD[0]?RTOS_BROKER_PASSWORD:NULL,
         .keep_alive=15,.will_topic=link_topic,.will_msg="\x01",
         .will_qos=1,.will_retain=1};
     mqtt_set_inpub_callback(client,incoming,data,NULL);
     flags&=(uint16_t)~(CONNECTED|FAILED|SUB_MASK);
     state(NETWORK_CONNECTING,now);
+#ifdef RTOS_HUMP_TEST_BOOT
+    err_t connect_error=mqtt_client_connect(client,&address,RTOS_BROKER_PORT,connection,NULL,&info);
+    printf("[NET_DIAG] mqtt_client_connect err=%d ip=%s\n",(int)connect_error,ipaddr_ntoa(netif_ip4_addr(netif_default)));
+    if (connect_error!=ERR_OK) fail(now,6);
+#else
     if (mqtt_client_connect(client,&address,RTOS_BROKER_PORT,connection,NULL,&info)!=ERR_OK) fail(now,6);
+#endif
 }
 static void step(uint32_t now)
 {
