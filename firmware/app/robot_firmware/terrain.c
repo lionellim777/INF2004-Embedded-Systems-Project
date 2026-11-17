@@ -43,14 +43,17 @@ static hump_roll_t roll_detector;
 static tilt_alert_t tilt_detector;
 static motion_class_state_t motion_class;
 static uint64_t last_roll_poll_ms;
+#ifndef TERRAIN_NO_ROLL_TRACE
 /* Roll trace for tuning: every detector input sample of a run, kept in RAM and printed after the
  * stop. filtered = the 8-sample average the detector sees, raw = the single newest sample, both as
- * roll change from the level calibration in 0.1 degree. */
+ * roll change from the level calibration in 0.1 degree. The RTOS image defines
+ * TERRAIN_NO_ROLL_TRACE to leave out the 3.6 KB buffer. */
 enum { ROLL_TRACE_SAMPLES = 600 }; /* about 16 s: covers the slow 50 cm move */
 static struct { uint16_t ms; int16_t filtered; int16_t raw; } roll_trace[ROLL_TRACE_SAMPLES];
 static unsigned roll_trace_count;
 static uint64_t roll_trace_start_ms;
 static bool roll_trace_started;
+#endif
 static uint64_t next_sample_ms;
 static hump_phase_t phase;
 static uint64_t event_start_ms;
@@ -265,8 +268,10 @@ void terrain_run_start(void)
     }
     hump_roll_begin_run(&roll_detector);
     last_roll_poll_ms = 0;
+#ifndef TERRAIN_NO_ROLL_TRACE
     roll_trace_count = 0;
     roll_trace_started = false;
+#endif
     tilt_alert_reset(&tilt_detector);
     /* The brief asks for the highest hump "during the run", and the dashboard labels these "this run":
      * start every run from zero instead of carrying the totals over from earlier runs. */
@@ -278,11 +283,13 @@ void terrain_run_start(void)
     status.highest_roll_hump_mm = 0.0f;
 }
 
+#ifndef TERRAIN_NO_ROLL_TRACE
 static int16_t tenths(float degrees)
 {
     const float scaled = degrees * 10.0f;
     return (int16_t)(scaled > 3000.0f ? 3000.0f : (scaled < -3000.0f ? -3000.0f : scaled));
 }
+#endif
 
 void terrain_run_end(void)
 {
@@ -295,6 +302,11 @@ void terrain_run_end(void)
     }
 }
 
+#ifdef TERRAIN_NO_ROLL_TRACE
+void terrain_print_roll_trace(void)
+{
+}
+#else
 void terrain_print_roll_trace(void)
 {
     if (roll_trace_count == 0u) {
@@ -312,6 +324,7 @@ void terrain_print_roll_trace(void)
     roll_trace_count = 0;
     roll_trace_started = false;
 }
+#endif
 
 void terrain_motion_update(int32_t left_forward_counts, int32_t right_forward_counts, uint32_t now_ms)
 {
@@ -335,12 +348,14 @@ void terrain_motion_go(void)
 {
     const uint64_t now_ms = to_ms_since_boot(get_absolute_time());
     hump_roll_motion_go(&roll_detector, (uint32_t)now_ms);
+#ifndef TERRAIN_NO_ROLL_TRACE
     /* The trace covers the first GO of a run only; later calls (course turns) do not restart it. */
     if (!roll_trace_started) {
         roll_trace_started = true;
         roll_trace_start_ms = now_ms;
         roll_trace_count = 0;
     }
+#endif
 }
 
 void terrain_poll(void)
@@ -395,12 +410,14 @@ void terrain_poll(void)
     last_roll_poll_ms = now_ms;
     const float roll_change = roll_of(&average) - level_roll;
     status.current_roll_change_deg = roll_change;
+#ifndef TERRAIN_NO_ROLL_TRACE
     if (roll_trace_started && roll_trace_count < ROLL_TRACE_SAMPLES) {
         roll_trace[roll_trace_count].ms = (uint16_t)(now_ms - roll_trace_start_ms);
         roll_trace[roll_trace_count].filtered = tenths(roll_change);
         roll_trace[roll_trace_count].raw = tenths(roll_of(&reading) - level_roll);
         ++roll_trace_count;
     }
+#endif
     report_roll_event(hump_roll_update(&roll_detector, roll_change, (uint32_t)now_ms));
     /* Tilt alert: skip the launch/turn hold-off, when acceleration reads as tilt. The roll detector
      * clears its hold-off flag lazily inside the update call above, so it is current here. */

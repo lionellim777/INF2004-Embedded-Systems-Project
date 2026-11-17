@@ -22,7 +22,7 @@ option(RTOS_COMPACT_CORE_STATE "Opt-in packed baseline and capture coordination 
 option(RTOS_COMPACT_CONTROL_STATE "Opt-in Motion-owned controller state and flags" OFF)
 option(RTOS_FIRST_FAILURE_CACHE "Retain duplicate first failed raw waveform for diagnosis" ON)
 option(RTOS_OBSTACLE "Enable experimental USB-selectable obstacle manoeuvring" OFF)
-option(RTOS_TERRAIN "Publish terrain telemetry; no terrain producer task is connected yet" OFF)
+option(RTOS_TERRAIN "Publish terrain telemetry; the Observer task polls the IMU (hump, tilt, motion state)" OFF)
 if(RTOS_NETWORK_SETTINGS_FILE)
     configure_file("${RTOS_NETWORK_SETTINGS_FILE}" "${CMAKE_BINARY_DIR}/generated/network_settings.h" COPYONLY)
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/network_settings.local.h")
@@ -95,8 +95,11 @@ endif()
 target_link_libraries(robocar_rtos_motion PRIVATE mtkernel pico_stdlib
     hardware_adc hardware_clocks hardware_exception hardware_pwm pico_rand pico_cyw43_arch_lwip_poll pico_lwip_mqtt m)
 if(RTOS_TERRAIN)
-    target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_TERRAIN=1)
-    target_sources(robocar_rtos_motion PRIVATE terrain_telemetry.c)
+    # terrain.c is the same IMU module as the polling firmware (GY-511 on I2C0, GP4/GP5). It is
+    # polled from the Observer task only; the roll trace buffer is left out to save RAM.
+    target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_TERRAIN=1 TERRAIN_NO_ROLL_TRACE=1)
+    target_sources(robocar_rtos_motion PRIVATE terrain_telemetry.c "${BASELINE}/terrain.c")
+    target_link_libraries(robocar_rtos_motion PRIVATE hardware_i2c)
 endif()
 if(RTOS_OBSTACLE)
     target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_OBSTACLE=1)

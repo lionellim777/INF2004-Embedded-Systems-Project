@@ -18,6 +18,10 @@
 #ifdef RTOS_OBSTACLE
 #include "obstacle_io.h"
 #endif
+#ifdef RTOS_TERRAIN
+#include "terrain.h"
+#include "terrain_telemetry.h"
+#endif
 #ifndef RTOS_WAIT_FOR_USB
 #define RTOS_WAIT_FOR_USB 0
 #endif
@@ -68,6 +72,17 @@ static void observer_task(int start_code, void *context)
     uint32_t last_info = 0;
     uint32_t last_stop = 0;
     uint16_t last_reads=0;
+#ifdef RTOS_TERRAIN
+    /* IMU (GY-511, GP4/GP5): the same terrain.c as the polling firmware. Its state is not thread
+     * safe, so only this task touches it. Level calibration blocks for about 2 s and needs the car
+     * level and still: it runs once here at boot and again on 'g' while the car is not armed. */
+    puts("[TERRAIN] Hump, tilt and motion state from the GY-511. g=level calibration while stopped.");
+    terrain_calibrate();
+    uint32_t humps_seen = 0u;
+    uint32_t terrain_settle_until = 0u;
+    uint32_t last_terrain_send = 0u;
+    bool terrain_was_armed = false;
+#endif
     for (;;) {
         runtime_span_t observer_span=runtime_measure_begin(RUNTIME_OBSERVER,time_us_32());
         int command = getchar_timeout_us(0);
@@ -120,6 +135,55 @@ static void observer_task(int start_code, void *context)
             printf(" gap_us=%" PRIu32 "\n", runtime.max_gap_us);
             last_print = now;
         }
+#ifdef RTOS_TERRAIN
+        {
+            bool armed; uint8_t gate_reason;
+            board_gate_snapshot(&armed,&gate_reason);
+            if (command == 'g') {
+                if (armed) puts("[TERRAIN] Level calibration only while the car is stopped.");
+                else terrain_calibrate();
+            }
+            /* A run starts when the gate arms (GP20) and ends when it disarms. The detector keeps
+             * polling for 500 ms after the stop so that a hump still open at the stop is reported. */
+            if (armed && !terrain_was_armed) {
+                terrain_run_start();
+                terrain_motion_go();
+                humps_seen = 0u;
+                terrain_settle_until = 0u;
+            } else if (!armed && terrain_was_armed) {
+                terrain_settle_until = now + 500u;
+            }
+            terrain_was_armed = armed;
+            if (armed || (terrain_settle_until != 0u && (int32_t)(now - terrain_settle_until) < 0)) {
+                terrain_poll();
+            } else if (terrain_settle_until != 0u) {
+                terrain_run_end();
+                terrain_settle_until = 0u;
+            }
+            /* Speed, turn rate and motion state come from the same encoders Motion uses. The left
+             * raw count falls as the car drives forward; the classifier wants both forward positive. */
+            encoder_sample_t wheels = encoders_snapshot();
+            terrain_motion_update((int32_t)(0u - wheels.left_raw), (int32_t)wheels.right_raw, now);
+            const terrain_status_t st = terrain_get_status();
+            const terrain_source_t source = {
+                .available = st.available, .calibrated = st.calibrated, .sample_valid = st.pitch_valid,
+                .roll_change_deg = st.current_roll_change_deg, .humps = st.roll_hump_count,
+                .last_height_mm = st.last_roll_hump_mm, .highest_height_mm = st.highest_roll_hump_mm,
+                .motion_state = st.motion_state, .tilt_active = st.tilt_alert_active,
+                .tilt_alerts = st.tilt_alert_count };
+            terrain_reading_t reading;
+            if (terrain_reading_from(now, &source, &reading)) {
+                if ((uint32_t)(now - last_terrain_send) >= 100u) {
+                    (void)network_terrain(&reading);
+                    last_terrain_send = now;
+                }
+                /* '>' not '!=': the count restarts at 0 at every run start and calibration. */
+                if (st.roll_hump_count > humps_seen)
+                    (void)network_hump_event(now, (uint8_t)reading.humps, reading.last_height_dmm);
+            }
+            humps_seen = st.roll_hump_count;
+        }
+#endif
         runtime_measure_end(RUNTIME_OBSERVER,observer_span,time_us_32());mtk_bridge_delay_ms(10);
     }
 }
