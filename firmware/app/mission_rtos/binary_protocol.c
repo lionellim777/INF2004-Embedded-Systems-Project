@@ -22,17 +22,21 @@ bool line_record_encode(uint32_t ms,const uint16_t raw[3],uint8_t pattern,bool v
 bool terrain_record_encode(const terrain_reading_t *r,uint8_t out[TERRAIN_RECORD_BYTES])
 {
     if(out==NULL || r==NULL || r->roll_decideg<-255 || r->roll_decideg>255 || r->humps>255 ||
-       r->last_height_dmm>511 || r->highest_height_dmm>511)return false;
-    uint8_t b[9]={0};put32(b,r->ms);
+       r->last_height_dmm>511 || r->highest_height_dmm>511 || r->motion_state>6u || r->tilt_alerts>15u)return false;
+    uint8_t b[TERRAIN_RECORD_BYTES]={0};put32(b,r->ms);
+    /* Run results are kept while the sensor reading is invalid; only live values are zeroed. */
     uint64_t fields=r->calibrated?2u:0u;
+    fields|=(uint64_t)r->humps<<11u;
+    fields|=(uint64_t)r->last_height_dmm<<19u;
+    fields|=(uint64_t)r->highest_height_dmm<<28u;
+    uint8_t motion=(uint8_t)r->motion_state;
     if(r->valid){
         fields|=1u;
         fields|=(uint64_t)((uint16_t)r->roll_decideg&511u)<<2u;
-        fields|=(uint64_t)r->humps<<11u;
-        fields|=(uint64_t)r->last_height_dmm<<19u;
-        fields|=(uint64_t)r->highest_height_dmm<<28u;
+        motion=(uint8_t)(motion|(r->tilt_active?8u:0u)|(uint8_t)(r->tilt_alerts<<4u));
     }
     for(unsigned i=0;i<5;i++)b[4+i]=(uint8_t)(fields>>(8u*i));
+    b[9]=motion;
     memcpy(out,b,sizeof b);return true;
 }
 bool hump_event_record_encode(uint32_t ms,uint8_t index,uint16_t height_dmm,uint8_t dropped,uint8_t out[HUMP_EVENT_BYTES])

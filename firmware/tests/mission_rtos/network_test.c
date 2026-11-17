@@ -126,8 +126,10 @@ static void terrain_protocol(void)
  /* Hand-packed: valid1,calibrated1, roll -25 (0.1 deg) as signed9, humps 2,
   * last 100 and highest 126 (0.1 mm) as 9 bits each -> 0x7E320179F. */
  terrain_reading_t r={.ms=0x01020304u,.valid=true,.calibrated=true,.roll_decideg=-25,
-                      .humps=2,.last_height_dmm=100,.highest_height_dmm=126};
- const uint8_t expected[TERRAIN_RECORD_BYTES]={4,3,2,1,0x9f,0x17,0x20,0xe3,0x07};
+                      .humps=2,.last_height_dmm=100,.highest_height_dmm=126,
+                      .motion_state=5,.tilt_active=true,.tilt_alerts=2};
+ /* Last byte: motion state 5 | tilt active 1<<3 | 2 alerts<<4 = 0x2d. */
+ const uint8_t expected[TERRAIN_RECORD_BYTES]={4,3,2,1,0x9f,0x17,0x20,0xe3,0x07,0x2d};
  uint8_t b[TERRAIN_RECORD_BYTES];
  assert(terrain_record_encode(&r,b) && !memcmp(b,expected,sizeof b));
  terrain_reading_t edge={.valid=true,.roll_decideg=-255,.humps=255,.last_height_dmm=511,.highest_height_dmm=511};
@@ -138,31 +140,43 @@ static void terrain_protocol(void)
  bad=edge;bad.humps=256;assert(!terrain_record_encode(&bad,b));
  bad=edge;bad.last_height_dmm=512;assert(!terrain_record_encode(&bad,b));
  bad=edge;bad.highest_height_dmm=512;assert(!terrain_record_encode(&bad,b));
+ bad=edge;bad.motion_state=7;assert(!terrain_record_encode(&bad,b));
+ bad=edge;bad.tilt_alerts=16;assert(!terrain_record_encode(&bad,b));
+ /* Invalid sensor reading: roll and tilt are zeroed, the run's hump results and the motion state stay. */
  r.valid=false;assert(terrain_record_encode(&r,b));
- const uint8_t invalid[TERRAIN_RECORD_BYTES]={4,3,2,1,2,0,0,0,0};
+ const uint8_t invalid[TERRAIN_RECORD_BYTES]={4,3,2,1,0x02,0x10,0x20,0xe3,0x07,0x05};
  assert(!memcmp(b,invalid,sizeof b));
- puts("PASS terrain record: hand-packed signed roll, hump count and heights");
+ puts("PASS terrain record: hand-packed signed roll, hump count, heights, motion state and tilt alert");
 }
 static void terrain_converter(void)
 {
  terrain_source_t s={.available=true,.calibrated=true,.sample_valid=true,.roll_change_deg=-2.46f,
-                     .humps=3,.last_height_mm=10.04f,.highest_height_mm=12.66f};
+                     .humps=3,.last_height_mm=10.04f,.highest_height_mm=12.66f,
+                     .motion_state=2,.tilt_active=true,.tilt_alerts=20};
  terrain_reading_t r;
  assert(terrain_reading_from(500,&s,&r));
  assert(r.ms==500 && r.valid && r.calibrated && r.roll_decideg==-25 && r.humps==3 &&
-        r.last_height_dmm==100 && r.highest_height_dmm==127);
+        r.last_height_dmm==100 && r.highest_height_dmm==127 &&
+        r.motion_state==2 && r.tilt_active && r.tilt_alerts==15); /* alert count saturates at 15 */
  terrain_source_t off=s;off.available=false;assert(terrain_reading_from(1,&off,&r) && !r.valid && r.calibrated);
  off=s;off.calibrated=false;assert(terrain_reading_from(1,&off,&r) && !r.valid && !r.calibrated);
  off=s;off.sample_valid=false;assert(terrain_reading_from(1,&off,&r) && !r.valid && r.calibrated);
  const terrain_reading_t kept=r;
- terrain_source_t bad[]={s,s,s,s,s,s,s};
- bad[0].roll_change_deg=0.0f/0.0f;bad[1].roll_change_deg=25.56f;bad[2].roll_change_deg=-25.56f;
- bad[3].humps=256;bad[4].last_height_mm=-0.06f;bad[5].highest_height_mm=51.16f;bad[6].last_height_mm=1e30f;
+ terrain_source_t bad[]={s,s,s,s,s,s};
+ bad[0].roll_change_deg=0.0f/0.0f;bad[1].humps=256;bad[2].last_height_mm=-0.06f;
+ bad[3].highest_height_mm=51.16f;bad[4].last_height_mm=1e30f;bad[5].motion_state=7;
  for(unsigned i=0;i<sizeof bad/sizeof bad[0];i++){
   assert(!terrain_reading_from(2,&bad[i],&r));assert(!memcmp(&r,&kept,sizeof r));
  }
  terrain_source_t edge=s;edge.roll_change_deg=-25.54f;edge.humps=255;edge.highest_height_mm=51.14f;
  assert(terrain_reading_from(3,&edge,&r) && r.roll_decideg==-255 && r.highest_height_dmm==511);
+ /* A tilt past 25.5 degrees saturates the roll field instead of dropping the reading. */
+ terrain_source_t tipped=s;tipped.roll_change_deg=-27.1f;
+ assert(terrain_reading_from(4,&tipped,&r) && r.roll_decideg==-255);
+ tipped.roll_change_deg=30.0f;assert(terrain_reading_from(5,&tipped,&r) && r.roll_decideg==255);
+ /* The sensor is invalid but the run's hump results are still published. */
+ terrain_source_t lost=s;lost.sample_valid=false;
+ assert(terrain_reading_from(6,&lost,&r) && !r.valid && r.humps==3 && r.highest_height_dmm==127);
  puts("PASS terrain converter: rounds Ezra's float status to 0.1 deg / 0.1 mm");
 }
 static void obstacle_protocol(void)

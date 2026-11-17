@@ -12,11 +12,16 @@ typedef struct {
     float roll_change_deg;
     uint32_t humps;
     float last_height_mm, highest_height_mm;
+    /* From terrain_status_t of the current firmware: motion_state (a motion_class_t value),
+     * tilt_alert_active, tilt_alert_count (counted this run). */
+    uint8_t motion_state;
+    bool tilt_active;
+    uint32_t tilt_alerts;
 } terrain_source_t;
 
-/* Rounds to the terrain/v1 units. Returns false, leaving out untouched, for
- * NaN or values outside the record ranges; the caller then keeps the last
- * published snapshot, whose capture time stops advancing. */
+/* Rounds to the terrain/v1 units. Roll beyond +/-25.5 degrees saturates. Returns false,
+ * leaving out untouched, for NaN or other values outside the record ranges; the caller then
+ * keeps the last published snapshot, whose capture time stops advancing. */
 bool terrain_reading_from(uint32_t ms, const terrain_source_t *source, terrain_reading_t *out);
 
 /* Completed humps waiting for MQTT acknowledgement. When full, the oldest

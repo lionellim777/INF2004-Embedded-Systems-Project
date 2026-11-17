@@ -39,16 +39,19 @@ def decode(topic, payload):
         if not valid and (any(raw) or pattern):raise ValueError('Invalid line record has numeric values')
         return dict(type=kind,captured_ms=int.from_bytes(payload[:4],'little'),raw_adc=raw,pattern=pattern,valid=valid)
     if kind=='terrain':
-        if len(payload)!=9:raise ValueError('Invalid terrain record length')
-        fields=int.from_bytes(payload[4:],'little')
+        if len(payload)!=10:raise ValueError('Invalid terrain record length')
+        fields=int.from_bytes(payload[4:9],'little')
         if fields>>37:raise ValueError('Invalid terrain padding')
         valid,calibrated=bool(fields&1),bool(fields&2)
         roll=(fields>>2)&511;roll=roll-512 if roll&256 else roll
         humps,last,highest=(fields>>11)&255,(fields>>19)&511,(fields>>28)&511
         if roll==-256:raise ValueError('Invalid terrain roll')
-        if not valid and (roll or humps or last or highest):raise ValueError('Invalid terrain record has numeric values')
+        motion,tilt_active,tilt_alerts=payload[9]&7,bool(payload[9]&8),payload[9]>>4
+        if motion>6:raise ValueError('Invalid terrain motion state')
+        if not valid and (roll or tilt_active or tilt_alerts):raise ValueError('Invalid terrain record has live values')
         return dict(type=kind,captured_ms=int.from_bytes(payload[:4],'little'),valid=valid,calibrated=calibrated,
-                    roll_decideg=roll,humps=humps,last_height_dmm=last,highest_height_dmm=highest)
+                    roll_decideg=roll,humps=humps,last_height_dmm=last,highest_height_dmm=highest,
+                    motion_state=motion,tilt_active=tilt_active,tilt_alerts=tilt_alerts)
     if kind=='hump_event':
         if len(payload)!=8:raise ValueError('Invalid hump event length')
         fields=int.from_bytes(payload[4:],'little')

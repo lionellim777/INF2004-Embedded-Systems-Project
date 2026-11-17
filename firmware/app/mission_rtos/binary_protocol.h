@@ -16,14 +16,21 @@ bool line_record_encode(uint32_t ms,const uint16_t raw[3],uint8_t pattern,
                         bool valid,uint8_t out[LINE_RECORD_BYTES]);
 /* Terrain: time32, then LSB-first valid1, calibrated1, roll change signed9
  * (0.1 deg, -255..255), humps8, last and highest hump height9 each
- * (0.1 mm, 0..511), padding3. Out-of-range values are rejected, not clipped.
- * Invalid readings keep time and calibrated but zero every numeric field. */
-#define TERRAIN_RECORD_BYTES 9u
+ * (0.1 mm, 0..511), padding3, then one more byte: motion state3 (0 stationary,
+ * 1 accelerating, 2 cruising, 3 decelerating, 4 turning, 5 climbing hump,
+ * 6 descending hump), tilt alert active1, tilt alerts this run4 (saturating at 15).
+ * Out-of-range values are rejected, not clipped (tilt alerts saturate).
+ * Hump count and heights are results of the run: they are kept while the sensor
+ * reading is invalid. Invalid readings (valid=0) zero the live values only:
+ * roll change and the tilt fields. The motion state comes from the wheel
+ * encoders and is always sent. */
+#define TERRAIN_RECORD_BYTES 10u
 typedef struct terrain_reading {
     uint32_t ms;
     int16_t roll_decideg;
     uint16_t humps, last_height_dmm, highest_height_dmm;
-    bool valid, calibrated;
+    uint8_t motion_state, tilt_alerts;
+    bool valid, calibrated, tilt_active;
 } terrain_reading_t;
 bool terrain_record_encode(const terrain_reading_t *reading, uint8_t out[TERRAIN_RECORD_BYTES]);
 /* Hump event: completion time32, then LSB-first hump number8, height9

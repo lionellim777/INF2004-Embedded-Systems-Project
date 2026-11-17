@@ -83,15 +83,19 @@ async def broker_roundtrip(packets):
 def check_terrain_decoder():
     topic="inf2004/aai10/robot1/v1/terrain"
     # Same hand-packed fixture as network_test.c terrain_protocol().
-    assert decode(topic,bytes.fromhex("040302019f1720e307"))==dict(
+    assert decode(topic,bytes.fromhex("040302019f1720e3072d"))==dict(
         type="terrain",captured_ms=0x01020304,valid=True,calibrated=True,roll_decideg=-25,
-        humps=2,last_height_dmm=100,highest_height_dmm=126)
-    assert decode(topic,bytes.fromhex("040302010200000000"))["valid"] is False
-    for bad in ["040302019f1720e3","040302019f1720e30700","040302019f1720e327","04030201000000e000","040302010400000000","040302010104000000"]:
+        humps=2,last_height_dmm=100,highest_height_dmm=126,motion_state=5,tilt_active=True,tilt_alerts=2)
+    # Invalid sensor reading: the run's hump results and the motion state stay, live values are zero.
+    invalid=decode(topic,bytes.fromhex("04030201021020e30705"))
+    assert invalid["valid"] is False and invalid["humps"]==2 and invalid["highest_height_dmm"]==126
+    assert invalid["motion_state"]==5 and not invalid["tilt_active"] and invalid["tilt_alerts"]==0 and invalid["roll_decideg"]==0
+    for bad in ["040302019f1720e307","040302019f1720e3072d00","040302019f1720e32d","040302019f1720e3272d","04030201040000000000",
+                "04030201010400000000","040302019f1720e30707","04030201021020e30725","04030201021020e3070d"]:
         try: decode(topic,bytes.fromhex(bad))
         except ValueError: pass
         else: raise AssertionError(f"Malformed terrain packet accepted: {bad}")
-    print("PASS terrain decoder: hand-packed fixture, invalid zeroing, length/padding/value rejection")
+    print("PASS terrain decoder: hand-packed fixture, invalid keeps run results, length/padding/value rejection")
 
 
 def check_hump_decoder():
