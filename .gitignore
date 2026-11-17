@@ -36,6 +36,8 @@ __pycache__/
 .env.*
 !.env.example
 firmware/app/mission_rtos/network_settings.local.h
+config/comm_secrets.h
+config/local/
 
 
 # Recorded optical regression inputs, not build binaries.
