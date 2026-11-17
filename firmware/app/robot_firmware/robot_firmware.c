@@ -39,6 +39,7 @@
 #include "course_control.h"
 #include "obstacle_bypass.h"
 #include "terrain.h"
+#include "motion_class.h"
 #include "calibration_wifi.h"
 #include "measurement.h"
 
@@ -920,6 +921,8 @@ int main(void)
         }
         now_us = time_us_64();
         encoder_sample_t enc = encoders_snapshot();
+        /* Left raw counts fall as the car drives forward; the classifier wants both forward positive. */
+        terrain_motion_update((int32_t)(0u - enc.left_raw), (int32_t)enc.right_raw, (uint32_t)(now_us / 1000u));
         bool line_visible = roles.left || roles.right;
         float left_throttle = 0.0f, right_throttle = 0.0f;
 
@@ -1372,6 +1375,8 @@ int main(void)
                    terrain.last_roll_hump_mm, terrain.current_roll_change_deg);
             printf(" TiltAlert=%u TiltAlerts=%lu MaxTilt=%.1f", terrain.tilt_alert_active ? 1u : 0u,
                    (unsigned long)terrain.tilt_alert_count, terrain.max_tilt_deg);
+            printf(" MotionState=%s SpeedMmS=%.0f TurnDps=%.0f", motion_class_name((motion_class_t)terrain.motion_state),
+                   (double)terrain.speed_mm_s, (double)terrain.turn_rate_dps);
             printf(" Humps=%lu PeakPitch=%.1f Pitch=%.1f PitchValid=%u Terrain=%s",
                    (unsigned long)terrain.hump_count, terrain.highest_peak_angle_deg,
                    terrain.current_pitch_deg, terrain.pitch_valid && terrain.calibrated ? 1u : 0u,

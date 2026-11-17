@@ -1,6 +1,7 @@
 #include "terrain.h"
 #include "hump_roll.h"
 #include "tilt_alert.h"
+#include "motion_class.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -40,6 +41,7 @@ static float level_pitch;
 static float level_roll;
 static hump_roll_t roll_detector;
 static tilt_alert_t tilt_detector;
+static motion_class_state_t motion_class;
 static uint64_t last_roll_poll_ms;
 /* Roll trace for tuning: every detector input sample of a run, kept in RAM and printed after the
  * stop. filtered = the 8-sample average the detector sees, raw = the single newest sample, both as
@@ -309,6 +311,24 @@ void terrain_print_roll_trace(void)
     printf("\n");
     roll_trace_count = 0;
     roll_trace_started = false;
+}
+
+void terrain_motion_update(int32_t left_forward_counts, int32_t right_forward_counts, uint32_t now_ms)
+{
+    /* A right-side hump event is open: the roll detector is ACTIVE with the right wheel raised. Only
+     * meaningful while terrain_poll() runs (a run or its countdown); the launch hold-off keeps the
+     * detector from being ACTIVE while the car is accelerating. */
+    const bool in_hump = status.calibrated && roll_detector.phase == HUMP_ROLL_ACTIVE && roll_detector.sign < 0;
+    const float hump_roll = -(status.current_roll_change_deg - roll_detector.baseline_deg);
+    const motion_class_event_t event = motion_class_update(&motion_class, left_forward_counts, right_forward_counts,
+                                                           hump_roll, in_hump, now_ms);
+    status.motion_state = (uint8_t)motion_class.state;
+    status.speed_mm_s = motion_class.speed_mm_s;
+    status.turn_rate_dps = motion_class.turn_dps;
+    if (event.changed) {
+        printf("[MOTION STATE] state=%s prev=%s speed_mm_s=%.0f turn_dps=%.0f.\n", motion_class_name(event.to),
+               motion_class_name(event.from), (double)motion_class.speed_mm_s, (double)motion_class.turn_dps);
+    }
 }
 
 void terrain_motion_go(void)

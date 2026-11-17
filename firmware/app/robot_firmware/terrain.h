@@ -23,6 +23,11 @@ typedef struct {
     bool tilt_alert_active;
     uint32_t tilt_alert_count;
     float max_tilt_deg;
+    /* Motion classification and turn rate (motion_class.h): a motion_class_t value, wheel speed from
+     * the encoders in mm/s, turn rate in deg/s (positive = turning left). */
+    uint8_t motion_state;
+    float speed_mm_s;
+    float turn_rate_dps;
 } terrain_status_t;
 
 /* GY-511 / LSM303DLHC on Grove 3: SDA=GP4, SCL=GP5. */
@@ -43,6 +48,11 @@ void terrain_run_end(void);
 /* Print the roll samples recorded since the last terrain_motion_go()/terrain_run_start() (up to
  * about 16 s) as [ROLL TRACE] lines. Call after the motors have stopped, never while driving. */
 void terrain_print_roll_trace(void);
+/* Call every main-loop pass with the cumulative wheel counts, forward positive for both wheels, and
+ * the time in ms. Classifies the motion (stationary, accelerating, cruising, decelerating, turning,
+ * climbing hump, descending hump) and prints a [MOTION STATE] line when it changes. Works with the
+ * accelerometer missing (hump phases are then never reported). */
+void terrain_motion_update(int32_t left_forward_counts, int32_t right_forward_counts, uint32_t now_ms);
 terrain_status_t terrain_get_status(void);
 
 #endif
