@@ -3,7 +3,7 @@
 from pathlib import Path
 import json
 folder=Path(__file__).resolve().parents[1]/'firmware/app/robot_firmware/wireless'
-for name in ['calibration','stationary']:
+for name in ['calibration','stationary','measurement']:
     text=(folder/(name+'.html')).read_text()
     (folder/(name+'_page.h')).write_text(
         '/* Generated; edit '+name+'.html. */\n#ifndef CALIBRATION_PAGE_H\n#define CALIBRATION_PAGE_H\n'

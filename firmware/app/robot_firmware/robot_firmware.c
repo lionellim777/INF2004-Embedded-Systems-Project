@@ -39,7 +39,9 @@
 #include "course_control.h"
 #include "obstacle_bypass.h"
 #include "terrain.h"
+#include "motion_class.h"
 #include "calibration_wifi.h"
+#include "measurement.h"
 
 enum {
     LEFT_MOTOR_A_PIN = 8,
@@ -669,9 +671,8 @@ int main(void)
     sleep_ms(2500);
     (void)calibration_wifi_init();
     print_controls();
-    if (terrain_init()) {
-        terrain_calibrate();
-    }
+    terrain_calibrate(); /* probes the sensor itself and reports if it is missing */
+    measurement_init();
 
     ir_timer_ready = add_repeating_timer_us(-(int64_t)BARCODE_SAMPLE_US, ir_sample_alarm, NULL, &ir_timer);
     sleep_ms(2);
@@ -695,6 +696,16 @@ int main(void)
     selected = MOTION_STRAIGHT_30CM;
 #endif
     course_config_t selected_course={'s','s',120};
+    bool straight_long = false; /* 'k': 50 cm hump-test move instead of the calibrated 30 cm one */
+    /* 'j': 50 cm at the slow bounded-distance profile (600 cps, the course cruise speed). The
+     * 'k' move runs at 2800-3000 cps, three to five times faster than line following. */
+    bool straight_slow = false;
+    /* Launch trace for straight moves: wheel counts and PWM every 50 ms for the first 1.2 s,
+     * kept in RAM and printed after the stop (nothing is printed while driving). Used to tune
+     * the left launch floor against the right drift at launch. */
+    enum { LAUNCH_LOG_SAMPLES = 24, LAUNCH_LOG_STEP_US = 50000 };
+    static struct { uint16_t ms; int16_t left, right; uint8_t pwm_left, pwm_right; } launch_log[LAUNCH_LOG_SAMPLES];
+    unsigned launch_log_count = 0u;
     static motion_control_t motion;
     motion_init(&motion);
     static run_diagnostics_t diagnostics = {0};
@@ -737,6 +748,8 @@ int main(void)
             if (ch < 0) { ch = getchar_timeout_us(0u); }
             if (ch == PICO_ERROR_TIMEOUT) { break; }
             if (ch >= 'A' && ch <= 'Z') { ch += 'a' - 'A'; }
+            /* Read-only Measurements tab: m e g h p w, idle only. Never moves motors. */
+            if (measurement_command(ch, !running && settling_until_us == 0u && !optical_pending, now_us)) { continue; }
             if (ch == 'x') {
                 motors_stop();
                 if(optical_pending)optical_finish(true,false);
@@ -777,10 +790,31 @@ int main(void)
                 print_controls();
             } else if (ROBOCAR_CENTER_LINE && (ch=='n'||ch=='t'||ch=='b'||ch=='c')) {
                 printf("[SELECT] Use Y/Z mission for GP28-centred tracking; legacy straddle diagnostics disabled.\n");
+            } else if (ch == 'j') {
+                if (running || settling_until_us != 0u) {
+                    printf("[SELECT] Rejected while running/settling. Stop first.\n");
+                } else {
+                    selected = MOTION_STRAIGHT_30CM;
+                    straight_long = false;
+                    straight_slow = true;
+                    printf("[SELECT] STRAIGHT_50CM_SLOW (hump at course speed, 600 cps, nominal 500 mm). No movement until GP20.\n");
+                }
+            } else if (ch == 'k') {
+                if (running || settling_until_us != 0u) {
+                    printf("[SELECT] Rejected while running/settling. Stop first.\n");
+                } else {
+                    selected = MOTION_STRAIGHT_30CM;
+                    straight_long = true;
+                    straight_slow = false;
+                    printf("[SELECT] STRAIGHT_50CM (hump test, cutoff=%d counts, provisional). No movement until GP20.\n",
+                           MOTION_STRAIGHT_50CM_STOP_COUNTS);
+                }
             } else if (ch == 'f' || ch == 'l' || ch == 'r' || ch == 'u' || ch == 'n' || ch == 't' || ch == 'b' || ch == 'c') {
                 if (running || settling_until_us != 0u) {
                     printf("[SELECT] Rejected while running/settling. Stop first.\n");
                 } else {
+                    straight_long = false;
+                    straight_slow = false;
                     selected = ch == 'f' ? MOTION_STRAIGHT_30CM :
                         (ch == 'l' ? MOTION_LEFT_90 : (ch == 'r' ? MOTION_RIGHT_90 :
                         (ch == 'u' ? MOTION_RIGHT_180 : (ch == 'b' ? MOTION_BARCODE : (ch == 'c' ? MOTION_CONTINUOUS : MOTION_NONE)))));
@@ -812,6 +846,7 @@ int main(void)
                 motor_guard_reset(&drive_guard);
                 restore_interrupts(irq);
                 running = true;
+                terrain_run_start();
                 barcode_reader_init(&barcode_reader);
                 motion_init(&motion);
                 pending = selected;
@@ -838,6 +873,7 @@ int main(void)
         }
 
         if(optical_pending && (uint32_t)(time_us_32()-optical.start_us)>=OPTICAL_DURATION_US)optical_finish(false,false);
+        measurement_poll(!running && settling_until_us == 0u && !optical_pending, now_us);
 
         uint32_t ir_irq = save_and_disable_interrupts();
         uint16_t left_raw = ir_latest[0];
@@ -885,6 +921,8 @@ int main(void)
         }
         now_us = time_us_64();
         encoder_sample_t enc = encoders_snapshot();
+        /* Left raw counts fall as the car drives forward; the classifier wants both forward positive. */
+        terrain_motion_update((int32_t)(0u - enc.left_raw), (int32_t)enc.right_raw, (uint32_t)(now_us / 1000u));
         bool line_visible = roles.left || roles.right;
         float left_throttle = 0.0f, right_throttle = 0.0f;
 
@@ -987,8 +1025,16 @@ int main(void)
                             printf("[BARCODE] Start rejected: %s.\n",!fresh?"IR sampling is not live":!aligned?"place GP28 directly over black tape and hold still throughout countdown":"single-pass test requires GP26 on white");
                         }
                     }
-                } else { began = motion_begin(&motion, pending, enc, now_us); }
+                } else {
+                    began = pending == MOTION_STRAIGHT_30CM && straight_slow ?
+                        motion_begin_distance(&motion, 500u, enc, now_us) : motion_begin(&motion, pending, enc, now_us);
+                }
                 if (began) {
+                    if (pending == MOTION_STRAIGHT_30CM && straight_long) {
+                        motion.left.target = motion.right.target = MOTION_STRAIGHT_50CM_STOP_COUNTS;
+                    }
+                    terrain_motion_go();
+                    launch_log_count = 0u;
                     terrain_status_t initial = terrain_get_status();
                     run_diagnostics_begin(&diagnostics, initial.hump_count, initial.read_errors,
                                           initial.pitch_sequence);
@@ -1102,6 +1148,12 @@ int main(void)
             line_check_output_t out = motion.kind==MOTION_COURSE ? course_step(&course,roles,enc,now_us) : scan_kind(motion.kind) ?
                 barcode_drive_step_mode(roles, now_us - motion.start_us, left, right, invalid, &barcode_progress,motion.kind==MOTION_CONTINUOUS) :
                 line_check_step(roles, now_us - motion.start_us, left, right, invalid);
+            /* The roll detector assumes straight travel. A junction turn brakes, pivots and
+             * relaunches inside one course run, so keep the launch hold-off armed through it:
+             * roll is ignored until 600 ms after line following resumes. Line-loss recovery
+             * (COURSE_LOST) is deliberately not included, so a hump that upsets tracking is kept. */
+            if(course_run && (course.phase==COURSE_BRAKE||course.phase==COURSE_TURN||
+                              course.phase==COURSE_SETTLE||course.phase==COURSE_SEEK))terrain_motion_go();
             if(course_run){
                 barcode_progress=course.drive;
                 if(ROBOCAR_CENTER_LINE && course.center_level_valid)roles.left=course.center_visible;
@@ -1158,6 +1210,15 @@ int main(void)
             }
         } else if (running && motion.phase == MOTION_ACTIVE) {
             motion_poll(&motion, enc, now_us);
+            if (motion.kind == MOTION_STRAIGHT_30CM && launch_log_count < LAUNCH_LOG_SAMPLES &&
+                now_us - motion.start_us >= (uint64_t)(launch_log_count + 1u) * LAUNCH_LOG_STEP_US) {
+                launch_log[launch_log_count].ms = (uint16_t)((now_us - motion.start_us) / 1000u);
+                launch_log[launch_log_count].left = (int16_t)motion_left_position(&motion, enc);
+                launch_log[launch_log_count].right = (int16_t)motion_right_position(&motion, enc);
+                launch_log[launch_log_count].pwm_left = (uint8_t)(motion.left.throttle * 100.0f + 0.5f);
+                launch_log[launch_log_count].pwm_right = (uint8_t)(motion.right.throttle * 100.0f + 0.5f);
+                ++launch_log_count;
+            }
             if (motion.phase == MOTION_ACTIVE) {
                 left_throttle = motion.left.throttle;
                 right_throttle = motion.right.throttle;
@@ -1219,6 +1280,18 @@ int main(void)
                    (long)motion.left.cutoff_position, (long)motion.right.cutoff_position,
                    (unsigned long)motion.left.cutoff_elapsed_us,
                    (unsigned long)motion.right.cutoff_elapsed_us);
+            if (motion.kind == MOTION_STRAIGHT_30CM && launch_log_count != 0u) {
+                printf("[LAUNCH] ms:L/R/L-R/pwmL%%/pwmR%%");
+                for (unsigned i = 0u; i < launch_log_count; ++i) {
+                    printf(" %u:%d/%d/%+d/%u/%u", launch_log[i].ms, launch_log[i].left, launch_log[i].right,
+                           launch_log[i].left - launch_log[i].right,
+                           launch_log[i].pwm_left, launch_log[i].pwm_right);
+                }
+                printf(".\n");
+                launch_log_count = 0u;
+            }
+            terrain_run_end();
+            terrain_print_roll_trace();
             terrain_status_t final = terrain_get_status();
             printf("[CHECK] samples=%lu IR_L=%u..%u edges=%lu IR_C=%u..%u edges=%lu IR_R=%u..%u edges=%lu "
                    "Sonar_valid=%lu no_echo=%lu range_cm=%.1f..%.1f "
@@ -1297,10 +1370,17 @@ int main(void)
             }
             if(scan_kind(motion.kind))printf(" GP26Filtered=%u",barcode_filtered);
             terrain_status_t terrain = terrain_get_status();
+            printf(" RollHumps=%lu HighestRollHumpMm=%.1f LastRollHumpMm=%.1f RollChange=%.1f",
+                   (unsigned long)terrain.roll_hump_count, terrain.highest_roll_hump_mm,
+                   terrain.last_roll_hump_mm, terrain.current_roll_change_deg);
+            printf(" TiltAlert=%u TiltAlerts=%lu MaxTilt=%.1f", terrain.tilt_alert_active ? 1u : 0u,
+                   (unsigned long)terrain.tilt_alert_count, terrain.max_tilt_deg);
+            printf(" MotionState=%s SpeedMmS=%.0f TurnDps=%.0f", motion_class_name((motion_class_t)terrain.motion_state),
+                   (double)terrain.speed_mm_s, (double)terrain.turn_rate_dps);
             printf(" Humps=%lu PeakPitch=%.1f Pitch=%.1f PitchValid=%u Terrain=%s",
                    (unsigned long)terrain.hump_count, terrain.highest_peak_angle_deg,
                    terrain.current_pitch_deg, terrain.pitch_valid && terrain.calibrated ? 1u : 0u,
-                   terrain.calibrated ? "READY" : "UNAVAILABLE");
+                   terrain.calibrated ? "READY" : terrain.available ? "NOT_CALIBRATED" : "SENSOR_NOT_FOUND");
             if (range_valid) { printf(" Range=%.1fcm", distance_cm); }
             else { printf(" Range=NO_ECHO"); }
             if(avoid_run)printf(" Sonar=%s PulseUs=%lu",sonar_status,(unsigned long)sonar_pulse_us);

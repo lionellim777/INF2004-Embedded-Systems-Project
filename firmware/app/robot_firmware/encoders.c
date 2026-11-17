@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "pico/stdlib.h"
+#include "hardware/irq.h"
 #include "hardware/sync.h"
 
 enum {
@@ -16,14 +17,25 @@ static volatile uint32_t counts[2];
 static volatile uint32_t invalid[2];
 static uint8_t previous_state[2];
 
-static uint8_t read_state(uint pin_a, uint pin_b)
+/* The handler and its table run from RAM, and the GPIO interrupt has top priority, so flash
+ * (XIP) stalls and other handlers (USB etc.) cannot delay it past the gap between A and B edges.
+ * A late read sees both pins changed and counts an invalid transition (a missed edge). */
+static uint8_t __not_in_flash_func(read_state)(uint pin_a, uint pin_b)
 {
     /* Read A/B from the same instant, rather than two separate GPIO reads. */
     uint32_t pins=gpio_get_all();
     return (uint8_t)(((pins>>pin_a)&1u)*2u | ((pins>>pin_b)&1u));
 }
 
-static void encoder_gpio_callback(uint gpio, uint32_t events)
+/* Non-const so it lives in RAM (.data), not flash. */
+static int8_t transition_table[16] = {
+     0,  1, -1,  0,
+    -1,  0,  0,  1,
+     1,  0,  0, -1,
+     0, -1,  1,  0,
+};
+
+static void __not_in_flash_func(encoder_gpio_callback)(uint gpio, uint32_t events)
 {
     (void)events;
     uint index;
@@ -41,17 +53,11 @@ static void encoder_gpio_callback(uint gpio, uint32_t events)
         return;
     }
 
-    static const int8_t transition[16] = {
-         0,  1, -1,  0,
-        -1,  0,  0,  1,
-         1,  0,  0, -1,
-         0, -1,  1,  0,
-    };
     uint8_t current = read_state(pin_a, pin_b);
     if ((previous_state[index] ^ current) == 3u) {
         ++invalid[index];
     }
-    counts[index] += (uint32_t)(int32_t)transition[(previous_state[index] << 2u) | current];
+    counts[index] += (uint32_t)(int32_t)transition_table[(previous_state[index] << 2u) | current];
     previous_state[index] = current;
 }
 
@@ -72,6 +78,8 @@ void encoders_init(void)
     gpio_set_irq_enabled(LEFT_B_PIN, edges, true);
     gpio_set_irq_enabled(RIGHT_A_PIN, edges, true);
     gpio_set_irq_enabled(RIGHT_B_PIN, edges, true);
+    /* Encoder edges must not wait behind USB/other interrupts. */
+    irq_set_priority(IO_IRQ_BANK0, PICO_HIGHEST_IRQ_PRIORITY);
 }
 
 int32_t encoder_left_count(void)

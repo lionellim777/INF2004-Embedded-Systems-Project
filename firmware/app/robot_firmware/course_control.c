@@ -118,7 +118,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
 #if !ROBOCAR_CENTER_LINE
     (void)step_us;
 #endif
-    if(enc.left_invalid!=c->reference.start.left_invalid || enc.right_invalid!=c->reference.start.right_invalid)
+    if(enc.left_invalid-c->reference.start.left_invalid>MOTION_ENCODER_INVALID_TOLERANCE || enc.right_invalid-c->reference.start.right_invalid>MOTION_ENCODER_INVALID_TOLERANCE)
         return stopped(c,"COURSE_ENCODER_FAULT");
     int32_t l=motion_left_position(&c->reference,enc),r=motion_right_position(&c->reference,enc);
     /* Bound before magnitude arithmetic, including impossible/reset values. */
