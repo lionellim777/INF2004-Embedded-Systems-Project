@@ -146,30 +146,32 @@ static void side_angle_adjustment_test(void){
     puts("PASS isolated side echo causes 10-degree turn and clear rescan before outward move");
 }
 static void original_heading_check_test(void){
-    init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_FORWARD;a.phase_us=a.episode_us=now;
-    a.angled_probe=true;a.offset_mm=300;a.return_deg=60;
-    for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++){
-        a.no_return=true;tick(i%12==0,false,0,0,false);
-    }
-    assert(!out.stop&&a.scan_center_no_return==3);
-    assert(a.phase==AVOID_WAIT&&a.next==AVOID_MOVE_ALONG);
-    bool right_turn=false,restored=false;
-    for(unsigned i=0;i<12000&&a.phase!=AVOID_RETURN_LINE&&!out.stop;i++){
-        bool blocked=a.phase==AVOID_SCAN_RETURN&&a.scan_serial==1;
-        a.no_return=!blocked;
-        tick(i%12==0,blocked,blocked?20:0,0,false);
-        if(a.phase==AVOID_TURN_TO_LINE){
-            right_turn=true;
-            assert(a.leg.left.target==1100*60/90&&a.leg.right.target==-1100*60/90);
+    for(unsigned close=0;close<2;close++){
+        init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_FORWARD;a.phase_us=a.episode_us=now;
+        a.angled_probe=true;a.offset_mm=300;a.return_deg=60;
+        for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++){
+            a.no_return=true;tick(i%12==0,false,0,0,false);
         }
-        if(a.phase==AVOID_RESTORE_FORWARD){
-            restored=true;
-            assert(a.leg.left.target==-1090*60/90&&a.leg.right.target==1090*60/90);
+        assert(!out.stop&&a.scan_center_no_return==3);
+        assert(a.phase==AVOID_WAIT&&a.next==AVOID_MOVE_ALONG);
+        bool right_turn=false,restored=false;
+        for(unsigned i=0;i<12000&&a.phase!=AVOID_RETURN_LINE&&!out.stop;i++){
+            bool blocked=a.phase==AVOID_SCAN_RETURN&&a.scan_serial==1;
+            a.no_return=!blocked;
+            tick(i%12==0,blocked,blocked?(close?8:20):0,0,false);
+            if(a.phase==AVOID_TURN_TO_LINE){
+                right_turn=true;
+                assert(a.leg.left.target==1100*60/90&&a.leg.right.target==-1100*60/90);
+            }
+            if(a.phase==AVOID_RESTORE_FORWARD){
+                restored=true;
+                assert(a.leg.left.target==-1090*60/90&&a.leg.right.target==1090*60/90);
+            }
+            assert(a.phase!=AVOID_TURN_OUT&&a.phase!=AVOID_SCAN_SIDE);
         }
-        assert(a.phase!=AVOID_TURN_OUT&&a.phase!=AVOID_SCAN_SIDE);
-    }
-    assert(!out.stop&&a.along_mm==200&&a.scan_serial==3);
-    assert(right_turn&&restored&&a.phase==AVOID_RETURN_LINE);
+        assert(!out.stop&&a.along_mm==200&&a.scan_serial==3);
+        assert(right_turn&&restored&&a.phase==AVOID_RETURN_LINE);
+        }
     puts("PASS inverse-A return check: blocked path restores heading, advances 100mm and retries; three no-returns start tape seek");
 }
 static void no_return_path_tests(void){

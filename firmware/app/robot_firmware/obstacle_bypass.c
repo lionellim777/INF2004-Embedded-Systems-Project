@@ -557,7 +557,9 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             }
         }else if(a->phase==AVOID_SCAN_RETURN){
             if(a->scan_blocked){
-                if(!a->angled_probe||a->scan_min_cm<=MIN_PIVOT_CM)
+                /* A blocked inverse-A ray restores the original heading.
+                 * Forward movement retains its live distance guards. */
+                if(!a->angled_probe)
                     return fail(a,"AVOID_RETURN_BLOCKED");
                 if(a->along_mm>=MAX_ALONG_MM)return fail(a,"AVOID_OBJECT_END_NOT_CONFIRMED");
                 wait_for(a,AVOID_RESTORE_FORWARD,now);return quiet(a);
