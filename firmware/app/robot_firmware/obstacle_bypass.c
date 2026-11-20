@@ -35,7 +35,8 @@ const char *obstacle_bypass_phase(avoid_phase_t p)
         "FACE_FORWARD","SCAN_FORWARD","MOVE_ALONG","FACE_OBJECT","SCAN_OBJECT_SIDE",
         "FACE_ALONG","SEEK_RETURN_LINE","VERIFY_LINE","CHECK_FOUND_TAPE",
         "PROBE_TAPE_HEADING","ADVANCE_AXLE_TO_TAPE","ALIGN_WITH_TAPE","CONFIRM_TAPE_HEADING","SCAN_OBJECT_EDGE","CHECK_LEFT_EDGE","CLEAR_REAR_MARGIN",
-        "TURN_TO_TRACK","SCAN_TO_TRACK","TURN_FURTHER_RIGHT","TURN_TOWARD_LINE","FAILED"};
+        "TURN_TO_TRACK","SCAN_TO_TRACK","TURN_FURTHER_RIGHT","TURN_TOWARD_LINE",
+        "RESTORE_FORWARD","FAILED"};
     return p<=AVOID_FAILED?names[p]:"INVALID";
 }
 static line_check_output_t quiet(obstacle_bypass_t *a)
@@ -86,8 +87,8 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     }
     a->servo_angle=90;
     motion_kind_t turn=MOTION_NONE;
-    if(p==AVOID_TURN_FORWARD||p==AVOID_TURN_ALONG)turn=MOTION_RIGHT_90;
-    if(p==AVOID_TURN_OUT||p==AVOID_TURN_LOOK||p==AVOID_TURN_TO_LINE)turn=MOTION_LEFT_90;
+    if(p==AVOID_TURN_FORWARD||p==AVOID_TURN_ALONG||p==AVOID_TURN_TO_LINE)turn=MOTION_RIGHT_90;
+    if(p==AVOID_TURN_OUT||p==AVOID_TURN_LOOK||p==AVOID_RESTORE_FORWARD)turn=MOTION_LEFT_90;
     if(p==AVOID_TURN_RETURN||p==AVOID_TURN_CLEARANCE)turn=MOTION_RIGHT_90;
     if(p==AVOID_ALIGN_TURN)turn=a->align_direction>0?MOTION_RIGHT_90:MOTION_LEFT_90;
     if(turn!=MOTION_NONE){
@@ -103,7 +104,7 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
             a->leg.left.target=a->leg.left.target*(int)(90-a->return_deg)/90;
             a->leg.right.target=a->leg.right.target*(int)(90-a->return_deg)/90;
         }
-        if(p==AVOID_TURN_TO_LINE){
+        if(p==AVOID_TURN_TO_LINE||p==AVOID_RESTORE_FORWARD){
             a->leg.left.target=a->leg.left.target*(int)a->return_deg/90;
             a->leg.right.target=a->leg.right.target*(int)a->return_deg/90;
         }
@@ -388,6 +389,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->departure_travel_mm=INITIAL_OFFSET_MM;a->departure_forward_mm=0;
             a->departure_done_mm=a->departure_step_mm=a->edge_shift_count=a->clearance_adjustments=0;
             a->edge_shift_active=a->angled_probe=false;
+            a->clearance_step_planned=false;
             a->plan=(obstacle_plan_t){0};a->tail_margin_done=false;a->side_seen=false;a->clear_checks=0;a->last_side_seen_mm=0;
             a->approach_pending=false;a->approach_warning=false;
             a->rejoin_armed=false;a->white_us=0;
@@ -528,11 +530,13 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             if(a->scan_center_clear<2&&a->scan_center_no_return<3&&!a->scan_blocked)
                 return fail(a,"AVOID_FORWARD_RANGE_UNKNOWN");
             if(a->angled_probe){
-                /* A clear original-heading scan continues straight to tape. */
-                if(a->scan_blocked){
+                /* Add one extra angled step at the first clear checkpoint
+                 * before advancing and checking the inverse-A return. */
+                if(a->scan_blocked||!a->clearance_step_planned){
                     unsigned step_offset=(unsigned)ceilf(STEP_MM*sinf(a->return_deg*0.01745329252f));
                     if(a->offset_mm+step_offset>MAX_OFFSET_MM)
                         return fail(a,"AVOID_OBJECT_TOO_WIDE_OR_PATH_BLOCKED");
+                    if(!a->scan_blocked)a->clearance_step_planned=true;
                     a->departure_deg=a->return_deg;a->outward_mm=step_offset;
                     a->departure_travel_mm=STEP_MM;
                     a->departure_forward_mm=(unsigned)floorf(STEP_MM*cosf(a->departure_deg*0.01745329252f));
@@ -555,7 +559,14 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
                 wait_for(a,AVOID_MOVE_ALONG,now);
             }
         }else if(a->phase==AVOID_SCAN_RETURN){
-            if(a->scan_blocked)return fail(a,"AVOID_RETURN_BLOCKED");
+            if(a->scan_blocked){
+                /* A blocked inverse-A ray restores the original heading.
+                 * Forward movement retains its live distance guards. */
+                if(!a->angled_probe)
+                    return fail(a,"AVOID_RETURN_BLOCKED");
+                if(a->along_mm>=MAX_ALONG_MM)return fail(a,"AVOID_OBJECT_END_NOT_CONFIRMED");
+                wait_for(a,AVOID_RESTORE_FORWARD,now);return quiet(a);
+            }
             if(a->scan_center_clear<2&&a->scan_center_no_return<3)
                 return fail(a,"AVOID_RETURN_RANGE_UNKNOWN");
             wait_for(a,AVOID_RETURN_LINE,now);
@@ -625,12 +636,13 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         case AVOID_TURN_ALONG:wait_for(a,AVOID_SCAN_FORWARD,now);break;
         case AVOID_TURN_RETURN:wait_for(a,AVOID_SCAN_RETURN,now);break;
         case AVOID_TURN_TO_LINE:wait_for(a,AVOID_SCAN_RETURN,now);break;
+        case AVOID_RESTORE_FORWARD:wait_for(a,AVOID_MOVE_ALONG,now);break;
         case AVOID_TURN_CLEARANCE:wait_for(a,AVOID_SCAN_OUT,now);break;
         case AVOID_MOVE_ALONG:
             a->along_mm+=a->angled_probe?STEP_MM:ALONG_STEP_MM;
             if(a->angled_probe){
                 if(a->along_mm>=MAX_ALONG_MM)return fail(a,"AVOID_RETURN_LINE_NOT_FOUND");
-                wait_for(a,AVOID_MOVE_ALONG,now);
+                wait_for(a,AVOID_TURN_TO_LINE,now);
             }else wait_for(a,AVOID_CHECK_LEFT,now);
             break;
         case AVOID_CLEAR_TAIL:a->along_mm+=100;a->tail_margin_done=true;wait_for(a,AVOID_TURN_LOOK,now);break;

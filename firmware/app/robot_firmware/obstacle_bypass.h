@@ -10,7 +10,8 @@ typedef enum {
     AVOID_TURN_FORWARD, AVOID_SCAN_FORWARD, AVOID_MOVE_ALONG, AVOID_TURN_LOOK,
     AVOID_SCAN_SIDE, AVOID_TURN_ALONG, AVOID_RETURN_LINE, AVOID_VERIFY, AVOID_CHECK_TAPE,
     AVOID_TAPE_PROBE, AVOID_AXLE_ADVANCE, AVOID_ALIGN_TURN, AVOID_ALIGN_CONFIRM, AVOID_SCAN_INITIAL, AVOID_CHECK_LEFT, AVOID_CLEAR_TAIL,
-    AVOID_TURN_RETURN, AVOID_SCAN_RETURN, AVOID_TURN_CLEARANCE, AVOID_TURN_TO_LINE, AVOID_FAILED
+    AVOID_TURN_RETURN, AVOID_SCAN_RETURN, AVOID_TURN_CLEARANCE, AVOID_TURN_TO_LINE,
+    AVOID_RESTORE_FORWARD, AVOID_FAILED
 } avoid_phase_t;
 typedef struct {
     uint32_t left_raw;
@@ -50,6 +51,7 @@ typedef struct {
     unsigned departure_step_mm : 7;
     unsigned edge_shift_count, clearance_adjustments;
     bool edge_shift_active, angled_probe;
+    unsigned clearance_step_planned : 1;
     unsigned left_samples : 2;
     unsigned left_far : 2;
     unsigned tail_margin_done : 1;

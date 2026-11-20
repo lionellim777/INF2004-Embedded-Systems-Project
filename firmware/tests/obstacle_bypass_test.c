@@ -146,19 +146,46 @@ static void side_angle_adjustment_test(void){
     puts("PASS isolated side echo causes 10-degree turn and clear rescan before outward move");
 }
 static void original_heading_check_test(void){
+    /* The first clear checkpoint adds exactly one extra 100 mm angled leg. */
     init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_FORWARD;a.phase_us=a.episode_us=now;
-    a.angled_probe=true;a.offset_mm=300;a.return_deg=60;
-    for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++){
+    a.angled_probe=true;a.offset_mm=172;a.return_deg=60;a.plan.lateral_mm=338;
+    for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++)tick(i%12==0,true,100,0,false);
+    assert(!out.stop&&a.phase==AVOID_WAIT&&a.next==AVOID_TURN_OUT);
+    assert(a.departure_travel_mm==100&&a.departure_deg==60&&a.plan.lateral_mm==338);
+    assert(a.clearance_step_planned);
+    for(unsigned i=0;i<5000&&a.scan_serial<2&&!out.stop;i++){
         a.no_return=true;tick(i%12==0,false,0,0,false);
+        if(a.phase==AVOID_MOVE_OUT)assert(a.departure_step_mm==100);
     }
-    assert(!out.stop&&a.scan_center_no_return==3);
+    assert(!out.stop&&a.scan_serial==2&&a.offset_mm==258);
     assert(a.phase==AVOID_WAIT&&a.next==AVOID_MOVE_ALONG);
-    for(unsigned i=0;i<3000&&a.along_mm<200&&!out.stop;i++){
-        a.no_return=true;tick(i%12==0,false,0,0,false);
-        assert(a.scan_serial==1&&a.servo_angle==90);
-    }
-    assert(!out.stop&&a.along_mm>=200);
-    puts("PASS clear original-heading scan continues straight without a return turn");
+    for(unsigned close=0;close<2;close++){
+        init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_FORWARD;a.phase_us=a.episode_us=now;
+        a.angled_probe=true;a.offset_mm=300;a.return_deg=60;a.clearance_step_planned=true;
+        for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++){
+            a.no_return=true;tick(i%12==0,false,0,0,false);
+        }
+        assert(!out.stop&&a.scan_center_no_return==3);
+        assert(a.phase==AVOID_WAIT&&a.next==AVOID_MOVE_ALONG);
+        bool right_turn=false,restored=false;
+        for(unsigned i=0;i<12000&&a.phase!=AVOID_RETURN_LINE&&!out.stop;i++){
+            bool blocked=a.phase==AVOID_SCAN_RETURN&&a.scan_serial==1;
+            a.no_return=!blocked;
+            tick(i%12==0,blocked,blocked?(close?8:20):0,0,false);
+            if(a.phase==AVOID_TURN_TO_LINE){
+                right_turn=true;
+                assert(a.leg.left.target==1100*60/90&&a.leg.right.target==-1100*60/90);
+            }
+            if(a.phase==AVOID_RESTORE_FORWARD){
+                restored=true;
+                assert(a.leg.left.target==-1090*60/90&&a.leg.right.target==1090*60/90);
+            }
+            assert(a.phase!=AVOID_TURN_OUT&&a.phase!=AVOID_SCAN_SIDE);
+        }
+        assert(!out.stop&&a.along_mm==200&&a.scan_serial==3);
+        assert(right_turn&&restored&&a.phase==AVOID_RETURN_LINE);
+        }
+    puts("PASS inverse-A return check: blocked path restores heading, advances 100mm and retries; three no-returns start tape seek");
 }
 static void no_return_path_tests(void){
     for(unsigned mode=0;mode<2;mode++){
@@ -271,7 +298,7 @@ static void run(unsigned scenario){
         assert(a.phase==AVOID_FOLLOW&&a.detected==1&&(a.plan.edge_from_no_return||a.plan.left_edge_known));
         assert(seen_phases&(1u<<AVOID_VERIFY));
         if(scenario==18)assert(a.no_echo>0);
-        if(scenario==8)assert(a.offset_mm>=450&&a.offset_mm<=550);
+        if(scenario==8)assert(a.offset_mm>=450&&a.offset_mm<=600);
         if(scenario==10)assert(a.no_echo>0);
         if(scenario==17)assert(a.encoder_skips[1]==1&&enc.right_invalid==1&&(seen_phases&(1u<<AVOID_SCAN_FORWARD)));
         /* A stale course timestamp after the bypass must not immediately fault. */
@@ -716,15 +743,15 @@ static void planned_detour_tests(void){
         if(a.phase==AVOID_SCAN_INITIAL)cm=a.servo_angle<=100?20:100;
         if(a.phase==AVOID_SCAN_FORWARD&&a.offset_mm<340)cm=20;
         int center=(a.phase==AVOID_FOLLOW||a.phase==AVOID_VERIFY||a.phase==AVOID_CHECK_TAPE||a.phase==AVOID_TAPE_PROBE)?700:0;
-        if(a.phase==AVOID_MOVE_ALONG)center=((motion_left_position(&a.leg,enc)+motion_right_position(&a.leg,enc))/(2*13.491f))>35?700:0;
+        if(a.phase==AVOID_RETURN_LINE)center=((motion_left_position(&a.leg,enc)+motion_right_position(&a.leg,enc))/(2*13.491f))>35?700:0;
         if(a.phase==AVOID_TURN_OUT){planned=true;if(a.offset_mm)saw_repeat=true;assert(a.departure_deg==55&&a.leg.left.target==-666&&a.leg.right.target==666);}
         if(a.phase==AVOID_TURN_FORWARD){
             if(!saw_forward)assert(a.departure_done_mm==100&&a.offset_mm>=80&&a.offset_mm<=100);
             saw_forward=true;assert(a.leg.left.target==672&&a.leg.right.target==-672);
         }
         assert(a.phase!=AVOID_SCAN_OUT&&a.phase!=AVOID_SCAN_SIDE);
-        assert(a.phase!=AVOID_TURN_TO_LINE&&a.phase!=AVOID_TURN_LOOK);
-        if(a.phase==AVOID_MOVE_ALONG)saw_return=true;
+        assert(a.phase!=AVOID_TURN_LOOK);
+        if(a.phase==AVOID_RETURN_LINE)saw_return=true;
         tick(i%12==0,true,cm,center,false);
     }
     if(out.stop||!a.completed)printf("planned route ended phase=%s reason=%s along=%u\n",obstacle_bypass_phase(a.phase),out.state,a.along_mm);
