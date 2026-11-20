@@ -23,6 +23,9 @@ option(RTOS_COMPACT_CONTROL_STATE "Opt-in Motion-owned controller state and flag
 option(RTOS_FIRST_FAILURE_CACHE "Retain duplicate first failed raw waveform for diagnosis" ON)
 option(RTOS_OBSTACLE "Enable experimental USB-selectable obstacle manoeuvring" OFF)
 option(RTOS_TERRAIN "Publish terrain telemetry; the Observer task polls the IMU (hump, tilt, motion state)" OFF)
+option(RTOS_CURVE_FOLLOW "Course: steer toward the side sensor on a long centre+side overlap, longer crossing limit" ON)
+option(RTOS_LAUNCH_CAP "Course: higher, faster first-launch breakaway power" ON)
+option(RTOS_TRIM_GAIN "Course: double the centre-trim steering" OFF)
 if(RTOS_NETWORK_SETTINGS_FILE)
     configure_file("${RTOS_NETWORK_SETTINGS_FILE}" "${CMAKE_BINARY_DIR}/generated/network_settings.h" COPYONLY)
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/network_settings.local.h")
@@ -63,14 +66,14 @@ target_include_directories(mtkernel PRIVATE "${CMAKE_BINARY_DIR}/generated"
 
 set(BASELINE "${CMAKE_CURRENT_LIST_DIR}/../robot_firmware")
 add_executable(robocar_rtos_motion main.c board.c safety_gate.c motion_record.c motion_runtime.c
-    binary_protocol.c network_service.c
+    binary_protocol.c network_service.c barcode_actions.c
     track_sensor.c track_runtime.c scan_diagnostic.c runtime_measure.c runtime_report.c port/task_observe.c
     "${BASELINE}/course_control.c" "${BASELINE}/barcode_waveform.c" "${BASELINE}/barcode_decoder.c"
     port/mtk_bridge.c "${BASELINE}/encoders.c" "${BASELINE}/motion_control.c")
 target_include_directories(robocar_rtos_motion PRIVATE "${CMAKE_CURRENT_LIST_DIR}"
     "${BASELINE}" "${CMAKE_BINARY_DIR}/generated" "${MTK}/config" "${MTK}/include")
 target_compile_definitions(robocar_rtos_motion PRIVATE _PICO_RP2040_
-    RTOS_TRACK=1 RTOS_RUNTIME_EVIDENCE=1 BARCODE_WAVE_RECOVERY_OPTICS=1 BARCODE_WAVE_LAST_PASS=1 ROBOCAR_CENTER_LINE=1 PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
+    RTOS_TRACK=1 RTOS_BARCODE_ACTIONS=1 RTOS_RUNTIME_EVIDENCE=1 BARCODE_WAVE_RECOVERY_OPTICS=1 BARCODE_WAVE_LAST_PASS=1 ROBOCAR_CENTER_LINE=1 PROHIBIT_DEF_SIZE_T PICO_STACK_SIZE=0x1000 PICO_STDIO_USB_STDOUT_TIMEOUT_US=1000)
 target_compile_options(robocar_rtos_motion PRIVATE -Wall -Wextra -Werror -fstack-usage)
 if(RTOS_COMPACT_ADC_STATE)
     target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_COMPACT_ADC_STATE=1)
@@ -114,3 +117,12 @@ endif()
 pico_enable_stdio_usb(robocar_rtos_motion 1)
 pico_enable_stdio_uart(robocar_rtos_motion 0)
 pico_add_extra_outputs(robocar_rtos_motion)
+if(RTOS_CURVE_FOLLOW)
+    target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_CURVE_FOLLOW=1)
+endif()
+if(RTOS_LAUNCH_CAP)
+    target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_LAUNCH_CAP=1)
+endif()
+if(RTOS_TRIM_GAIN)
+    target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_TRIM_GAIN=1)
+endif()

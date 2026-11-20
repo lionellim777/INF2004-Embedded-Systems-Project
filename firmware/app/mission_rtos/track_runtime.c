@@ -1,6 +1,9 @@
 #include "track_runtime.h"
 #include "track_sensor.h"
 #include "network_service.h"
+#ifdef RTOS_BARCODE_ACTIONS
+#include "barcode_actions.h"
+#endif
 #include <string.h>
 #ifdef RTOS_OBSTACLE
 #include "obstacle_bypass.h"
@@ -51,10 +54,22 @@ bool track_runtime_begin(track_runtime_t *t,uint16_t token,encoder_sample_t enc,
     t->status="TRACK_START_NOT_ALIGNED";t->reads=0;t->letter=0;
     if(!sensors(&ir,now) || !center_baseline_value(&t->baseline,now,&baseline,&spread) ||
        level(ir.raw[1],178,2908)<IR_BLACK_LEVEL)return false;
-    /* Reuse exact validated follow/recovery algorithm. First integration
-     * milestone scans routes; Y/Z actions remain straight as in the AAZ test. */
+    /* Reuse exact validated follow/recovery algorithm. Without the barcode-action table Y/Z stay
+     * straight as in the AAZ test; with it (the real RTOS build) every letter follows barcode_actions.h. */
     course_begin(&t->course,(course_config_t){'s','s',120},enc,now);
+#ifdef RTOS_BARCODE_ACTIONS
+    course_set_letter_actions(&t->course,barcode_actions_table());
+#endif
     course_enable_flow_follow(&t->course,true);
+#ifdef RTOS_CURVE_FOLLOW
+    course_set_curve_follow(&t->course,true);
+#endif
+#ifdef RTOS_LAUNCH_CAP
+    course_set_launch_cap(&t->course,0.34f);
+#endif
+#ifdef RTOS_TRIM_GAIN
+    course_set_trim_gain(&t->course,2.0f);
+#endif
     course_set_center_reference(&t->course,baseline);
     t->token=token;t->requested_us=now;t->state=0;t->reads=0;t->letter=0;
     t->status="TRACK_DECODER_ARMING";track_request(token);return true;

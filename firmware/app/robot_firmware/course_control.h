@@ -67,6 +67,12 @@ typedef struct {
     bool candidate,latched,clear_tracking,seek_reverse;
 #endif
     const char *fault;
+    /* Optional per-letter table, set by course_set_letter_actions(); NULL keeps the Y/Z-only behaviour. */
+    const char *letter_actions;
+    /* Set by course_set_curve_follow(): a long centre+side black overlap is a curve, not a crossing. */
+    bool curve_follow;
+    /* Multiplier on the centre-trim steering (0 = 1.0, the validated amount). */
+    float trim_gain;
 } course_control_t;
 #if ROBOCAR_COMPACT_CONTROL_STATE
 _Static_assert(COURSE_LOST==7,"Review compact course phase width when phases change");
@@ -79,6 +85,16 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
 const char *course_on_barcode(course_control_t *c,char letter,encoder_sample_t enc,
                              uint64_t now,bool on_crossing);
 bool course_reads_barcodes(const course_control_t *c);
+/* Optional table of 26 action characters for the letters A..Z (0 = record only), used instead of the
+ * Y/Z config. Call right after course_begin(); the table must not change while the run is armed. */
+void course_set_letter_actions(course_control_t *c,const char *actions);
+/* Off by default (the tested crossing-too-wide stop is unchanged). When on, a centre+side overlap that lasts
+ * longer than a crossing steers gently toward the side sensor, and only a much longer one stops the run. */
+void course_set_curve_follow(course_control_t *c,bool enabled);
+/* Optional higher breakaway cap (duty 0..0.5) and faster launch ramp; 0 keeps the validated defaults. */
+void course_set_launch_cap(course_control_t *c,float cap_pwm);
+/* Scale the small centre-trim steering so it can move wheels near their dead zone; 0 keeps the default. */
+void course_set_trim_gain(course_control_t *c,float gain);
 /* Foreground sensor context. Normalised GP28: white=0, calibrated black=1000.
  * Barcode activity includes raw confirmed edges, not just decoded symbols. */
 void course_center_level(course_control_t *c,int32_t level);

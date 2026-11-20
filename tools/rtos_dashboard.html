@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>AAI10 · Car monitor (RTOS)</title>
+<style>
+/* Styling taken from the AAI10-Calibrate dashboard (firmware/app/robot_firmware/wireless/calibration.html). */
+:root{--frame:#232425;--frame-2:#2c2d2f;--face:#0f0f0f;--face-2:#191919;--seam:#000;--line:#353638;--line-2:#4a4b4e;
+--ink:#f3f1ea;--ink-2:#bcbab2;--ink-3:#9a9891;--dark:#121212;
+--amber:#f4a62a;--amber-bg:#2e2410;--red:#ff7a6b;--red-bg:#341816;--red-fill:#c8352a;--green:#8adbaa;--green-bg:#14271c;
+--board:"Avenir Next Condensed","Bahnschrift","Roboto Condensed","Arial Narrow",sans-serif-condensed,system-ui,sans-serif;
+--text:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+font:16px/1.5 var(--text);color:var(--ink);background:var(--frame);color-scheme:dark;-webkit-text-size-adjust:100%}
+*{box-sizing:border-box}
+body{margin:0;background:var(--frame)}
+.wrap{max-width:1600px;margin:0 auto;padding:16px 20px 28px}
+h1,h2,h3{margin:0;font-family:var(--board);font-stretch:condensed;font-weight:600;letter-spacing:.01em}
+h1{font-size:1.75rem;line-height:1.1}
+h2{font-size:1.15rem;line-height:1.2;color:var(--ink)}
+p{margin:8px 0}
+small,.meta{color:var(--ink-3);font-size:.85rem}
+[hidden]{display:none!important}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:14px}
+.top .version{color:var(--ink-3);font-size:.9rem;margin-left:10px}
+.link{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.status{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;font-weight:600;padding:5px 12px;border-radius:4px;background:var(--amber-bg);color:var(--amber)}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.status.online{background:var(--green-bg);color:var(--green)}
+.status.offline{background:var(--red-bg);color:var(--red)}
+#age{font-size:.85rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+#age.stale{color:var(--amber)}
+
+.board{background:var(--face);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
+.board>header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+/* Landscape: three columns side by side, events across the bottom. */
+.grid{display:grid;gap:14px;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+#events-board,#actions-board{grid-column:1/-1}
+.act-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px;margin:0 0 12px}
+.act-cell{display:grid;grid-template-columns:2.2em 1fr;align-items:center;gap:6px;padding:6px 8px;background:var(--face-2);border:1px solid transparent;border-radius:4px}
+.act-cell b{font-family:var(--board);font-stretch:condensed;font-size:1.3rem}
+.act-cell.differs{border-color:var(--amber)}
+.act-cell.set b{color:var(--green)}
+select{font:inherit;color:var(--ink);background:var(--face);border:1px solid var(--line-2);border-radius:4px;padding:5px 6px;min-width:0;width:100%}
+.ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:inherit;color:var(--ink);background:var(--face-2);border:1px solid var(--line-2);border-radius:4px;padding:9px 16px;cursor:pointer;font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
+#act-msg{font-weight:600}
+
+.flaps{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--board);font-stretch:condensed;font-weight:600;line-height:1}
+.flaps .w{display:inline-flex;gap:3px}
+.flaps .c{position:relative;display:inline-grid;place-items:center;width:.78em;height:1.22em;background:#1b1b1b;color:var(--ink);border-radius:3px;overflow:hidden}
+.flaps .c::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--seam)}
+.flaps .c.flip{animation:flip .12s cubic-bezier(.2,.8,.2,1) calc(var(--d,0ms) + 100ms)}
+.flaps .c.flip::before{content:attr(data-g);position:absolute;inset:0;display:grid;place-items:center;background:inherit;color:var(--ink-2);opacity:0;animation:pass .1s steps(1,end) var(--d,20ms)}
+@keyframes pass{from{opacity:1}to{opacity:0}}
+@keyframes flip{from{transform:scaleY(.55);filter:brightness(.6)}to{transform:none;filter:none}}
+#phase{font-size:2.3rem;min-height:1.3em}
+#phase.fault .c{color:var(--red)}#phase.warn .c{color:var(--amber)}#phase.ok .c{color:var(--green)}
+#phase-meaning{font-size:1rem;color:var(--ink);margin:12px 0 0}
+
+.strip{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));margin:14px 0 0;background:var(--face-2);border-radius:4px}
+.strip div{padding:8px 12px;border-left:1px solid var(--line)}
+.strip div:first-child{border-left:0}
+.strip dt{font-size:.8rem;color:var(--ink-3)}
+.strip dd{margin:2px 0 0;font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums;font-family:var(--board);font-stretch:condensed}
+.strip dd.bad{color:var(--red)}.strip dd.warn{color:var(--amber)}
+.badge{font-family:var(--board);font-stretch:condensed;font-weight:700;font-size:1.9rem;line-height:1.1;letter-spacing:.03em;color:var(--ink-3)}
+#tilt,#motion,#hump{border-width:2px;border-color:var(--line-2)}
+#tilt[data-state=ok]{border-color:var(--green)}#tilt[data-state=warn]{border-color:var(--amber)}
+#tilt[data-state=alert]{border-color:var(--red-fill);background:var(--red-bg)}
+#tilt[data-state=ok] .badge{color:var(--green)}#tilt[data-state=warn] .badge{color:var(--amber)}#tilt[data-state=alert] .badge{color:var(--red)}
+.tilt-gauge{position:relative;height:14px;margin:12px 0 2px;background:var(--face-2);border-radius:7px;overflow:hidden}
+.tilt-gauge i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--green);transition:width .2s}
+#tilt[data-state=warn] .tilt-gauge i{background:var(--amber)}#tilt[data-state=alert] .tilt-gauge i{background:var(--red-fill)}
+.tilt-gauge .mark{position:absolute;top:0;bottom:0;width:2px;background:var(--ink-2);opacity:.7}
+.tilt-scale{display:flex;justify-content:space-between;font-size:.75rem;color:var(--ink-3)}
+#motion[data-state=go]{border-color:var(--green)}#motion[data-state=turn]{border-color:var(--amber)}
+#motion[data-state=hump]{border-color:var(--green);background:var(--green-bg)}
+#motion[data-state=go] .badge,#motion[data-state=hump] .badge{color:var(--green)}#motion[data-state=turn] .badge{color:var(--amber)}
+#hump[data-state=ok]{border-color:var(--green)}#hump[data-state=hit]{border-color:var(--green);background:var(--green-bg)}
+#hump[data-state=ok] .badge,#hump[data-state=hit] .badge{color:var(--green)}
+
+.bc-head{display:flex;gap:18px;align-items:center}
+#bc-letter{font-size:4.6rem}
+#bc-letter.empty .c{color:var(--ink-3)}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;font-size:.95rem}
+.facts dt{color:var(--ink-3)}.facts dd{margin:0;font-variant-numeric:tabular-nums}
+.facts dd.bad{color:var(--red)}
+.subhead{margin:16px 0 4px;font-size:.95rem;color:var(--ink-2);font-family:var(--text);font-weight:600}
+#bc-history{font-size:1.4rem;margin-top:6px}
+.empty-note{color:var(--ink-3);font-size:.92rem;margin:6px 0}
+
+.bar{display:grid;grid-template-columns:8em 1fr 4em;align-items:center;gap:10px;margin:6px 0;font-variant-numeric:tabular-nums}
+.bar span:first-child{color:var(--ink-3)}
+.bar i{display:block;height:12px;background:var(--face-2);border-radius:2px;overflow:hidden}
+.bar i b{display:block;height:100%;width:0;background:var(--ink);transition:width .25s ease-out}
+.bar span:last-child{text-align:right;font-weight:600}
+.mt{width:100%;border-collapse:collapse;font-size:.92rem;font-variant-numeric:tabular-nums}
+.mt th{text-align:left;color:var(--ink-3);font-weight:400;padding:4px 10px 4px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.mt td{padding:5px 10px 5px 0;border-bottom:1px solid var(--face-2)}
+.mt td.bad{color:var(--red);font-weight:600}
+
+.filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip span{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:5px 12px;border-radius:4px;background:var(--face-2);color:var(--ink-2);font-size:.9rem;border:1px solid transparent}
+.chip input:checked+span{background:var(--ink);color:var(--dark);font-weight:600}
+.chip input:focus-visible+span{outline:2px solid var(--amber);outline-offset:2px}
+.chip span em{font-style:normal;opacity:.75}
+.pause{display:inline-flex;align-items:center;gap:8px;margin:0 0 0 auto;font-size:.9rem;color:var(--ink-2);cursor:pointer}
+.pause input{width:18px;height:18px;accent-color:var(--amber)}
+.cols,.ev{display:grid;grid-template-columns:5.6em 6.5em 5.2em minmax(0,1fr);gap:12px;padding:0 12px}
+.cols{padding-bottom:6px;font-size:.82rem;color:var(--ink-3);border-bottom:1px solid var(--line);margin-top:12px}
+#events{list-style:none;margin:0;padding:0;max-height:240px;overflow:auto}
+.ev{align-items:baseline;padding:8px 12px;border-bottom:1px solid var(--face-2)}
+.t{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:.9rem}
+.sys{font-family:var(--board);font-stretch:condensed;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em;font-size:.95rem}
+.sev{justify-self:start;font-size:.78rem;font-weight:600;padding:2px 7px;border-radius:3px;background:var(--face-2);color:var(--ink-3)}
+.ev[data-sev=fault] .sev{background:var(--red-bg);color:var(--red)}
+.ev[data-sev=warn] .sev{background:var(--amber-bg);color:var(--amber)}
+.ev[data-sev=ok] .sev{background:var(--green-bg);color:var(--green)}
+.ev[data-sev=fault] .what{color:var(--red)}
+.what{font-weight:600;overflow-wrap:anywhere}
+#events[data-filter=problems] .ev:not([data-sev=fault]):not([data-sev=warn]),
+#events[data-filter=barcode] .ev:not([data-sys=Barcode]),
+#events[data-filter=run] .ev:not([data-sys=Run]),
+#events[data-filter=terrain] .ev:not([data-sys=Terrain]):not([data-sys=Tilt]){display:none}
+
+@media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.col:nth-child(3){grid-column:1/-1}}
+@media(max-width:700px){.grid{grid-template-columns:minmax(0,1fr)}.cols{display:none}.ev{grid-template-columns:auto 1fr auto}.wrap{padding:12px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<div class="wrap">
+<header class="top"><div><h1>Car monitor<span class="version">AAI10 · RTOS · monitor</span></h1></div>
+<div class="link"><span id="age">No data yet</span><span id="connection" class="status" role="status">Connecting…</span></div></header>
+<main class="grid">
+
+<div class="col">
+<section id="now" class="board" aria-labelledby="now-h">
+<header><h2 id="now-h">Now</h2><span id="now-test" class="meta"></span></header>
+<div id="phase" class="flaps" aria-hidden="true"></div><span id="phase-sr" class="sr" hidden aria-live="polite"></span>
+<p id="phase-meaning">Waiting for the car to report.</p>
+<dl class="strip" style="--n:5">
+<div><dt>Run time</dt><dd id="c-time">—</dd></div>
+<div><dt>Barcode reads</dt><dd id="c-reads">0</dd></div>
+<div><dt>Rejected</dt><dd id="c-retries">0</dd></div>
+<div><dt>Warnings</dt><dd id="c-warns">0</dd></div>
+<div><dt>Faults</dt><dd id="c-faults">0</dd></div>
+</dl>
+</section>
+
+<section id="tilt" class="board" data-state="idle" aria-labelledby="tilt-h">
+<header><h2 id="tilt-h">Tilt</h2><span class="meta">Alert over 15° for 0.4 s · clears under 10° · stops a run</span></header>
+<div id="tilt-badge" class="badge" role="status" aria-live="assertive">WAITING FOR CAR</div>
+<div class="tilt-gauge" aria-hidden="true"><i id="tilt-fill"></i><span class="mark" style="left:50%"></span><span class="mark" style="left:75%"></span></div>
+<div class="tilt-scale" aria-hidden="true"><span>0°</span><span>10°</span><span>15°</span><span>20°+</span></div>
+<dl class="strip" style="--n:4">
+<div><dt>Roll now</dt><dd id="tilt-roll">—</dd></div>
+<div><dt>Max this run</dt><dd id="tilt-max">—</dd></div>
+<div><dt>Alerts</dt><dd id="tilt-count">—</dd></div>
+<div><dt>Calibrated</dt><dd id="tilt-cal">—</dd></div>
+</dl>
+</section>
+</div>
+
+<div class="col">
+<section id="motion" class="board" data-state="idle" aria-labelledby="motion-h">
+<header><h2 id="motion-h">Motion</h2><span class="meta">From the wheel encoders and the hump detector</span></header>
+<div id="motion-badge" class="badge" role="status" aria-live="polite">WAITING FOR CAR</div>
+<dl class="strip" style="--n:3">
+<div><dt>Speed</dt><dd id="motion-speed">—</dd></div>
+<div><dt>Wheels L / R</dt><dd id="motion-wheels">—</dd></div>
+<div><dt>Previous state</dt><dd id="motion-prev">—</dd></div>
+<div><dt>Course status / stop reason</dt><dd id="motion-course">—</dd></div>
+</dl>
+</section>
+
+<section id="hump" class="board" data-state="idle" aria-labelledby="hump-h">
+<header><h2 id="hump-h">Hump</h2><span class="meta">Height from the sideways tip · humps under the right wheel</span></header>
+<div id="hump-badge" class="badge" role="status" aria-live="polite">WAITING FOR CAR</div>
+<dl class="strip" style="--n:3">
+<div><dt>Last hump</dt><dd id="hump-last">—</dd></div>
+<div><dt>Highest this run</dt><dd id="hump-high">—</dd></div>
+<div><dt>Humps this run</dt><dd id="hump-count">—</dd></div>
+</dl>
+<p class="empty-note">A hump is reported once the car has driven over it.</p>
+</section>
+
+<section id="sensors" class="board" aria-labelledby="sens-h">
+<header><h2 id="sens-h">Line sensors</h2><span class="meta">Raw IR · higher is darker</span></header>
+<div class="bar"><span>Barcode · GP26</span><i><b id="b0"></b></i><span id="l0">—</span></div>
+<div class="bar"><span>Centre · GP28</span><i><b id="b1"></b></i><span id="l1">—</span></div>
+<div class="bar"><span>Side · GP27</span><i><b id="b2"></b></i><span id="l2">—</span></div>
+<small>Pattern: <span id="pat">—</span></small>
+</section>
+</div>
+
+<div class="col">
+<section id="barcode" class="board" aria-labelledby="bc-h">
+<header><h2 id="bc-h">Barcode</h2><span class="meta">Code 39 · A–Z</span></header>
+<div class="bc-head">
+<div id="bc-letter" class="flaps empty" aria-hidden="true"></div>
+<dl class="facts">
+<dt>Decoded</dt><dd id="bc-value">None yet</dd>
+<dt>Reads</dt><dd id="bc-reads">—</dd>
+<dt>Rejected</dt><dd id="bc-rej">—</dd>
+<dt>Line recoveries</dt><dd id="bc-rec">—</dd>
+<dt>Scanner faults</dt><dd id="bc-flt">—</dd>
+</dl>
+</div>
+<h3 class="subhead">Reads this run</h3>
+<div id="bc-history" class="flaps"></div><p id="bc-history-empty" class="empty-note">No reads yet.</p>
+</section>
+
+<section id="perf" class="board" aria-labelledby="perf-h">
+<header><h2 id="perf-h">Timing and tasks</h2><span class="meta">Longest gap between runs of each task · free stack</span></header>
+<table class="mt" id="tasks"><thead><tr><th>Task</th><th>Gap max</th><th>Armed gap</th><th>Stack free</th><th>Guard</th></tr></thead><tbody></tbody></table>
+<p class="empty-note" id="tasks-empty">Appears once the car reports its task diagnostics.</p>
+</section>
+</div>
+
+<section id="actions-board" class="board" aria-labelledby="act-h">
+<header><h2 id="act-h">Barcode actions</h2><span class="meta">What the car does for each letter · set before a run, refused while running, reset at power-up</span></header>
+<div id="act-grid" class="act-grid"></div>
+<div class="ctl">
+<button id="act-send" class="primary" disabled>Send to car</button>
+<button id="act-reset" type="button">Built-in defaults</button>
+<button id="act-car" type="button">Show the car's table</button>
+<span id="act-msg" role="status"></span>
+</div>
+<p id="act-car-state" class="empty-note">The car has not reported its table yet. It does so each time it connects.</p>
+</section>
+
+<section id="events-board" class="board" aria-labelledby="ev-h">
+<header><h2 id="ev-h">Events</h2><span class="meta">Newest first</span></header>
+<div class="filters">
+<label class="chip"><input type="radio" name="evf" value="all" checked><span>All <em id="n-all">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="problems"><span>Problems <em id="n-problems">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="barcode"><span>Barcode <em id="n-barcode">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="run"><span>Run <em id="n-run">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="terrain"><span>Terrain <em id="n-terrain">0</em></span></label>
+<label class="pause"><input type="checkbox" id="pause"> <span>Pause updates</span></label></div>
+<div class="cols" aria-hidden="true"><span>Time</span><span>System</span><span>Status</span><span>Event</span></div>
+<ul id="events" data-filter="all" aria-label="Car events"></ul>
+<p id="events-empty" class="empty-note" style="padding:0 12px">Events appear here as the car reports them: link changes, run start and stop, barcode reads, humps and tilt alerts.</p>
+</section>
+</main>
+</div>
+<script>
+'use strict';
+const el=id=>document.getElementById(id);
+const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const GLYPHS='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+function flap(node,text){
+ text=String(text).toUpperCase();
+ const prev=node.dataset.text||'';if(prev===text)return;node.dataset.text=text;
+ const old=prev.replace(/ /g,'');const still=reduced()||document.hidden;
+ node.textContent='';let i=0;const cells=[];
+ for(const word of text.split(' ')){if(!word)continue;const w=document.createElement('span');w.className='w';for(const ch of word){const c=document.createElement('span');c.className='c';c.textContent=ch;w.append(c);if(!still&&old[i]!==ch)cells.push([c,ch,i]);i++;}node.append(w);}
+ cells.forEach(([c,ch,idx])=>{c.dataset.g=GLYPHS[(GLYPHS.indexOf(ch)+7+idx)%GLYPHS.length];c.style.setProperty('--d',(20+Math.min(idx*18,160))+'ms');c.classList.add('flip');});
+}
+const set=(id,v)=>{el(id).textContent=v};
+const cls=(id,c)=>{el(id).className=c||''};
+const mmFmt=d=>(d/10).toFixed(1)+' mm';
+let humpSeen=-1,humpHitUntil=0,paused=false,filter='all';
+document.querySelectorAll('input[name=evf]').forEach(r=>r.onchange=()=>{filter=r.value;el('events').dataset.filter=filter});
+el('pause').onchange=e=>{paused=e.target.checked};
+
+function render(s){
+ const t=s.topics,names=Object.keys(t);
+ const newest=names.length?Math.min(...names.map(n=>t[n].age)):null;
+ const live=newest!==null&&newest<3;
+ set('age',newest===null?'No data yet':live?'Live · '+newest.toFixed(1)+' s':'Last record '+newest.toFixed(0)+' s ago');
+ el('age').className=live||newest===null?'':'stale';
+ const link=t.link?t.link.state:null;
+ set('connection',!names.length?'Waiting for the car':!live?'No data':link==='online'?'Car online':link?('Link '+link):'Receiving');
+ el('connection').className='status '+(live&&link!=='offline'&&names.length?'online':names.length&&!live?'offline':'');
+
+ const m=t.motion,tr=t.terrain,ln=t.line,sd=t.scan_diag,bc=t.barcode,run=s.run;
+ const mfault=m?m.fault:0,sfault=sd?sd.faults:0;
+ const guardHit=s.tasks.filter(k=>!k.low_guard_intact).length;
+ const tiltN=tr?tr.tilt_alerts:0;
+
+ /* Now */
+ if(m){
+  const running=!m.stop_latched,reason=s.stop_reasons[Math.min(m.stop_reason,6)];
+  const pickup=!running&&reason==='MOTION'&&tiltN>0;
+  const phase=mfault||sfault?'FAULT':running?'RUNNING':'STOPPED';
+  flap(el('phase'),phase);el('phase').className='flaps '+(phase==='FAULT'?'fault':running?'ok':'warn');
+  set('phase-meaning',running?'Running. GP20, a stop command or a pick-up ends the run.':
+     pickup?'Stopped by the tilt alert: the car was picked up or tipped over.':
+     reason==='COMPLETE'?'Run complete.':reason==='BUTTON'?'Stopped with GP20 or a stop command.':
+     reason==='BOOT'?'Ready. Press GP20 on the car to start.':'Stopped, reason '+reason.toLowerCase()+'.');
+ }
+ set('c-time',run.duration==null?'—':run.duration.toFixed(1)+' s');
+ set('c-reads',run.reads.length);
+ set('c-retries',sd?sd.rejected:0);
+ set('c-warns',tiltN+guardHit);cls('c-warns',tiltN+guardHit?'warn':'');
+ set('c-faults',mfault+sfault);cls('c-faults',mfault+sfault?'bad':'');
+
+ /* Tilt */
+ if(tr){
+  const roll=Math.abs(tr.roll_decideg/10);
+  const state=!tr.calibrated?'idle':tr.tilt_active?'alert':roll>=10?'warn':'ok';
+  el('tilt').dataset.state=state;
+  set('tilt-badge',!tr.calibrated?'NOT CALIBRATED':tr.tilt_active?'TILT ALERT':roll>=10?'TILTING':'LEVEL');
+  el('tilt-fill').style.width=Math.min(100,roll/20*100)+'%';
+  set('tilt-roll',(tr.roll_decideg/10).toFixed(1)+'°');
+  set('tilt-max',run.max_roll.toFixed(1)+'°');
+  set('tilt-count',tr.tilt_alerts);cls('tilt-count',tr.tilt_alerts?'warn':'');
+  set('tilt-cal',tr.calibrated?'Yes':'No');cls('tilt-cal',tr.calibrated?'':'bad');
+ }
+
+ /* Motion */
+ if(tr){
+  const st=tr.motion_state,name=s.motion_states[st]||'UNKNOWN';
+  set('motion-badge',name);
+  el('motion').dataset.state=st>=5?'hump':st===4?'turn':st>=1?'go':'idle';
+  set('motion-prev',run.prev_state==null?'—':(s.motion_states[run.prev_state]||'—'));
+  set('motion-course',s.topics.track_status?s.topics.track_status.status:'—');
+ }
+ if(m){
+  const speed=(Math.abs(m.left_mm_s)+Math.abs(m.right_mm_s))/2;
+  set('motion-speed',speed.toFixed(0)+' mm/s');
+  set('motion-wheels',Math.abs(m.left_mm_s)+' / '+Math.abs(m.right_mm_s));
+ }
+
+ /* Hump */
+ if(tr){
+  if(humpSeen>=0&&tr.humps>humpSeen)humpHitUntil=Date.now()+4000;
+  humpSeen=tr.humps;
+  const hit=Date.now()<humpHitUntil;
+  el('hump').dataset.state=hit?'hit':'ok';
+  set('hump-badge',hit?'HUMP DETECTED':tr.humps?'HUMPS LOGGED':'NO HUMP YET');
+  set('hump-last',tr.humps?mmFmt(tr.last_height_dmm):'—');
+  set('hump-high',tr.humps?mmFmt(tr.highest_height_dmm):'—');
+  set('hump-count',tr.humps);
+ }
+
+ /* Line sensors */
+ if(ln){
+  ln.raw_adc.forEach((v,i)=>{set('l'+i,v);el('b'+i).style.width=Math.min(100,v/40.95)+'%'});
+  set('pat',ln.pattern.toString(2).padStart(3,'0'));
+ }
+
+ /* Barcode */
+ const last=run.reads.length?run.reads[run.reads.length-1]:(bc&&bc.valid&&bc.barcode?bc.barcode:null);
+ const letter=last||'-';
+ flap(el('bc-letter'),letter);el('bc-letter').className='flaps'+(last?'':' empty');
+ set('bc-value',last?'Letter '+last:(bc&&bc.unreadable?'Unreadable':'None yet'));
+ if(sd){set('bc-reads',sd.reads);set('bc-rej',sd.rejected);set('bc-rec',sd.recoveries);set('bc-flt',sd.faults);cls('bc-flt',sd.faults?'bad':'')}
+ flap(el('bc-history'),run.reads.join(' ')||' ');
+ el('bc-history-empty').hidden=run.reads.length>0;
+
+ /* Tasks */
+ const body=el('tasks').tBodies[0];body.replaceChildren();
+ s.tasks.sort((a,b)=>a.task_id-b.task_id).forEach(k=>{
+  const r=body.insertRow();
+  [k.task,(k.gap_max_us/1000).toFixed(1)+' ms',(k.armed_gap_max_us/1000).toFixed(1)+' ms',k.untouched_bytes+' B',k.low_guard_intact?'OK':'HIT'].forEach((x,i)=>{const c=r.insertCell();c.textContent=x;if(i===4&&x==='HIT')c.className='bad'});
+ });
+ el('tasks-empty').hidden=s.tasks.length>0;
+
+ renderActions(s,t,m);
+
+ /* Events */
+ if(!paused){
+  const list=el('events'),ev=[...s.events].reverse();
+  list.replaceChildren();
+  ev.forEach(e=>{
+   const li=document.createElement('li');li.className='ev';li.dataset.sev=e.sev;li.dataset.sys=e.system;
+   const a=document.createElement('span');a.className='t';a.textContent=e.t.toFixed(1)+' s';
+   const b=document.createElement('span');b.className='sys';b.textContent=e.system;
+   const c=document.createElement('span');c.className='sev';c.textContent=e.sev==='fault'?'Fault':e.sev==='warn'?'Warning':'OK';
+   const d=document.createElement('span');d.className='what';d.textContent=e.text;
+   li.append(a,b,c,d);list.append(li);
+  });
+  const n=f=>ev.filter(f).length;
+  set('n-all',ev.length);set('n-problems',n(e=>e.sev==='fault'||e.sev==='warn'));
+  set('n-barcode',n(e=>e.system==='Barcode'));set('n-run',n(e=>e.system==='Run'));
+  set('n-terrain',n(e=>e.system==='Terrain'||e.system==='Tilt'));
+  el('events-empty').hidden=ev.length>0;
+ }
+}
+/* Barcode actions: the form edits `form`; the car's own table comes back on topic barcode_actions. */
+const RESULTS=['No command since the car powered up','Accepted','Refused: a run is armed','Refused: invalid command'];
+let form=null,dirty=false,names=null,defaults=null,lastCar=null,canSend=false,running=false;
+const sameCodes=(a,b)=>a&&b&&a.length===b.length&&a.every((v,i)=>v===b[i]);
+function buildActions(s){
+ names=s.action_names;defaults=s.default_codes;form=defaults.slice();
+ const grid=el('act-grid');
+ for(let i=0;i<26;i++){
+  const cell=document.createElement('label');cell.className='act-cell';cell.id='act-cell-'+i;
+  const letter=document.createElement('b');letter.textContent=String.fromCharCode(65+i);
+  const sel=document.createElement('select');sel.id='act-sel-'+i;sel.setAttribute('aria-label','Action for letter '+letter.textContent);
+  names.forEach((n,v)=>{const o=document.createElement('option');o.value=v;o.textContent=n;sel.append(o)});
+  sel.onchange=()=>{form[i]=Number(sel.value);dirty=true;el('act-msg').textContent='';paintActions()};
+  cell.append(letter,sel);grid.append(cell);
+ }
+ el('act-reset').onclick=()=>{form=defaults.slice();dirty=true;paintActions()};
+ el('act-car').onclick=()=>{if(lastCar){form=lastCar.slice();dirty=false;paintActions()}};
+ el('act-send').onclick=async()=>{
+  el('act-send').disabled=true;
+  try{
+   const r=await fetch('/barcode_actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codes:form})});
+   const j=await r.json();el('act-msg').textContent=j.message;el('act-msg').style.color=j.ok?'var(--green)':'var(--red)';
+  }catch(e){el('act-msg').textContent='Could not reach the dashboard server.';el('act-msg').style.color='var(--red)'}
+ };
+}
+function paintActions(){
+ for(let i=0;i<26;i++){
+  const sel=el('act-sel-'+i);if(Number(sel.value)!==form[i])sel.value=form[i];
+  const cell=el('act-cell-'+i);
+  cell.className='act-cell'+(lastCar&&lastCar[i]!==form[i]?' differs':'')+(form[i]?' set':'');
+ }
+ const differs=!lastCar||!sameCodes(lastCar,form);
+ el('act-send').disabled=!canSend||running||!differs;
+ el('act-send').title=!canSend?'Sending is disabled in this dashboard run':running?'The car is running; it would refuse':!differs?'The car already has this table':'';
+}
+function renderActions(s,t,m){
+ if(!form)buildActions(s);
+ canSend=s.can_send;running=!!(m&&!m.stop_latched);
+ const rep=t.barcode_actions;
+ if(rep){
+  lastCar=rep.codes;
+  if(!dirty||sameCodes(lastCar,form)){form=lastCar.slice();dirty=false}
+  const names_=rep.codes.map((c,i)=>c?String.fromCharCode(65+i)+' = '+s.action_names[c]:null).filter(Boolean);
+  set('act-car-state','Car reports: '+(names_.length?names_.join(' · '):'no letters set')+'. Latest command: '+RESULTS[rep.result]+'.');
+ }
+ paintActions();
+}
+async function tick(){
+ try{
+  const r=await fetch('/state',{cache:'no-store'});render(await r.json());
+ }catch(e){set('connection','Dashboard server unreachable');el('connection').className='status offline'}
+}
+tick();setInterval(tick,300);
+</script></body></html>

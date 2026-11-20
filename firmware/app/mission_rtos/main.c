@@ -22,6 +22,11 @@
 #include "terrain.h"
 #include "terrain_telemetry.h"
 #endif
+#ifdef RTOS_TERRAIN
+#define PICKUP_IR_RAW 3500u  /* all three IR sensors above this: nothing under the car */
+#define PICKUP_HOLD_MS 150u  /* for this long: ignores a single stray sample */
+#define CALIBRATION_RETRY_MS 3000u /* between level-calibration retries while uncalibrated and stopped */
+#endif
 #ifndef RTOS_WAIT_FOR_USB
 #define RTOS_WAIT_FOR_USB 0
 #endif
@@ -36,6 +41,11 @@ void *knl_lowmem_top;
 void *knl_lowmem_limit;
 static uint8_t kernel_pool[KERNEL_POOL_SIZE] __attribute__((aligned(8)));
 static motion_runtime_t runtime;
+#ifdef RTOS_TRACK
+/* Latest course/track status text for the MQTT track_status record. The string
+ * is always a static literal and the pointer read is a single aligned word. */
+const char *rtos_track_status(void){const char *s=runtime.track.status;return s?s:"IDLE";}
+#endif
 static void motion_task(int start_code, void *context)
 {
     (void)start_code; (void)context;
@@ -85,6 +95,8 @@ static void observer_task(int start_code, void *context)
     uint32_t terrain_settle_until = 0u;
     uint32_t last_terrain_send = 0u;
     bool terrain_was_armed = false;
+    uint32_t pickup_since_ms = 0u;
+    uint32_t next_calibration_ms = 0u;
 #endif
     for (;;) {
         runtime_span_t observer_span=runtime_measure_begin(RUNTIME_OBSERVER,time_us_32());
@@ -158,6 +170,15 @@ static void observer_task(int start_code, void *context)
                 if (armed) puts("[TERRAIN] Level calibration only while the car is stopped.");
                 else terrain_calibrate();
             }
+            /* The boot calibration fails if the car is moved or tilted in its first seconds, and without
+             * USB nothing could ask again: hump detection stayed off for the whole session. Retry every
+             * few seconds while the car is stopped and not calibrated; each attempt keeps the Observer
+             * busy for about 2 s and is rejected again if the car is still being moved. */
+            if (!armed && terrain_settle_until == 0u && !terrain_get_status().calibrated &&
+                (int32_t)(now - next_calibration_ms) >= 0) {
+                (void)terrain_calibrate();
+                next_calibration_ms = to_ms_since_boot(get_absolute_time()) + CALIBRATION_RETRY_MS;
+            }
             /* A run starts when the gate arms (GP20) and ends when it disarms. The detector keeps
              * polling for 500 ms after the stop so that a hump still open at the stop is reported. */
             if (armed && !terrain_was_armed) {
@@ -180,6 +201,29 @@ static void observer_task(int start_code, void *context)
             encoder_sample_t wheels = encoders_snapshot();
             terrain_motion_update((int32_t)(0u - wheels.left_raw), (int32_t)wheels.right_raw, now);
             const terrain_status_t st = terrain_get_status();
+            /* Demo rule: the run ends when the car is picked up, and the motors must stop. Off the ground
+             * is read from the three IR sensors: with nothing under the car all three saturate (about
+             * 4000 of 4095 on the car), while floor reads about 170 and the centre sensor on tape about
+             * 2600, so all three above PICKUP_IR_RAW cannot happen on the track. It must last
+             * PICKUP_HOLD_MS. A hump can also tip the sensors off the floor, so during a hump phase the
+             * tilt alert (above 15 degrees for 400 ms) must agree before the run is stopped. It uses the
+             * existing STOP_MOTION reason so the motion record and runtime decoders are unchanged. */
+            track_ir_t ir;
+            track_sensor_read(&ir);
+            const bool off_ground = ir.age_us < 100000u && ir.raw[0] > PICKUP_IR_RAW &&
+                                    ir.raw[1] > PICKUP_IR_RAW && ir.raw[2] > PICKUP_IR_RAW;
+            if (!armed || !off_ground) {
+                pickup_since_ms = 0u;
+            } else {
+                if (pickup_since_ms == 0u) pickup_since_ms = now ? now : 1u;
+                const bool hump_phase = st.motion_state == 5u || st.motion_state == 6u;
+                if ((uint32_t)(now - pickup_since_ms) >= PICKUP_HOLD_MS && (!hump_phase || st.tilt_alert_active)) {
+                    board_stop(STOP_MOTION);
+                    printf("[PICKUP] off the ground (IR %u/%u/%u) tilt_alert=%d: motors stopped, run latched.\n",
+                           ir.raw[0], ir.raw[1], ir.raw[2], (int)st.tilt_alert_active);
+                    pickup_since_ms = 0u;
+                }
+            }
             const terrain_source_t source = {
                 .available = st.available, .calibrated = st.calibrated, .sample_valid = st.pitch_valid,
                 .roll_change_deg = st.current_roll_change_deg, .humps = st.roll_hump_count,

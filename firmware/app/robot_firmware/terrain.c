@@ -43,6 +43,8 @@ static hump_roll_t roll_detector;
 static tilt_alert_t tilt_detector;
 static motion_class_state_t motion_class;
 static uint64_t last_roll_poll_ms;
+#define MAX_CONSECUTIVE_READ_ERRORS 25u /* about half a second of samples */
+static uint8_t consecutive_read_errors;
 #ifndef TERRAIN_NO_ROLL_TRACE
 /* Roll trace for tuning: every detector input sample of a run, kept in RAM and printed after the
  * stop. filtered = the 8-sample average the detector sees, raw = the single newest sample, both as
@@ -371,12 +373,19 @@ void terrain_poll(void)
 
     acceleration_t reading;
     if (!read_acceleration(&reading)) {
+        ++status.read_errors;
+        /* One failed I2C read (a bump jostling the Grove lead, motor noise) must not throw the level
+         * calibration away mid-run: skip the sample and only give up after a sustained failure. */
+        if (++consecutive_read_errors < MAX_CONSECUTIVE_READ_ERRORS) {
+            return;
+        }
         status.calibrated = false;
         status.pitch_valid = false;
-        ++status.read_errors;
-        printf("Terrain sensor read failed; hump monitoring paused.\n");
+        printf("Terrain sensor read failed %u times in a row; hump monitoring paused.\n",
+               (unsigned)consecutive_read_errors);
         return;
     }
+    consecutive_read_errors = 0u;
     samples[sample_next] = reading;
     sample_next = (sample_next + 1u) % FILTER_SAMPLES;
     if (sample_count < FILTER_SAMPLES) {
@@ -440,7 +449,6 @@ void terrain_poll(void)
             peak_climb = tilt;
             peak_descent = 0.0f;
             level_since_ms = 0;
-            printf("HUMP: climbing started.\n");
         }
     } else if (phase == HUMP_CLIMBING) {
         if (tilt > peak_climb) {

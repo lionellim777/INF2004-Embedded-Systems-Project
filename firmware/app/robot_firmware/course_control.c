@@ -12,9 +12,9 @@ static void new_segment(course_control_t *c,int32_t l,int32_t r,uint64_t now)
     float left=barcode_clamp(0.157f*0.5f+c->drive.left_integral,0.12f,0.22f);
     float right=barcode_clamp(0.142f*0.5f+c->drive.right_integral,0.14f,0.22f);
     c->segment_l=l;c->segment_r=r;c->segment_us=now;
-    c->steady_line_us=0;
+    c->steady_line_us=0;const float cap=c->drive.launch_cap_pwm;
     c->drive=(barcode_progress_t){.center_profile=ROBOCAR_CENTER_LINE,
-        .launch_left_pwm=left,.launch_right_pwm=right};
+        .launch_left_pwm=left,.launch_right_pwm=right,.launch_cap_pwm=cap};
 }
 void course_begin(course_control_t *c,course_config_t config,encoder_sample_t enc,uint64_t now)
 {
@@ -23,6 +23,14 @@ void course_begin(course_control_t *c,course_config_t config,encoder_sample_t en
     c->drive.center_profile=ROBOCAR_CENTER_LINE;c->center_reference=500;
     if(!course_config_valid(config)){c->phase=COURSE_FAILED;c->fault="COURSE_BAD_CONFIG";}
 }
+void course_set_letter_actions(course_control_t *c,const char *actions)
+{c->letter_actions=actions;}
+void course_set_trim_gain(course_control_t *c,float gain)
+{c->trim_gain=gain;}
+void course_set_launch_cap(course_control_t *c,float cap_pwm)
+{c->drive.launch_cap_pwm=cap_pwm;}
+void course_set_curve_follow(course_control_t *c,bool enabled)
+{c->curve_follow=enabled;}
 void course_center_level(course_control_t *c,int32_t level)
 {
     c->center_level_valid=true;c->center_level=level;
@@ -85,8 +93,15 @@ const char *course_on_barcode(course_control_t *c,char letter,encoder_sample_t e
 {
     (void)enc;
     if(c->phase==COURSE_FAILED)return "IGNORED_STOPPED";
-    if(letter!='Y'&&letter!='Z')return "IGNORED_UNMAPPED";
-    char action=letter=='Y'?c->config.y_action:c->config.z_action;
+    char action;
+    if(c->letter_actions!=NULL){
+        if(letter<'A'||letter>'Z')return "IGNORED_UNMAPPED";
+        action=c->letter_actions[letter-'A'];
+        if(action==0)return "IGNORED_UNMAPPED";
+    }else{
+        if(letter!='Y'&&letter!='Z')return "IGNORED_UNMAPPED";
+        action=letter=='Y'?c->config.y_action:c->config.z_action;
+    }
     if(!course_action_valid(action)){stopped(c,"COURSE_BAD_CONFIG");return "INVALID_CONFIG";}
     c->route_updates++;
     if(action=='x'){
@@ -132,6 +147,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
     }
 #endif
     bool both=ir.left&&ir.right;
+    bool curve_steer=false;
     float center_steer=0;
 #if ROBOCAR_CENTER_LINE
     if(c->flow_follow && c->center_level_valid)front_preview(c,now);
@@ -148,6 +164,8 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
             int good_direction=c->center_trim.direction;
             center_steer=center_trim_step_profile(&c->center_trim,c->center_level,c->center_reference,
                                          ir.right||c->right_preview,l,r,now,c->flow_follow);
+            /* trim_gain 0 keeps the validated amount. The drive clamps the result to +/-220 cps. */
+            if(c->trim_gain>0.0f)center_steer*=c->trim_gain;
             if(good_hint&&!c->center_trim.exhausted&&
                (!c->center_trim.active||c->center_trim.direction==good_direction)){
                 c->bend_direction=good_direction;c->bend_hint_us=now;
@@ -388,9 +406,16 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
                 }
             }
         }
+        /* A crossing is over in ~0.1 s. With curve_follow, black under both sensors for 0.5 s / ~30 mm
+         * is the tape curving toward the side sensor: steer gently toward it and keep following, and
+         * stop only for a much longer overlap (a wide patch of tape or a dark floor mark). */
+        const uint64_t wide_us=c->curve_follow?20000000u:1200000u;
+        const int32_t wide_counts=c->curve_follow?12000:1200;
         if(c->phase==COURSE_FOLLOW && both && c->latched &&
-           (now-c->both_us>=1200000u || l-c->entry_l>=1200 || r-c->entry_r>=1200))
+           (now-c->both_us>=wide_us || l-c->entry_l>=wide_counts || r-c->entry_r>=wide_counts))
             return stopped(c,"COURSE_CROSSING_TOO_WIDE");
+        curve_steer=c->curve_follow && c->phase==COURSE_FOLLOW && both && c->latched &&
+            (now-c->both_us>=500000u || l-c->entry_l>=400 || r-c->entry_r>=400);
         if(both || c->phase==COURSE_CENTER)ir.left=ir.right=false;
     }
     /* Crossing/committed centering wins over the ordinary bend memory. */
@@ -402,7 +427,7 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
         c->drive.left_target=c->drive.right_target=ROBOCAR_CENTER_LINE?600.0f:TRACK_TARGET_CPS;
         c->drive.balance_offset=(l-c->segment_l)-(r-c->segment_r);
     }
-    c->drive.center_steer=(c->phase==COURSE_FOLLOW && !both)?center_steer:0;
+    c->drive.center_steer=(c->phase==COURSE_FOLLOW && !both)?center_steer:curve_steer?120.0f:0;
 #if ROBOCAR_CENTER_LINE
     bool steady=c->phase==COURSE_FOLLOW&&!both&&!ir.right&&c->center_level_valid&&
         c->center_level>=c->center_reference*90/100&&!c->center_trim.active&&

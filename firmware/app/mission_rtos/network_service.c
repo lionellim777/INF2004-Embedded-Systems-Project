@@ -53,9 +53,12 @@ static void scan_export(void)
 
 enum { INITIALIZED=1u, CONNECTED=2u, FAILED=4u, FORCE_STATUS=8u,
        SUB_SHIFT=4u, SUB_MASK=48u, RESULT_PENDING=64u, RETRY_SHIFT=7u, RETRY_MASK=896u,
-       ERROR_SHIFT=10u,ERROR_MASK=15360u };
+       ERROR_SHIFT=10u,ERROR_MASK=15360u,
+       /* Barcode-action preset (RTOS_BARCODE_ACTIONS): its own subscription, made once online so the
+        * three-subscription start-up count above is unchanged, and a report waiting to be published. */
+       ACTIONS_SUBSCRIBED=16384u, ACTIONS_REPORT_PENDING=32768u };
 /* policy: period bits0..12 (200..5000), state13..15. flags: above, error10..13;
- * bits14..15 zero.
+ * bits14..15 only with RTOS_BARCODE_ACTIONS, otherwise zero.
  * Network task is the sole writer; observer reads an aligned halfword. */
 static volatile uint16_t policy=200u;
 /* Keep the complete radio path compiled even in the default unconfigured
@@ -91,6 +94,14 @@ static const char status_command[]=RTOS_TOPIC_PREFIX "command/get_status";
 static const char period_command[]=RTOS_TOPIC_PREFIX "command/set_period_ms";
 static const char stop_command[]=RTOS_TOPIC_PREFIX "command/stop";
 static const char result_topic[]=RTOS_TOPIC_PREFIX "command_result";
+#ifdef RTOS_BARCODE_ACTIONS
+#include "barcode_actions.h"
+static const char actions_command[]=RTOS_TOPIC_PREFIX "command/set_barcode_actions";
+static const char actions_topic[]=RTOS_TOPIC_PREFIX "barcode_actions";
+static uint8_t actions_buffer[BARCODE_ACTION_PACKED_BYTES];
+static size_t actions_received;
+static bool actions_active, actions_bad;
+#endif
 
 uint8_t network_state(void) { return (uint8_t)(policy>>13u); }
 uint8_t network_error(void) { return (uint8_t)((flags&ERROR_MASK)>>ERROR_SHIFT); }
@@ -186,9 +197,12 @@ static void read_obstacle(uint8_t b[OBSTACLE_RECORD_BYTES])
 static void fail(uint32_t now,uint8_t code)
 {
     if (client!=NULL) mqtt_disconnect(client);
-    flags&=(uint16_t)~(CONNECTED|FAILED|SUB_MASK|RESULT_PENDING);
+    flags&=(uint16_t)~(CONNECTED|FAILED|SUB_MASK|RESULT_PENDING|ACTIONS_SUBSCRIBED);
     error_code(code); /* cancellation callbacks must not replace the root cause */
     command_frame.state=0;
+#ifdef RTOS_BARCODE_ACTIONS
+    actions_active=false;
+#endif
     state(NETWORK_RETRYING,now);
 #ifdef RTOS_TRACK
     scan_pending=false;scan_index=0;
@@ -216,9 +230,21 @@ static void subscribed(void *context,err_t error)
     if (error!=ERR_OK || count>=3) { error_code(8);flags|=FAILED; }
     else flags=(uint16_t)((flags&~SUB_MASK) | ((count+1u)<<SUB_SHIFT));
 }
+#ifdef RTOS_BARCODE_ACTIONS
+static void actions_subscribed(void *context,err_t error)
+{
+    (void)context;
+    /* Best effort: if the broker refuses, clear the flag so the next step asks again. */
+    if (error!=ERR_OK) flags&=(uint16_t)~ACTIONS_SUBSCRIBED;
+}
+#endif
 static void incoming(void *context,const char *topic,u32_t length)
 {
     (void)context;
+#ifdef RTOS_BARCODE_ACTIONS
+    actions_active=(topic!=NULL && !strcmp(topic,actions_command));
+    if (actions_active) { actions_received=0; actions_bad=(length!=BARCODE_ACTION_PACKED_BYTES); }
+#endif
     uint8_t kind=topic==NULL?0:!strcmp(topic,status_command)?BINARY_COMMAND_STATUS:
         !strcmp(topic,period_command)?BINARY_COMMAND_PERIOD:
         !strcmp(topic,stop_command)?BINARY_COMMAND_STOP:0;
@@ -228,6 +254,21 @@ static void data(void *context,const u8_t *bytes,u16_t length,u8_t data_flags)
 {
     (void)context;
     bool last=(data_flags&MQTT_DATA_FLAG_LAST)!=0;
+#ifdef RTOS_BARCODE_ACTIONS
+    if (actions_active) {
+        if (!actions_bad && bytes!=NULL && length<=sizeof actions_buffer-actions_received) {
+            memcpy(actions_buffer+actions_received,bytes,length); actions_received+=length;
+        } else actions_bad=true;
+        if (last) {
+            /* An invalid command is recorded as such; either way the car reports its table. */
+            if (!actions_bad && actions_received==sizeof actions_buffer)
+                (void)barcode_actions_apply(actions_buffer,actions_received);
+            else (void)barcode_actions_apply(NULL,0);
+            actions_active=false; flags|=ACTIONS_REPORT_PENDING;
+        }
+        return;
+    }
+#endif
     uint8_t kind=command_frame.state&3u;
     binary_command_t command;
     bool accepted=binary_command_append(&command_frame,bytes,length,last,&command);
@@ -248,6 +289,22 @@ static bool publish(const char *topic,const uint8_t *bytes,size_t length,uint8_t
      * lwIP copies the supplied bytes into its MQTT output ring before return. */
     return length<=UINT16_MAX && mqtt_publish(client,topic,bytes,(u16_t)length,0,retain,NULL,NULL)==ERR_OK;
 }
+#ifdef RTOS_TRACK
+const char *rtos_track_status(void);
+static const char track_status_topic[]=RTOS_TOPIC_PREFIX "track_status";
+static const char *track_status_last;
+static uint32_t track_status_ms;
+/* ASCII status / stop reason of the course controller. Sent when it changes
+ * and every 2 s, so the reason a run ended is in the log without USB. The
+ * caller skips passes that already published a burst (lwIP has few handles). */
+static void track_status_publish(uint32_t now)
+{
+    const char *s=rtos_track_status();
+    if(s==track_status_last && (uint32_t)(now-track_status_ms)<2000u)return;
+    size_t n=strlen(s);if(n>48u)n=48u;
+    if(publish(track_status_topic,(const uint8_t *)s,n,0)){track_status_last=s;track_status_ms=now;}
+}
+#endif
 #ifdef RTOS_RUNTIME_EVIDENCE
 static void runtime_publish(uint32_t now)
 {
@@ -313,6 +370,9 @@ static void step(uint32_t now)
         if (((flags&SUB_MASK)>>SUB_SHIFT)==3u) {
             state(NETWORK_ONLINE,now); online_ms=now; status_ms=now; motion_ms=now;
             flags|=FORCE_STATUS;
+#ifdef RTOS_BARCODE_ACTIONS
+            flags|=ACTIONS_REPORT_PENDING; /* tell the dashboard what table this boot is using */
+#endif
             error_code(0);
 #ifdef RTOS_RUNTIME_EVIDENCE
             runtime_slot=0;runtime_ms=now-250u;
@@ -324,7 +384,17 @@ static void step(uint32_t now)
     } else if (current==NETWORK_ONLINE) {
         if (!mqtt_client_is_connected(client)) { fail(now,11); return; }
         if ((uint32_t)(now-online_ms)>=30000u) flags&=(uint16_t)~RETRY_MASK;
+#ifdef RTOS_BARCODE_ACTIONS
+        if (!(flags&ACTIONS_SUBSCRIBED) &&
+            mqtt_subscribe(client,actions_command,1,actions_subscribed,NULL)==ERR_OK) flags|=ACTIONS_SUBSCRIBED;
+        if (flags&ACTIONS_REPORT_PENDING) {
+            uint8_t report[BARCODE_ACTION_REPORT_BYTES]; barcode_actions_report(report);
+            if (publish(actions_topic,report,sizeof report,1)) flags&=(uint16_t)~ACTIONS_REPORT_PENDING;
+        }
+#endif
+        bool burst=false;
         if ((flags&FORCE_STATUS) || (uint32_t)(now-status_ms)>=1000u) {
+            burst=true;
             uint8_t barcode[5],status_bytes[10],motion[MOTION_RECORD_BYTES],line[LINE_RECORD_BYTES]; read_barcode(barcode);read_line(line);
             board_read(motion);
             uint8_t available=(uint8_t)((motion[12]&1u) | ((barcode[4]&32u)?2u:0u) | ((line[8]&128u)?4u:0u));
@@ -353,6 +423,7 @@ static void step(uint32_t now)
         if (flags&RESULT_PENDING)
             if (publish(result_topic,&result,1,0)) flags&=(uint16_t)~RESULT_PENDING;
         if ((uint32_t)(now-motion_ms)>=(policy&8191u)) {
+            burst=true;
             uint8_t motion[MOTION_RECORD_BYTES]; board_read(motion);
             if (publish(motion_topic,motion,sizeof motion,0)) motion_ms=now;
             uint8_t line[LINE_RECORD_BYTES];read_line(line);
@@ -366,6 +437,11 @@ static void step(uint32_t now)
             if(obstacle[4]&1u)(void)publish(obstacle_topic,obstacle,sizeof obstacle,0);
 #endif
         }
+#ifdef RTOS_TRACK
+        if(!burst)track_status_publish(now);
+#else
+        (void)burst;
+#endif
 #ifdef RTOS_RUNTIME_EVIDENCE
         runtime_publish(now);
 #endif

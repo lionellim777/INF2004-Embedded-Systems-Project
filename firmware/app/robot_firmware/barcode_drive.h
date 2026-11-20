@@ -44,6 +44,7 @@ typedef struct {
     uint64_t launch_us;
     int32_t launch_l,launch_r;
     float launch_left_pwm,launch_right_pwm;
+    float launch_cap_pwm; /* 0 = default 0.26 cap and 0.12/s ramp; see barcode_drive_step_profile */
 #if !ROBOCAR_COMPACT_CONTROL_STATE
     bool center_bend; /* Bounded course continuation permits stronger forward-only steering. */
 #endif
@@ -129,9 +130,14 @@ static inline line_check_output_t barcode_drive_step_profile(ir_roles_t ir,uint6
             p->left_integral=p->launch_left_pwm-0.157f*0.5f-0.000040f*600;
             p->right_integral=p->launch_right_pwm-0.142f*0.5f-0.000040f*600;
         }else{
-            float increment=0.12f*(float)(elapsed-p->step_us)/1000000.0f;
-            if(dl<8)p->launch_left_pwm=barcode_clamp(p->launch_left_pwm+increment,0.0f,0.26f);
-            if(dr<8)p->launch_right_pwm=barcode_clamp(p->launch_right_pwm+increment,0.0f,0.26f);
+            /* launch_cap_pwm==0 keeps the validated 26% cap and 12%/s ramp. A positive value (set by the
+             * RTOS course) allows a higher breakaway cap and a faster ramp so a loaded wheel can break
+             * away well inside the one-second stall limit. */
+            const float cap=p->launch_cap_pwm>0.0f?p->launch_cap_pwm:0.26f;
+            const float rate=p->launch_cap_pwm>0.0f?0.30f:0.12f;
+            float increment=rate*(float)(elapsed-p->step_us)/1000000.0f;
+            if(dl<8)p->launch_left_pwm=barcode_clamp(p->launch_left_pwm+increment,0.0f,cap);
+            if(dr<8)p->launch_right_pwm=barcode_clamp(p->launch_right_pwm+increment,0.0f,cap);
             p->step_us=elapsed;p->left_target=p->right_target=600;
             p->left_pwm=dl-dr>=12?0:p->launch_left_pwm;
             p->right_pwm=dr-dl>=12?0:p->launch_right_pwm;

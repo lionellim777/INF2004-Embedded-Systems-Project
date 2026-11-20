@@ -79,6 +79,20 @@ def decode(topic, payload):
         return dict(type=kind, captured_ms=int.from_bytes(payload[:4], "little"),
                     barcode=chr(64+code) if 1 <= code <= 26 else None,
                     unreadable=code == 27, valid=valid, simulated=simulated)
+    if kind == "track_status":
+        # ASCII status / stop reason of the course controller (e.g. CENTER_LINE_NOT_REACQUIRED).
+        if not 1 <= len(payload) <= 48 or not all(32 <= b < 127 for b in payload):
+            raise ValueError("Invalid track status")
+        return dict(type=kind, status=payload.decode("ascii"))
+    if kind == "barcode_actions":
+        # 13 bytes of 4-bit action codes (letter A is the low nibble of byte 0), then the result of the
+        # latest set_barcode_actions command (firmware/app/mission_rtos/barcode_actions.h).
+        if len(payload) != 14:
+            raise ValueError("Invalid barcode actions length")
+        codes = [(payload[i // 2] >> (4 * (i & 1))) & 15 for i in range(26)]
+        if max(codes) > 11 or payload[13] > 3:
+            raise ValueError("Invalid barcode action code or result")
+        return dict(type=kind, codes=codes, result=payload[13])
     if kind == "status":
         if len(payload) != 10:
             raise ValueError("Invalid status length")
