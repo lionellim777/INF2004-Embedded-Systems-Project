@@ -146,9 +146,22 @@ static void side_angle_adjustment_test(void){
     puts("PASS isolated side echo causes 10-degree turn and clear rescan before outward move");
 }
 static void original_heading_check_test(void){
+    /* The first clear checkpoint adds exactly one extra 100 mm angled leg. */
+    init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_FORWARD;a.phase_us=a.episode_us=now;
+    a.angled_probe=true;a.offset_mm=172;a.return_deg=60;a.plan.lateral_mm=338;
+    for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++)tick(i%12==0,true,100,0,false);
+    assert(!out.stop&&a.phase==AVOID_WAIT&&a.next==AVOID_TURN_OUT);
+    assert(a.departure_travel_mm==100&&a.departure_deg==60&&a.plan.lateral_mm==338);
+    assert(a.clearance_step_planned);
+    for(unsigned i=0;i<5000&&a.scan_serial<2&&!out.stop;i++){
+        a.no_return=true;tick(i%12==0,false,0,0,false);
+        if(a.phase==AVOID_MOVE_OUT)assert(a.departure_step_mm==100);
+    }
+    assert(!out.stop&&a.scan_serial==2&&a.offset_mm==258);
+    assert(a.phase==AVOID_WAIT&&a.next==AVOID_MOVE_ALONG);
     for(unsigned close=0;close<2;close++){
         init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_FORWARD;a.phase_us=a.episode_us=now;
-        a.angled_probe=true;a.offset_mm=300;a.return_deg=60;
+        a.angled_probe=true;a.offset_mm=300;a.return_deg=60;a.clearance_step_planned=true;
         for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++){
             a.no_return=true;tick(i%12==0,false,0,0,false);
         }
@@ -285,7 +298,7 @@ static void run(unsigned scenario){
         assert(a.phase==AVOID_FOLLOW&&a.detected==1&&(a.plan.edge_from_no_return||a.plan.left_edge_known));
         assert(seen_phases&(1u<<AVOID_VERIFY));
         if(scenario==18)assert(a.no_echo>0);
-        if(scenario==8)assert(a.offset_mm>=450&&a.offset_mm<=550);
+        if(scenario==8)assert(a.offset_mm>=450&&a.offset_mm<=600);
         if(scenario==10)assert(a.no_echo>0);
         if(scenario==17)assert(a.encoder_skips[1]==1&&enc.right_invalid==1&&(seen_phases&(1u<<AVOID_SCAN_FORWARD)));
         /* A stale course timestamp after the bypass must not immediately fault. */

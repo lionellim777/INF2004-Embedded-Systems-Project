@@ -51,6 +51,7 @@ typedef struct {
     unsigned departure_step_mm : 7;
     unsigned edge_shift_count, clearance_adjustments;
     bool edge_shift_active, angled_probe;
+    unsigned clearance_step_planned : 1;
     unsigned left_samples : 2;
     unsigned left_far : 2;
     unsigned tail_margin_done : 1;

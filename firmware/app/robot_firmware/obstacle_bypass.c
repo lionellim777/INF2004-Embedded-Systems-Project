@@ -389,6 +389,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->departure_travel_mm=INITIAL_OFFSET_MM;a->departure_forward_mm=0;
             a->departure_done_mm=a->departure_step_mm=a->edge_shift_count=a->clearance_adjustments=0;
             a->edge_shift_active=a->angled_probe=false;
+            a->clearance_step_planned=false;
             a->plan=(obstacle_plan_t){0};a->tail_margin_done=false;a->side_seen=false;a->clear_checks=0;a->last_side_seen_mm=0;
             a->approach_pending=false;a->approach_warning=false;
             a->rejoin_armed=false;a->white_us=0;
@@ -529,11 +530,13 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             if(a->scan_center_clear<2&&a->scan_center_no_return<3&&!a->scan_blocked)
                 return fail(a,"AVOID_FORWARD_RANGE_UNKNOWN");
             if(a->angled_probe){
-                /* Advance at the original heading before checking inverse A. */
-                if(a->scan_blocked){
+                /* Add one extra angled step at the first clear checkpoint
+                 * before advancing and checking the inverse-A return. */
+                if(a->scan_blocked||!a->clearance_step_planned){
                     unsigned step_offset=(unsigned)ceilf(STEP_MM*sinf(a->return_deg*0.01745329252f));
                     if(a->offset_mm+step_offset>MAX_OFFSET_MM)
                         return fail(a,"AVOID_OBJECT_TOO_WIDE_OR_PATH_BLOCKED");
+                    if(!a->scan_blocked)a->clearance_step_planned=true;
                     a->departure_deg=a->return_deg;a->outward_mm=step_offset;
                     a->departure_travel_mm=STEP_MM;
                     a->departure_forward_mm=(unsigned)floorf(STEP_MM*cosf(a->departure_deg*0.01745329252f));
