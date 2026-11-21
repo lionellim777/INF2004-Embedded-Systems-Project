@@ -282,6 +282,10 @@ line_check_output_t course_step(course_control_t *c,ir_roles_t ir,encoder_sample
                       c->center_trim.active&&!c->center_trim.reversed&&!c->center_trim.exhausted?c->center_trim.direction:
                       c->center_trim.last_good?c->center_trim.last_good:-1;
         center_search_begin(&c->center_search,direction,l,r,now);
+        /* Field log: the sharp left curve was cleared once in 0.7 s, then failed on the next lap when the first
+         * (stale, right) guess plus a wide wrong-way sweep used the whole 3 s with the search heading back to the
+         * line. A line loss on the course gets 5 s; the sweep caps and stall checks are unchanged. */
+        c->center_search.budget_us=5000000u;
         if(c->recovery_limit_counts)c->center_search.limit=c->recovery_limit_counts>240?240:(int)c->recovery_limit_counts;
         if(!c->flow_follow && near_barcode(c,now))c->center_search.limit=60;
         center_trim_clear(&c->center_trim);

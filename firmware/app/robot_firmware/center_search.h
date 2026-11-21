@@ -25,12 +25,13 @@ typedef struct {
     bool retry_confirmation,extended_recovery;
 #endif
     unsigned confirmation_retries,sweep;
+    uint32_t budget_us; /* total search time before CENTER_LINE_NOT_REACQUIRED */
 } center_search_t;
 static inline void center_search_begin(center_search_t *s,int direction,
                                       int32_t l,int32_t r,uint64_t now)
 {
     *s=(center_search_t){.start_us=now,.stage_us=now,.last_us=now,
-        .left_us=now,.right_us=now,.origin_l=l,.origin_r=r,.direction=direction,.limit=120};
+        .left_us=now,.right_us=now,.origin_l=l,.origin_r=r,.direction=direction,.limit=120,.budget_us=3000000u};
 }
 static inline line_check_output_t center_search_step(center_search_t *s,bool center,
                                                    int32_t l,int32_t r,uint64_t now)
@@ -38,7 +39,7 @@ static inline line_check_output_t center_search_step(center_search_t *s,bool cen
     if(now<s->last_us || now-s->last_us>250000u)
         return (line_check_output_t){0,0,true,"CENTER_SEARCH_CONTROL_LATE"};
     s->last_us=now;
-    if(now-s->start_us>=3000000u)
+    if(now-s->start_us>=s->budget_us)
         return (line_check_output_t){0,0,true,"CENTER_LINE_NOT_REACQUIRED"};
     /* Once a candidate is seen WITHIN the sweep budget, hold zero power.
      * A separate, bounded settling window may cross the soft sweep boundary;

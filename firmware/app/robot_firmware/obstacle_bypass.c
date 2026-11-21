@@ -133,6 +133,10 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     }else if(p==AVOID_VERIFY){
         course_begin(&a->line,(course_config_t){'s','s',SENSOR_LEAD_MM},enc,now);
         course_set_center_reference(&a->line,a->reference);
+        /* Use the host's tuned follower (right-edge preview, curve and flow follow) while verifying too. A crossing
+         * can sit within 60 mm of the rejoin point, i.e. inside verification; the plain follower guessed a left
+         * trim at the crossing exit and followed the perpendicular branch instead of going straight. */
+        if(a->line_setup)a->line_setup(&a->line);
         a->line.recovery_limit_counts=240;
     }
 }
@@ -210,8 +214,8 @@ static bool alignment_window(const obstacle_bypass_t *a,encoder_sample_t enc)
          * 3 degrees of it). Ink nearer or farther than that is another line, such as a crossing beside the
          * rejoin point, and must not be aligned to. */
         int expected_deg=a->return_deg?a->return_deg:90;
-        int low=expected_deg-20>25?expected_deg-20:25;
-        int high=expected_deg+20<115?expected_deg+20:115;
+        int low=expected_deg-12>25?expected_deg-12:25;
+        int high=expected_deg+12<115?expected_deg+12:115;
         return heading>=low&&heading<=high;
     }
     int expected=a->return_deg?a->return_deg:90;
@@ -272,6 +276,8 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->route_heading_deg=route_heading(a,enc);
             a->align_direction=-1; /* Left first after finding tape. */
             a->probe_black=true;a->probe_gap=false;a->probe_first_black_mm=0;
+            {int pre=a->contact_set?mean_mm(a->contact_origin,enc):0;
+             a->pre_probe_black_mm=pre>0?(pre<40?(unsigned)pre:40u):0;}
             a->tape_decision="SPATIAL_INK_CHECK";
             enter(a,AVOID_TAPE_PROBE,enc,now);
             return quiet(a);
@@ -283,6 +289,9 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         (a->next==AVOID_AXLE_ADVANCE||a->next==AVOID_ALIGN_TURN))){
         bool centre_tape=center>=a->reference*80/100;
         bool tape=centre_tape||ir.right;
+        /* First contact is the tape edge reaching the centre sensor (30%), well before the 80% "on tape" level. */
+        if(center>=a->reference*30/100){if(!a->contact_set){a->contact_origin=obstacle_encoder_origin(enc);a->contact_set=true;}}
+        else if(center<a->reference*20/100)a->contact_set=false;
         if(!tape){
             if(!a->white_us)a->white_us=now;
             if(now-a->white_us>=100000)a->rejoin_armed=true;
@@ -322,7 +331,10 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         if(a->probe_black&&center<200){
             a->probe_black=false;a->probe_gap=true;
             a->probe_first_black_mm=mm>0?(unsigned)mm:0;
-            if(mm<8){
+            /* The car stops some way onto the tape (sensor latency and settling), so the probe only sees the rest of
+             * it. Count the black already travelled since first contact, or a normal line is rejected as ink that is
+             * too narrow and the car drives over it. Field log: 5 mm left after a stop about 9 mm in. */
+            if(mm+(int)a->pre_probe_black_mm<8){
                 a->tape_decision="INK_TOO_NARROW";
                 resume_detour(a,enc,now);return quiet(a);
             }
@@ -406,13 +418,15 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
          * direction. A committed obstacle stop and rejoin verification still
          * use precise recovery rather than rolling away from their target. */
         a->line.bend_disabled=a->phase==AVOID_VERIFY||a->approach_pending;
-        course_set_cruise_limit(&a->line,a->phase==AVOID_VERIFY||a->approach_warning?450:
-            a->phase==AVOID_FOLLOW&&a->fast_clear>=2?1000:600);
+        /* Fast cruise (1000 counts/s after two far sonar readings) is off: it was never validated, and with a
+         * working sonar it ramped the car to about 89 mm/s on the first straight, too fast for the sharp left
+         * curve (line lost, search failed at 17 s in the field log). The detour transit speed still uses fast_clear. */
+        course_set_cruise_limit(&a->line,a->phase==AVOID_VERIFY||a->approach_warning?450:600);
         if(a->phase==AVOID_FOLLOW&&a->approach_pending){
             if(a->approach_hits<2&&now-a->approach_us<APPROACH_CONFIRM_US)
                 return (line_check_output_t){0,0,false,"OBSTACLE_CONFIRM_STOPPED"};
             if(a->detected>=MAX_EPISODES)return fail(a,"AVOID_EPISODE_LIMIT");
-            a->detected++;a->episode_us=now;a->episode_origin=obstacle_encoder_origin(enc);a->offset_mm=a->along_mm=0;
+            a->detected++;a->verify_restarts=0;a->episode_us=now;a->episode_origin=obstacle_encoder_origin(enc);a->offset_mm=a->along_mm=0;
             /* Front tip is 130mm ahead of axle, half-width <=60mm: pivot
              * radius ~=143mm before margins and object width. 200mm lateral
              * offset allowed the tip to touch a bottle during side inspection.
@@ -432,8 +446,26 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         if(now-a->range_us>RANGE_STALE_US)return fail(a,"AVOID_RANGE_STALE");
         course_center_level(&a->line,center);
         line_check_output_t out=course_step(&a->line,ir,enc,now);
-        if(out.stop)return fail(a,out.state);
+        if(out.stop){
+            /* The follower is restarted at the start of verification. Field log: wheels moved about 40 counts, then
+             * stood still for 1 s with the car centred on good tape (BARCODE_ENCODER_STALL), ending the run just as
+             * the line was reached. Retry the restart a couple of times soon after verification begins; a real
+             * motor fault still stops the run once the retries are used. */
+            if(a->phase==AVOID_VERIFY&&!strcmp(out.state,"BARCODE_ENCODER_STALL")&&
+               a->verify_restarts<2&&now-a->phase_us<4000000){
+                a->verify_restarts++;
+                enter(a,AVOID_VERIFY,enc,now);
+                return quiet(a);
+            }
+            return fail(a,out.state);
+        }
         if(a->phase==AVOID_VERIFY){
+            /* Field logs: in 3 of 6 rejoins a left first-trim guess at the crossing exit led the follower onto the
+             * perpendicular left branch (heading kept turning left, -90 degrees or more within 16 s). The branch
+             * only exists on the left, so a wrong right guess costs one reversal while a wrong left guess can lock
+             * onto the branch. While crossing, make the first trim after the crossing go right. Verification
+             * only; a successful trim still updates the direction as usual. */
+            if(!strcmp(out.state,"CENTER_CROSS_STRAIGHT"))a->line.center_trim.last_good=1;
             if(center>=a->reference*80/100 && a->line.phase==COURSE_FOLLOW){
                 if(!a->hit_us)a->hit_us=now;
                 if(now-a->hit_us>=300000&&
@@ -444,7 +476,9 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
                     if(a->line_setup)a->line_setup(&a->line);
                 }
             }else a->hit_us=0;
-            if(now-a->phase_us>10000000)return fail(a,"AVOID_LINE_ALIGNMENT_FAILED");
+            /* A rejoin next to a crossing spends several seconds creeping through it before the 80 mm of clean line
+             * the check needs, so 10 s timed out a rejoin that was going straight. */
+            if(now-a->phase_us>25000000)return fail(a,"AVOID_LINE_ALIGNMENT_FAILED");
         }
         return out;
     }

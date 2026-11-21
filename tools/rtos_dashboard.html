@@ -172,6 +172,20 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 <div><dt>Calibrated</dt><dd id="tilt-cal">—</dd></div>
 </dl>
 </section>
+
+<section id="obstacle" class="board" data-state="idle" aria-labelledby="obs-h">
+<header><h2 id="obs-h">Obstacle</h2><span class="meta">Sonar on the servo · detour around it and back onto the line</span></header>
+<div id="obs-badge" class="badge" role="status" aria-live="polite">WAITING FOR CAR</div>
+<p id="obs-now" class="empty-note" style="margin:6px 0 0">The car reports a detour here while it goes around an obstacle.</p>
+<div class="stages" aria-label="Detour stages"><span id="st0">Detect</span><span id="st1">Leave line</span><span id="st2">Pass it</span><span id="st3">Rejoin</span></div>
+<dl class="strip" style="--n:4">
+<div><dt>Sonar range</dt><dd id="obs-range">—</dd></div>
+<div><dt>Servo angle</dt><dd id="obs-servo">—</dd></div>
+<div><dt>Detected</dt><dd id="obs-det">—</dd></div>
+<div><dt>Completed</dt><dd id="obs-done">—</dd></div>
+</dl>
+<ol id="obs-steps" aria-label="Steps this detour" hidden></ol>
+</section>
 </div>
 
 <div class="col">
@@ -197,27 +211,6 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 <p class="empty-note">A hump is reported once the car has driven over it.</p>
 </section>
 
-<section id="obstacle" class="board" data-state="idle" aria-labelledby="obs-h">
-<header><h2 id="obs-h">Obstacle</h2><span class="meta">Sonar on the servo · detour around it and back onto the line</span></header>
-<div id="obs-badge" class="badge" role="status" aria-live="polite">WAITING FOR CAR</div>
-<p id="obs-now" class="empty-note" style="margin:6px 0 0">The car reports a detour here while it goes around an obstacle.</p>
-<div class="stages" aria-label="Detour stages"><span id="st0">Detect</span><span id="st1">Leave line</span><span id="st2">Pass it</span><span id="st3">Rejoin</span></div>
-<dl class="strip" style="--n:4">
-<div><dt>Sonar range</dt><dd id="obs-range">—</dd></div>
-<div><dt>Servo angle</dt><dd id="obs-servo">—</dd></div>
-<div><dt>Detected</dt><dd id="obs-det">—</dd></div>
-<div><dt>Completed</dt><dd id="obs-done">—</dd></div>
-</dl>
-<ol id="obs-steps" aria-label="Steps this detour" hidden></ol>
-</section>
-
-<section id="sensors" class="board" aria-labelledby="sens-h">
-<header><h2 id="sens-h">Line sensors</h2><span class="meta">Raw IR · higher is darker</span></header>
-<div class="bar"><span>Barcode · GP26</span><i><b id="b0"></b></i><span id="l0">—</span></div>
-<div class="bar"><span>Centre · GP28</span><i><b id="b1"></b></i><span id="l1">—</span></div>
-<div class="bar"><span>Side · GP27</span><i><b id="b2"></b></i><span id="l2">—</span></div>
-<small>Pattern: <span id="pat">—</span></small>
-</section>
 </div>
 
 <div class="col">
@@ -241,6 +234,14 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 <header><h2 id="perf-h">Timing and tasks</h2><span class="meta">Longest gap between runs of each task · free stack</span></header>
 <table class="mt" id="tasks"><thead><tr><th>Task</th><th>Gap max</th><th>Armed gap</th><th>Stack free</th><th>Guard</th></tr></thead><tbody></tbody></table>
 <p class="empty-note" id="tasks-empty">Appears once the car reports its task diagnostics.</p>
+</section>
+
+<section id="sensors" class="board" aria-labelledby="sens-h">
+<header><h2 id="sens-h">Line sensors</h2><span class="meta">Raw IR · higher is darker</span></header>
+<div class="bar"><span>Barcode · GP26</span><i><b id="b0"></b></i><span id="l0">—</span></div>
+<div class="bar"><span>Centre · GP28</span><i><b id="b1"></b></i><span id="l1">—</span></div>
+<div class="bar"><span>Side · GP27</span><i><b id="b2"></b></i><span id="l2">—</span></div>
+<small>Pattern: <span id="pat">—</span></small>
 </section>
 </div>
 

@@ -38,6 +38,9 @@ typedef struct {
     obstacle_encoder_origin_t tape_origin, episode_origin, align_origin;
     bool probe_black, probe_gap;
     unsigned probe_first_black_mm;
+    obstacle_encoder_origin_t contact_origin; /* where the centre sensor first reached the tape */
+    unsigned pre_probe_black_mm;              /* black already travelled before the probe started */
+    bool contact_set;
     int route_heading_deg;
     obstacle_plan_t plan;
     float plan_cm[OBSTACLE_PLAN_RAYS];
@@ -69,7 +72,7 @@ typedef struct {
     uint64_t approach_us;
     float approach_min_cm;
     unsigned approach_hits : 2;
-    unsigned phase : 5;
+    unsigned verify_restarts : 2; /* start-up stalls retried during this detour's rejoin verification */    unsigned phase : 5;
     unsigned next : 5;
     unsigned resume_phase : 5;
     uint64_t white_us, candidate_us;
