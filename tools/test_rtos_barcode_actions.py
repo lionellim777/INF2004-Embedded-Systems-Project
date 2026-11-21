@@ -30,6 +30,59 @@ class TrackStatus(unittest.TestCase):
                 decode(self.TOPIC, bad)
 
 
+def obstacle_payload(phase, servo=90, range_mm=None, detected=0, completed=0, active=True):
+    """Same bit layout as obstacle_record_encode in binary_protocol.c."""
+    fields = 0
+    if active:
+        fields = 1 | phase << 1 | servo << 6 | detected << 26 | completed << 34
+        if range_mm is not None:
+            fields |= 1 << 13 | range_mm << 14
+    return (1000).to_bytes(4, "little") + fields.to_bytes(6, "little")
+
+
+class ObstacleBoard(unittest.TestCase):
+    TOPIC = "inf2004/aai10/robot1/v1/obstacle"
+
+    def setUp(self):
+        import rtos_dashboard as dash
+        self.dash = dash
+        dash.events.clear()
+        dash.obst.update(phase=None, detected=0, completed=0)
+
+    def feed(self, *args, **kw):
+        record = decode(self.TOPIC, obstacle_payload(*args, **kw))
+        self.dash.ingest("obstacle", record)
+        return record
+
+    def test_phase_names_and_range_are_decoded(self):
+        record = self.feed(2, servo=45, range_mm=183, detected=1)
+        self.assertEqual(record["phase_name"], "AVOID_TURN_OUT")
+        self.assertEqual((record["servo_deg"], record["range_mm"], record["detected"]), (45, 183, 1))
+
+    def test_a_detour_makes_events_once(self):
+        self.feed(0)                                   # following, nothing to report
+        self.feed(1, detected=1)                       # obstacle seen
+        self.feed(2, detected=1)                       # more of the same detour
+        self.feed(0, detected=1, completed=1)          # back on the line
+        self.feed(0, detected=1, completed=1)
+        texts = [e["text"] for e in self.dash.events if e["system"] == "Obstacle"]
+        self.assertEqual(len(texts), 2)
+        self.assertIn("#1 detected", texts[0])
+        self.assertIn("#1 complete", texts[1])
+
+    def test_failure_is_a_fault_and_a_new_run_resets_counters(self):
+        self.feed(1, detected=1)
+        self.feed(25, detected=1)                      # AVOID_FAILED
+        self.assertEqual(self.dash.events[-1]["sev"], "fault")
+        self.feed(0, active=False)                     # run ended
+        self.feed(1, detected=1)                       # the next run's first obstacle reports again
+        self.assertEqual(len([e for e in self.dash.events if "detected" in e["text"]]), 2)
+
+    def test_malformed_phase_is_refused(self):
+        with self.assertRaises(ValueError):
+            decode(self.TOPIC, obstacle_payload(31))
+
+
 class BarcodeActions(unittest.TestCase):
     def test_default_payload_is_hand_packed(self):
         # A=5 B=6 -> 0x65, C=1 D=4 -> 0x41, E..X zero, Y=0 Z=1 -> 0x10 (Z is the high nibble of byte 12).

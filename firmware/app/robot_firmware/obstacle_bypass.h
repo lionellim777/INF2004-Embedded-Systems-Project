@@ -113,8 +113,16 @@ typedef struct {
     float scan_min_cm;
     int32_t reference;
     const char *fault;
+    /* Optional: re-applies the host's line-follower options (letter actions, flow/curve follow, launch cap)
+     * each time the follower is restarted after a detour. NULL keeps the original plain follower. */
+    void (*line_setup)(course_control_t *line);
+    /* Extra 100 mm steps taken after the return leg ends without finding tape (bounded by RETURN_CREEPS). */
+    unsigned char return_creeps;
 } obstacle_bypass_t;
 void obstacle_bypass_begin(obstacle_bypass_t *a, encoder_sample_t enc, uint64_t now, int32_t reference);
+/* Call after obstacle_bypass_begin(). Applies setup now and again whenever the follower resumes after a
+ * detour. The rejoin verification itself still runs the original plain follower. */
+void obstacle_bypass_set_line_setup(obstacle_bypass_t *a, void (*setup)(course_control_t *line));
 /* Fresh range belongs to the servo command returned by the preceding call.
  * Every servo move discards samples during settling. No hardware I/O here. */
 line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a, ir_roles_t ir,

@@ -9,6 +9,7 @@ enum { SETTLE_US=300000, RANGE_STALE_US=400000, EPISODE_US=240000000,
        STEP_MM=100, EDGE_SHIFT_MM=60, MAX_EDGE_SHIFT_MM=300,
        ALONG_STEP_MM=200, MAX_ALONG_MM=1200, MAX_OFFSET_MM=600, MIN_ALONG_MM=400,
        SENSOR_LEAD_MM=120, MAX_EPISODES=5, INITIAL_OFFSET_MM=250,
+       SEPARATE_BAND_GAP_MM=25, RETURN_CREEPS=6, RETURN_CREEP_MM=100,
        WARNING_CM=45, APPROACH_CM=20, MIN_PIVOT_CM=12, APPROACH_CONFIRM_US=600000 };
 static const unsigned angles[]={50,70,90,110,125};
 enum { SCAN_SAMPLES_PER_RAY = 3 };
@@ -125,6 +126,7 @@ static void enter(obstacle_bypass_t *a,avoid_phase_t p,encoder_sample_t enc,uint
     else if(forward_phase(p)){
         unsigned mm=p==AVOID_MOVE_OUT?a->departure_step_mm:p==AVOID_MOVE_ALONG?(a->angled_probe?STEP_MM:ALONG_STEP_MM):p==AVOID_CLEAR_TAIL?100:
             p==AVOID_TAPE_PROBE?60:p==AVOID_AXLE_ADVANCE?a->axle_mm:
+            a->return_creeps?(unsigned)RETURN_CREEP_MM:
             (unsigned)ceilf(((unsigned)a->offset_mm-SENSOR_LEAD_MM+60)/sinf((a->return_deg?a->return_deg:90)*0.01745329252f));
         motion_begin_distance(&a->leg,mm,enc,now);
         a->leg.alignment_drive=p==AVOID_TAPE_PROBE||p==AVOID_AXLE_ADVANCE;
@@ -141,6 +143,11 @@ void obstacle_bypass_begin(obstacle_bypass_t *a,encoder_sample_t enc,uint64_t no
     a->encoder_seen[0]=enc.left_invalid;a->encoder_seen[1]=enc.right_invalid;
     course_begin(&a->line,(course_config_t){'s','s',SENSOR_LEAD_MM},enc,now);
     course_set_center_reference(&a->line,reference);
+}
+void obstacle_bypass_set_line_setup(obstacle_bypass_t *a,void (*setup)(course_control_t *line))
+{
+    a->line_setup=setup;
+    if(setup)setup(&a->line);
 }
 static int32_t mean_mm(obstacle_encoder_origin_t origin, encoder_sample_t enc)
 {
@@ -198,7 +205,15 @@ static bool alignment_window(const obstacle_bypass_t *a,encoder_sample_t enc)
     int32_t heading=obstacle_bypass_alignment_heading(a,enc)*a->align_direction;
     /* Straight tape seeking no longer approaches at the diagonal angle A.
      * Inspect the bounded sweep instead of using A as the tape bearing. */
-    if(a->angled_probe)return heading>=25&&heading<=115;
+    if(a->angled_probe){
+        /* The route line lies at the return angle from the crossing heading (field logs: sweeps ended within
+         * 3 degrees of it). Ink nearer or farther than that is another line, such as a crossing beside the
+         * rejoin point, and must not be aligned to. */
+        int expected_deg=a->return_deg?a->return_deg:90;
+        int low=expected_deg-20>25?expected_deg-20:25;
+        int high=expected_deg+20<115?expected_deg+20:115;
+        return heading>=low&&heading<=high;
+    }
     int expected=a->return_deg?a->return_deg:90;
     int lower=expected-20>25?expected-20:25;
     int upper=expected+25<115?expected+25:115;
@@ -266,7 +281,8 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
     }
     if(may_find_tape(a->phase)&&!(a->phase==AVOID_WAIT&&
         (a->next==AVOID_AXLE_ADVANCE||a->next==AVOID_ALIGN_TURN))){
-        bool tape=center>=a->reference*80/100||ir.right;
+        bool centre_tape=center>=a->reference*80/100;
+        bool tape=centre_tape||ir.right;
         if(!tape){
             if(!a->white_us)a->white_us=now;
             if(now-a->white_us>=100000)a->rejoin_armed=true;
@@ -275,7 +291,11 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
          * First leave it and move at least 80 mm laterally. */
         bool departed=a->offset_mm>=80||
             (a->phase==AVOID_MOVE_OUT&&mean_mm(obstacle_encoder_origin(a->leg.start),enc)>=80);
-        if(tape&&departed&&a->rejoin_armed){
+        /* Start the spatial ink check only once the centre sensor is on the tape. On a diagonal return the side
+         * sensor touches the tape first; checking then rejected the tape (centre still white), after which the car
+         * drove across the line without it ever being armed again. The side sensor still counts as "tape seen"
+         * for the white-gap arming above, so it does not re-arm early. */
+        if(centre_tape&&departed&&a->rejoin_armed){
             a->resume_phase=a->phase;a->resume_servo=a->servo_angle;
             a->candidate_us=now;a->rejoin_attempts++;a->rejoin_good=0;a->tape_decision="CHECKING";
             a->rejoin_armed=false;a->white_us=0;a->range_us=0;
@@ -307,8 +327,17 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
                 resume_detour(a,enc,now);return quiet(a);
             }
         }else if(!a->probe_black&&center>=a->reference*80/100){
-            /* Multiple black bands over 60 mm are consistent with barcode or
-             * printed text. Resume the saved detour; do not steer along ink. */
+            /* Closely spaced bands are consistent with barcode or printed text. A second band after a wide
+             * gap is a separate mark behind the line, so keep the first band: finish the probe here as a
+             * single crossing. Field log: line 19 mm, gap 41 mm, second band about 60 mm after first contact. */
+            if(mm-(int)a->probe_first_black_mm>=SEPARATE_BAND_GAP_MM){
+                int remaining=SENSOR_LEAD_MM+8-mm;
+                if(remaining<40||remaining>140)return fail(a,"AVOID_TAPE_POSITION_UNCERTAIN");
+                motion_abort(&a->leg);
+                a->axle_mm=(unsigned)remaining;
+                a->tape_decision="SINGLE_CROSSING";
+                wait_for(a,AVOID_AXLE_ADVANCE,now);return quiet(a);
+            }
             a->tape_decision="REPEATED_INK";
             resume_detour(a,enc,now);return quiet(a);
         }
@@ -361,8 +390,12 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             }
             if(a->approach_warning&&a->approach_min_cm<MIN_PIVOT_CM)
                 return fail(a,"AVOID_APPROACH_TOO_CLOSE");
-            if(a->approach_warning&&!a->approach_pending&&a->approach_yaw_rad>0.35f)
-                return fail(a,"AVOID_APPROACH_HEADING_UNCERTAIN");
+            /* The car has turned too far for the remembered target to still be ahead. Forget the warning and keep
+             * following the line; a target that is really in front is seen again by the next sonar reading. Stopping
+             * here ended whole course runs on a stray reading, because curves and line searches turn the car. */
+            if(a->approach_warning&&!a->approach_pending&&a->approach_yaw_rad>0.35f){
+                a->approach_warning=false;a->approach_yaw_rad=0;
+            }
             if(a->approach_warning&&a->approach_estimate_cm<=APPROACH_CM&&!a->approach_pending){
                 a->approach_pending=true;a->approach_us=now;a->approach_hits=0;
             }
@@ -392,7 +425,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->clearance_step_planned=false;
             a->plan=(obstacle_plan_t){0};a->tail_margin_done=false;a->side_seen=false;a->clear_checks=0;a->last_side_seen_mm=0;
             a->approach_pending=false;a->approach_warning=false;
-            a->rejoin_armed=false;a->white_us=0;
+            a->rejoin_armed=false;a->white_us=0;a->return_creeps=0;
             wait_for(a,AVOID_SCAN_INITIAL,now);return quiet(a);
         }
         if(!a->range_us){return quiet(a);}
@@ -408,6 +441,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
                    motion_right_position(&a->line.reference,enc)>=1080){
                     a->completed++;a->phase=AVOID_FOLLOW;
                     a->line.recovery_limit_counts=0;
+                    if(a->line_setup)a->line_setup(&a->line);
                 }
             }else a->hit_us=0;
             if(now-a->phase_us>10000000)return fail(a,"AVOID_LINE_ALIGNMENT_FAILED");
@@ -527,7 +561,10 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             a->departure_step_mm=remaining<STEP_MM?remaining:STEP_MM;
             wait_for(a,AVOID_MOVE_OUT,now);
         }else if(a->phase==AVOID_SCAN_FORWARD){
-            if(a->scan_center_clear<2&&a->scan_center_no_return<3&&!a->scan_blocked)
+            /* One clear centre echo backed by at least two far side rays is enough evidence of open space;
+             * the centre ray alone can miss on a flat surface even when the way ahead is clear. */
+            if(a->scan_center_clear<2&&a->scan_center_no_return<3&&!a->scan_blocked&&
+                !(a->scan_center_clear>=1&&a->scan_far_rays>=2))
                 return fail(a,"AVOID_FORWARD_RANGE_UNKNOWN");
             if(a->angled_probe){
                 /* Add one extra angled step at the first clear checkpoint
@@ -567,7 +604,8 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
                 if(a->along_mm>=MAX_ALONG_MM)return fail(a,"AVOID_OBJECT_END_NOT_CONFIRMED");
                 wait_for(a,AVOID_RESTORE_FORWARD,now);return quiet(a);
             }
-            if(a->scan_center_clear<2&&a->scan_center_no_return<3)
+            if(a->scan_center_clear<2&&a->scan_center_no_return<3&&
+                !(a->scan_center_clear>=1&&a->scan_far_rays>=2))
                 return fail(a,"AVOID_RETURN_RANGE_UNKNOWN");
             wait_for(a,AVOID_RETURN_LINE,now);
         }else{
@@ -663,7 +701,11 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
             if(a->align_reversed)return fail(a,"AVOID_TAPE_HEADING_NOT_FOUND");
             a->align_reversed=true;a->align_direction=-a->align_direction;
             wait_for(a,AVOID_ALIGN_TURN,now);break;
-        case AVOID_RETURN_LINE:return fail(a,"AVOID_RETURN_LINE_NOT_FOUND");
+        case AVOID_RETURN_LINE:
+            /* The calculated return distance comes from wheel counts, which slip. Before giving up, creep a few
+             * more short steps; the usual tape and sonar guards stay active during each one. */
+            if(a->return_creeps>=RETURN_CREEPS)return fail(a,"AVOID_RETURN_LINE_NOT_FOUND");
+            a->return_creeps++;wait_for(a,AVOID_RETURN_LINE,now);break;
         default:return fail(a,"AVOID_BAD_PHASE");
         }
         return quiet(a);

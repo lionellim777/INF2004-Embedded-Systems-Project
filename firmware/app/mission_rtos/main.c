@@ -76,7 +76,7 @@ static void observer_task(int start_code, void *context)
     (void)start_code; (void)context;
     puts("RTOS track integration v" RTOS_FIRMWARE_VERSION ": real motion/line/barcode producers");
 #ifdef RTOS_OBSTACLE
-    puts("o=experimental obstacle mode. GP20 required to start. Terrain unavailable.");
+    puts("Course run includes obstacle avoidance (sonar GP0/GP1, servo GP12). o is an alias for t.");
 #else
     puts("Terrain and obstacle unavailable.");
 #endif

@@ -38,6 +38,24 @@ static bool sensors(track_ir_t *ir,uint64_t now)
     (void)network_line((uint32_t)(now/1000u)-ir->age_us/1000u,ir->raw,pattern,valid);
     return valid;
 }
+/* The course options that were tuned on the car. Also re-applied by the obstacle bypass whenever its own
+ * line follower restarts after a detour, so obstacle mode follows the line the same way. */
+static void line_options(course_control_t *c)
+{
+#ifdef RTOS_BARCODE_ACTIONS
+    course_set_letter_actions(c,barcode_actions_table());
+#endif
+    course_enable_flow_follow(c,true);
+#ifdef RTOS_CURVE_FOLLOW
+    course_set_curve_follow(c,true);
+#endif
+#ifdef RTOS_LAUNCH_CAP
+    course_set_launch_cap(c,0.34f);
+#endif
+#ifdef RTOS_TRIM_GAIN
+    course_set_trim_gain(c,2.0f);
+#endif
+}
 void track_runtime_idle(track_runtime_t *t,uint64_t now)
 {
     track_ir_t ir;
@@ -57,19 +75,7 @@ bool track_runtime_begin(track_runtime_t *t,uint16_t token,encoder_sample_t enc,
     /* Reuse exact validated follow/recovery algorithm. Without the barcode-action table Y/Z stay
      * straight as in the AAZ test; with it (the real RTOS build) every letter follows barcode_actions.h. */
     course_begin(&t->course,(course_config_t){'s','s',120},enc,now);
-#ifdef RTOS_BARCODE_ACTIONS
-    course_set_letter_actions(&t->course,barcode_actions_table());
-#endif
-    course_enable_flow_follow(&t->course,true);
-#ifdef RTOS_CURVE_FOLLOW
-    course_set_curve_follow(&t->course,true);
-#endif
-#ifdef RTOS_LAUNCH_CAP
-    course_set_launch_cap(&t->course,0.34f);
-#endif
-#ifdef RTOS_TRIM_GAIN
-    course_set_trim_gain(&t->course,2.0f);
-#endif
+    line_options(&t->course);
     course_set_center_reference(&t->course,baseline);
     t->token=token;t->requested_us=now;t->state=0;t->reads=0;t->letter=0;
     t->status="TRACK_DECODER_ARMING";track_request(token);return true;
@@ -79,6 +85,7 @@ bool track_runtime_begin_obstacle(track_runtime_t *t,uint16_t token,encoder_samp
 {
     if(!track_runtime_begin(t,token,enc,now))return false;
     obstacle_bypass_begin(&obstacle,enc,now,t->course.center_reference);
+    obstacle_bypass_set_line_setup(&obstacle,line_options);
     last_echo=(obstacle_range_t){0};
     obstacle_io_begin();
     t->obstacle_enabled=true;
@@ -94,19 +101,26 @@ line_check_output_t track_runtime_step(track_runtime_t *t,encoder_sample_t enc,u
         if(!track_ready(t->token))return (line_check_output_t){0,0,now-t->requested_us>=100000u,"TRACK_DECODER_ARMING"};
         t->state=1;
     }
-    if(track_recording())course_note_barcode_activity(&t->course,now);
+#ifdef RTOS_OBSTACLE
+    /* Obstacle mode keeps its own follower inside the bypass. Barcodes go to that one, and only while it is
+     * following the line: during a detour a read has no crossing to act on. */
+    course_control_t *line=t->obstacle_enabled?&obstacle.line:&t->course;
+    const bool line_active=!t->obstacle_enabled||obstacle.phase==AVOID_FOLLOW;
+#else
+    course_control_t *line=&t->course;
+    const bool line_active=true;
+#endif
+    if(track_recording()&&line_active)course_note_barcode_activity(line,now);
     track_event_t event;
     while(track_event_take(t->token,&event)){
         t->reads++;t->letter=event.letter;
-#ifdef RTOS_OBSTACLE
-        if(!t->obstacle_enabled)
-#endif
-            (void)course_on_barcode(&t->course,event.letter,enc,now,event.crossing);
+        if(line_active)(void)course_on_barcode(line,event.letter,enc,now,event.crossing);
     }
     int32_t levels[3]={level(ir.raw[0],191,3164),level(ir.raw[1],178,2908),level(ir.raw[2],141,842)};
 #ifdef RTOS_OBSTACLE
     if(t->obstacle_enabled){
         obstacle_range_t range=obstacle_io_poll();
+        course_right_level(&obstacle.line,levels[2]);
         line_check_output_t out=obstacle_bypass_guarded_step(&obstacle,ir_roles(levels),levels[1],
             enc,now,range.fresh,range.valid,range.cm,range.error,range.no_return);
         obstacle_io_angle(obstacle.servo_angle);

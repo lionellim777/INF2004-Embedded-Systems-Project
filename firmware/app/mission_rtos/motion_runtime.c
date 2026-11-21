@@ -71,11 +71,12 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
                         motion_init(&r->motion);r->motion.kind=MOTION_COURSE;
                         r->motion.start=enc;r->motion.start_us=now;r->motion.phase=MOTION_ACTIVE;
 #ifdef RTOS_OBSTACLE
-                        if(selected==BOARD_OBSTACLE_SELECT)
-                            began=track_runtime_begin_obstacle(&r->track,r->token,enc,now);
-                        else
+                        /* With obstacle support built in, the normal course (the boot default and 't') runs
+                         * obstacle avoidance too; 'o' stays as an alias. */
+                        began=track_runtime_begin_obstacle(&r->track,r->token,enc,now);
+#else
+                        began=track_runtime_begin(&r->track,r->token,enc,now);
 #endif
-                            began=track_runtime_begin(&r->track,r->token,enc,now);
                         if(!began){motion_abort(&r->motion);track_runtime_end();}
                     }else
 #endif
@@ -96,7 +97,7 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
 #ifdef RTOS_TRACK
         if(r->motion.kind==MOTION_COURSE){
             line_check_output_t out=track_runtime_step(&r->track,enc,now);
-            if(now-r->motion.start_us>=180000000u){
+            if(now-r->motion.start_us>=720000000u){
                 r->track.status="TRACK_TIME_LIMIT";
                 r->motion.phase=MOTION_DONE;board_stop(STOP_COMPLETE);track_runtime_end();
             }else if(out.stop){
@@ -121,6 +122,15 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
     record.right_counts = motion_right_position(&r->motion, enc);
     if (r->motion.kind == MOTION_NONE) record.left_counts = record.right_counts = 0;
     int32_t count_limit=r->motion.kind==MOTION_COURSE?MOTION_TRACK_COUNTS:30000;
+    if (r->motion.kind == MOTION_COURSE) {
+        /* The telemetry field only carries +/-MOTION_TRACK_COUNTS. The course run has its own, larger travel
+         * bound (COURSE_LIMIT_COUNTS), so past this value report the saturated count instead of treating the
+         * record as invalid, which stopped long runs with STOP_RANGE. */
+        if (record.left_counts > count_limit) record.left_counts = count_limit;
+        if (record.left_counts < -count_limit) record.left_counts = -count_limit;
+        if (record.right_counts > count_limit) record.right_counts = count_limit;
+        if (record.right_counts < -count_limit) record.right_counts = -count_limit;
+    }
     record.valid = speed(-(int64_t)delta(enc.left_raw, r->previous_left), dt, &record.left_mm_s) &&
         speed(delta(enc.right_raw, r->previous_right), dt, &record.right_mm_s) &&
         record.left_counts >= -count_limit && record.left_counts <= count_limit &&

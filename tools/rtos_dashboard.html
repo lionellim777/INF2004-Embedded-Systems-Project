@@ -79,6 +79,16 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 #motion[data-state=go] .badge,#motion[data-state=hump] .badge{color:var(--green)}#motion[data-state=turn] .badge{color:var(--amber)}
 #hump[data-state=ok]{border-color:var(--green)}#hump[data-state=hit]{border-color:var(--green);background:var(--green-bg)}
 #hump[data-state=ok] .badge,#hump[data-state=hit] .badge{color:var(--green)}
+#obstacle{border-width:2px;border-color:var(--line-2)}
+#obstacle[data-state=clear]{border-color:var(--green)}#obstacle[data-state=clear] .badge{color:var(--green)}
+#obstacle[data-state=detour]{border-color:var(--amber);background:var(--amber-bg)}#obstacle[data-state=detour] .badge{color:var(--amber)}
+#obstacle[data-state=fail]{border-color:var(--red-fill);background:var(--red-bg)}#obstacle[data-state=fail] .badge{color:var(--red)}
+.stages{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:14px 0 0}
+.stages span{padding:6px 4px;background:var(--face-2);border-radius:4px;text-align:center;font-size:.85rem;color:var(--ink-3)}
+.stages span.on{background:var(--amber-bg);color:var(--amber);font-weight:700;outline:1px solid var(--amber)}
+.stages span.done{color:var(--green);font-weight:600}
+#obs-steps{margin:10px 0 0;padding-left:1.4em;font-size:.9rem;color:var(--ink-2);max-height:9.5em;overflow:auto}
+#obs-steps li:last-child{color:var(--ink);font-weight:600}
 
 .bc-head{display:flex;gap:18px;align-items:center}
 #bc-letter{font-size:4.6rem}
@@ -124,6 +134,7 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 #events[data-filter=problems] .ev:not([data-sev=fault]):not([data-sev=warn]),
 #events[data-filter=barcode] .ev:not([data-sys=Barcode]),
 #events[data-filter=run] .ev:not([data-sys=Run]),
+#events[data-filter=obstacle] .ev:not([data-sys=Obstacle]),
 #events[data-filter=terrain] .ev:not([data-sys=Terrain]):not([data-sys=Tilt]){display:none}
 
 @media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.col:nth-child(3){grid-column:1/-1}}
@@ -186,6 +197,20 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 <p class="empty-note">A hump is reported once the car has driven over it.</p>
 </section>
 
+<section id="obstacle" class="board" data-state="idle" aria-labelledby="obs-h">
+<header><h2 id="obs-h">Obstacle</h2><span class="meta">Sonar on the servo · detour around it and back onto the line</span></header>
+<div id="obs-badge" class="badge" role="status" aria-live="polite">WAITING FOR CAR</div>
+<p id="obs-now" class="empty-note" style="margin:6px 0 0">The car reports a detour here while it goes around an obstacle.</p>
+<div class="stages" aria-label="Detour stages"><span id="st0">Detect</span><span id="st1">Leave line</span><span id="st2">Pass it</span><span id="st3">Rejoin</span></div>
+<dl class="strip" style="--n:4">
+<div><dt>Sonar range</dt><dd id="obs-range">—</dd></div>
+<div><dt>Servo angle</dt><dd id="obs-servo">—</dd></div>
+<div><dt>Detected</dt><dd id="obs-det">—</dd></div>
+<div><dt>Completed</dt><dd id="obs-done">—</dd></div>
+</dl>
+<ol id="obs-steps" aria-label="Steps this detour" hidden></ol>
+</section>
+
 <section id="sensors" class="board" aria-labelledby="sens-h">
 <header><h2 id="sens-h">Line sensors</h2><span class="meta">Raw IR · higher is darker</span></header>
 <div class="bar"><span>Barcode · GP26</span><i><b id="b0"></b></i><span id="l0">—</span></div>
@@ -238,6 +263,7 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 <label class="chip"><input type="radio" name="evf" value="problems"><span>Problems <em id="n-problems">0</em></span></label>
 <label class="chip"><input type="radio" name="evf" value="barcode"><span>Barcode <em id="n-barcode">0</em></span></label>
 <label class="chip"><input type="radio" name="evf" value="run"><span>Run <em id="n-run">0</em></span></label>
+<label class="chip"><input type="radio" name="evf" value="obstacle"><span>Obstacle <em id="n-obstacle">0</em></span></label>
 <label class="chip"><input type="radio" name="evf" value="terrain"><span>Terrain <em id="n-terrain">0</em></span></label>
 <label class="pause"><input type="checkbox" id="pause"> <span>Pause updates</span></label></div>
 <div class="cols" aria-hidden="true"><span>Time</span><span>System</span><span>Status</span><span>Event</span></div>
@@ -265,6 +291,46 @@ const mmFmt=d=>(d/10).toFixed(1)+' mm';
 let humpSeen=-1,humpHitUntil=0,paused=false,filter='all';
 document.querySelectorAll('input[name=evf]').forEach(r=>r.onchange=()=>{filter=r.value;el('events').dataset.filter=filter});
 el('pause').onchange=e=>{paused=e.target.checked};
+
+/* Bypass phase (avoid_phase_t) -> [plain words, stage 0..3 or -1]. Stages: detect, leave line, pass it, rejoin. */
+const OBS={AVOID_FOLLOW:['Following the line',-1],AVOID_WAIT:['Stopped, letting the sonar settle',0],
+ AVOID_SCAN_INITIAL:['Scanning the obstacle ahead',0],AVOID_TURN_OUT:['Turning away from the line',1],
+ AVOID_SCAN_OUT:['Scanning the path outward',1],AVOID_MOVE_OUT:['Moving off the line',1],
+ AVOID_TURN_FORWARD:['Turning to face forward',2],AVOID_SCAN_FORWARD:['Scanning ahead',2],
+ AVOID_MOVE_ALONG:['Driving past the obstacle',2],AVOID_TURN_LOOK:['Turning to look at its side',2],
+ AVOID_SCAN_SIDE:['Scanning its side',2],AVOID_TURN_ALONG:['Turning back along it',2],
+ AVOID_CHECK_LEFT:['Checking its near edge',2],AVOID_CLEAR_TAIL:['Clearing its rear edge',2],
+ AVOID_RETURN_LINE:['Driving back toward the line',3],AVOID_TURN_RETURN:['Turning back toward the line',3],
+ AVOID_SCAN_RETURN:['Scanning the way back',3],AVOID_TURN_CLEARANCE:['Turning further for clearance',3],
+ AVOID_TURN_TO_LINE:['Turning toward the line',3],AVOID_CHECK_TAPE:['Checking the tape it found',3],
+ AVOID_TAPE_PROBE:['Probing the tape heading',3],AVOID_AXLE_ADVANCE:['Moving the axle onto the tape',3],
+ AVOID_ALIGN_TURN:['Aligning with the tape',3],AVOID_ALIGN_CONFIRM:['Confirming the tape heading',3],
+ AVOID_VERIFY:['Checking it is back on the line',3],AVOID_RESTORE_FORWARD:['Facing forward again',3],
+ AVOID_FAILED:['Detour failed',-1]};
+let obsPhase=null,obsSteps=[];
+function renderObstacle(o,run){
+ const live=o&&o.age<3&&run.active&&o.active;
+ const info=live?(OBS[o.phase_name]||[o.phase_name,-1]):null;
+ const following=live&&o.phase_name==='AVOID_FOLLOW',failed=live&&o.phase_name==='AVOID_FAILED';
+ const detour=live&&!following&&!failed;
+ if(live&&o.phase_name!==obsPhase){
+  if(obsPhase==='AVOID_FOLLOW'&&o.phase_name!=='AVOID_FOLLOW')obsSteps=[];  /* a new detour starts */
+  if(o.phase_name!=='AVOID_FOLLOW'&&info[0]!==obsSteps[obsSteps.length-1])obsSteps.push(info[0]);
+  obsPhase=o.phase_name;
+ }
+ if(!run.active&&!live)obsPhase=null;
+ el('obstacle').dataset.state=failed?'fail':detour?'detour':live?'clear':'idle';
+ set('obs-badge',!o?'WAITING FOR CAR':!live?'NOT RUNNING':failed?'DETOUR FAILED':detour?'DETOUR':'PATH CLEAR');
+ set('obs-now',!o?'The car reports a detour here while it goes around an obstacle.':!live?'Shows the live state while a run is in progress.':
+    following?'Following the line. Sonar looks straight ahead.':info[0]+'.');
+ const stage=detour?info[1]:-1;
+ for(let i=0;i<4;i++){const n=el('st'+i);n.className=detour&&i===stage?'on':detour&&i<stage?'done':''}
+ set('obs-range',live&&o.range_valid?(o.range_mm/10).toFixed(1)+' cm':'—');
+ set('obs-servo',live?o.servo_deg+'°':'—');
+ set('obs-det',o?o.detected:'—');set('obs-done',o?o.completed:'—');
+ const list=el('obs-steps');list.hidden=!obsSteps.length;
+ list.replaceChildren(...obsSteps.slice(-12).map(x=>{const li=document.createElement('li');li.textContent=x;return li}));
+}
 
 function render(s){
  const t=s.topics,names=Object.keys(t);
@@ -337,6 +403,9 @@ function render(s){
   set('hump-count',tr.humps);
  }
 
+ /* Obstacle: what the bypass is doing, in plain words, and the steps it has taken this detour. */
+ renderObstacle(t.obstacle,run);
+
  /* Line sensors */
  if(ln){
   ln.raw_adc.forEach((v,i)=>{set('l'+i,v);el('b'+i).style.width=Math.min(100,v/40.95)+'%'});
@@ -377,7 +446,7 @@ function render(s){
   const n=f=>ev.filter(f).length;
   set('n-all',ev.length);set('n-problems',n(e=>e.sev==='fault'||e.sev==='warn'));
   set('n-barcode',n(e=>e.system==='Barcode'));set('n-run',n(e=>e.system==='Run'));
-  set('n-terrain',n(e=>e.system==='Terrain'||e.system==='Tilt'));
+  set('n-terrain',n(e=>e.system==='Terrain'||e.system==='Tilt'));set('n-obstacle',n(e=>e.system==='Obstacle'));
   el('events-empty').hidden=ev.length>0;
  }
 }

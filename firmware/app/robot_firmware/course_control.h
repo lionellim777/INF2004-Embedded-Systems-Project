@@ -9,7 +9,7 @@
 #ifndef ROBOCAR_CENTER_LINE
 #define ROBOCAR_CENTER_LINE 0
 #endif
-#define COURSE_LIMIT_COUNTS 160000
+#define COURSE_LIMIT_COUNTS 432000
 /* A two-sensor crossing is a candidate, not proof of a geometric junction. */
 typedef enum { COURSE_FOLLOW, COURSE_CENTER, COURSE_BRAKE, COURSE_TURN,
                COURSE_SETTLE, COURSE_SEEK, COURSE_FAILED, COURSE_LOST } course_phase_t;

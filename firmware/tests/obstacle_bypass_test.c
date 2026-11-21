@@ -235,10 +235,10 @@ static void approach_clearance_tests(void){
     init();tick(true,true,20,700,false);tick(true,true,20,700,false);tick(true,true,10,700,false);
     assert(out.stop&&!out.left&&!out.right&&!strcmp(out.state,"AVOID_APPROACH_TOO_CLOSE"));
     /* Large search rotation cannot turn a remembered target into an invented
-     * front clearance; stop with an explicit uncertainty reason instead. */
-    init();tick(true,true,40,700,false);left=400;right=-400;
+     * front clearance: the warning is forgotten and the run keeps following the line. */
+    init();tick(true,true,40,700,false);assert(a.approach_warning);left=400;right=-400;
     tick(true,false,0,700,true);
-    assert(out.stop&&!strcmp(out.state,"AVOID_APPROACH_HEADING_UNCERTAIN"));
+    assert(!out.stop&&!a.approach_warning&&!a.approach_pending&&!a.detected);
     init();for(unsigned i=0;i<80;i++)tick(true,false,0,700,false);
     assert(!a.approach_warning&&!a.detected&&!out.stop);
     puts("PASS 45cm warning only, 450cps approach, 20cm immediate brake, retained travel budget, close/heading guards");
