@@ -1,0 +1,67 @@
+{
+  "date": "2026-11-22",
+  "target": "Cortex-M0+ (arm-none-eabi-gcc -Os)",
+  "rows": [
+    {
+      "type": "obstacle_bypass_t",
+      "before": 1976,
+      "after": 1784,
+      "saved": 192
+    },
+    {
+      "type": "course_control_t",
+      "before": 1176,
+      "after": 1072,
+      "saved": 104
+    },
+    {
+      "type": "motion_control_t",
+      "before": 176,
+      "after": 152,
+      "saved": 24
+    },
+    {
+      "type": "barcode_progress_t",
+      "before": 264,
+      "after": 248,
+      "saved": 16
+    },
+    {
+      "type": "center_search_t",
+      "before": 144,
+      "after": 136,
+      "saved": 8
+    },
+    {
+      "type": "center_trim_t",
+      "before": 72,
+      "after": 72,
+      "saved": 0
+    },
+    {
+      "type": "hump_roll_t",
+      "before": 40,
+      "after": 36,
+      "saved": 4
+    },
+    {
+      "type": "tilt_alert_t",
+      "before": 24,
+      "after": 24,
+      "saved": 0
+    },
+    {
+      "type": "motion_class_state_t",
+      "before": 116,
+      "after": 108,
+      "saved": 8
+    },
+    {
+      "type": "terrain_status_t",
+      "before": 68,
+      "after": 60,
+      "saved": 8
+    }
+  ],
+  "note": "Nested types are counted inside their containers; do not add the rows together."
+}

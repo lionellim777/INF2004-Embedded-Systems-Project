@@ -3,11 +3,21 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "control_representation.h"
 
 typedef struct {
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    /* Observer task writes; consumers copy the whole snapshot. Four flags and the 0..6 motion state: 7 bits. */
+    bool available:1;
+    bool calibrated:1;
+    bool pitch_valid:1;
+    bool tilt_alert_active:1;
+    unsigned motion_state:3;
+#else
     bool available;
     bool calibrated;
     bool pitch_valid;
+#endif
     float current_pitch_deg;
     uint32_t pitch_sequence;
     uint32_t read_errors;
@@ -20,12 +30,16 @@ typedef struct {
     float last_roll_hump_mm;
     float highest_roll_hump_mm;
     /* Tilt alert (tilt_alert.h): sustained tilt well beyond a hump, from the level calibration. */
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool tilt_alert_active;
+#endif
     uint32_t tilt_alert_count;
     float max_tilt_deg;
     /* Motion classification and turn rate (motion_class.h): a motion_class_t value, wheel speed from
      * the encoders in mm/s, turn rate in deg/s (positive = turning left). */
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     uint8_t motion_state;
+#endif
     float speed_mm_s;
     float turn_rate_dps;
 } terrain_status_t;

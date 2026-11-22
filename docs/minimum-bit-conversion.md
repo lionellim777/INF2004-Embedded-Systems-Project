@@ -12,6 +12,12 @@ controller state, shared ISR/task data, queues and MQTT. Compact transport
 alone does not complete it. Each field needs a justified range, width,
 implementation and ownership/access policy, plus before/after evidence.
 
+## Current status (stage 4)
+
+Packing is now the default build, covers the obstacle and Observer-owned state, and the shared fault mask and binary
+`track_status` are in. The table, RAM and message-size comparisons and the correctness evidence are on one page:
+[minimum-bit-representation.md](minimum-bit-representation.md). The stage notes below are the history.
+
 ## How to use Tribunal 1
 
 Preserve the completed Tribunal 1 report as the meeting record. Its proposed

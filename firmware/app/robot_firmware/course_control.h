@@ -16,13 +16,14 @@ typedef enum { COURSE_FOLLOW, COURSE_CENTER, COURSE_BRAKE, COURSE_TURN,
 typedef struct {
     course_config_t config;
 #if ROBOCAR_COMPACT_CONTROL_STATE
-    /* Eight phases plus18 Boolean decisions =21 bits in three bytes.
+    /* Eight phases plus 19 Boolean decisions = 22 bits in three bytes.
      * All course/drive/search/trim fields are owned by the Motion task. */
     unsigned char phase:3;
     bool center_search_started:1,center_level_valid:1,center_visible:1,barcode_seen:1;
     bool bend_disabled:1,bend_ready:1,bend_active:1,flow_follow:1;
     bool right_level_valid:1,right_preview:1,right_preview_tracking:1,loss_coast:1;
     bool ignore_current_crossing:1,deferred:1,candidate:1,latched:1,clear_tracking:1,seek_reverse:1;
+    bool curve_follow:1; /* long centre+side overlap is a curve, set by course_set_curve_follow() */
 #else
     course_phase_t phase;
 #endif
@@ -70,7 +71,9 @@ typedef struct {
     /* Optional per-letter table, set by course_set_letter_actions(); NULL keeps the Y/Z-only behaviour. */
     const char *letter_actions;
     /* Set by course_set_curve_follow(): a long centre+side black overlap is a curve, not a crossing. */
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool curve_follow;
+#endif
     /* Multiplier on the centre-trim steering (0 = 1.0, the validated amount). */
     float trim_gain;
 } course_control_t;

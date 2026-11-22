@@ -55,6 +55,12 @@ bool barcode_record_valid(const uint8_t *bytes, size_t size);
 bool status_record_encode(uint32_t ms, uint32_t boot_id, uint8_t available,
     uint8_t simulated, uint8_t state, uint8_t out[STATUS_RECORD_BYTES]);
 
+/* Track status: status code8 (track_status_codes.h; 0 unknown, never text), active faults8, latched
+ * faults8 (fault_flags.h bits0..5, bits6..7 zero). Replaces the former ASCII status string. */
+#define TRACK_STATUS_RECORD_BYTES 3u
+uint8_t track_status_code(const char *status);
+bool track_status_record_encode(const char *status,uint8_t active,uint8_t latched,
+                                uint8_t out[TRACK_STATUS_RECORD_BYTES]);
 enum { BINARY_COMMAND_INVALID, BINARY_COMMAND_STATUS, BINARY_COMMAND_PERIOD, BINARY_COMMAND_STOP };
 /* Shared command state is network-task-owned. Maximum two payload bytes.
  * state bits: kind0..1, active2, expected3..4, received5..6, padding7. */

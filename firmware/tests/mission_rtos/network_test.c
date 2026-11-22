@@ -6,6 +6,7 @@
  * deterministically without replacing the implementation with a test model. */
 #include "network_service.c"
 #include "terrain_telemetry.h"
+const char *rtos_track_status(void){return "CENTER_LINE_NOT_REACQUIRED";}
 cyw43_t cyw43_state;
 static mqtt_client_t fake_client;
 static int link=CYW43_LINK_UP;
@@ -343,6 +344,7 @@ int main(void)
   step(20001);assert(network_wifi_link()==diagnostic);
  }
  subscription_error=ERR_OK;online(30000);mock_scan_stopped=true;step(31000);assert(scan_pending && scan_index==0 && pending_ack);
+ track_status_last=rtos_track_status();track_status_faults=fault_active();track_status_ms=31000; /* status unchanged: no extra record in this window */
  unsigned queued=transmitted;step(31005);assert(transmitted==queued && scan_index==0);
  pending_ack=NULL;scan_ack(NULL,ERR_ARG);assert(!scan_pending && scan_index==0);
  step(31010);assert(pending_ack && scan_index==0);
@@ -378,6 +380,18 @@ int main(void)
 #else
  for(unsigned i=0;i<transmitted;++i) assert(!strstr(sent[i].topic,"/obstacle"));
 #endif
+ {bool seen_status=false;unsigned from=transmitted;
+  track_status_last=NULL;track_status_publish(99999u);
+  for(unsigned i=from;i<transmitted;++i) if(strstr(sent[i].topic,"/track_status")) {
+   seen_status=true;
+   assert(sent[i].length==TRACK_STATUS_RECORD_BYTES);                 /* binary: code8, active8, latched8 */
+   assert(sent[i].bytes[0]==track_status_code("CENTER_LINE_NOT_REACQUIRED") && sent[i].bytes[0]!=0);
+   assert(!(sent[i].bytes[1]&~FAULT_ALL) && !(sent[i].bytes[2]&~FAULT_ALL));
+  }
+  assert(seen_status);
+  assert(fault_latched()&FAULT_WIFI_LOSS);                            /* the reconnect scenario dropped the link */
+  assert(fault_latched()&FAULT_MQTT_LOSS);                            /* and the broker connection */
+  puts("PASS track_status is a 3-byte binary record; Wi-Fi and MQTT loss are latched in the shared fault mask");}
  puts("PASS actual MQTT service: explicit byte lengths, Z preservation, STOP-only commands, no start topic, period changes, backpressure, reconnect, subscription failure, clock wrap, signed Wi-Fi diagnostics");
  for(unsigned i=0;i<transmitted;++i) {
   printf("PACKET %s ",sent[i].topic);

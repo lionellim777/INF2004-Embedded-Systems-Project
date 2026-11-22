@@ -1,5 +1,33 @@
 #include "binary_protocol.h"
 #include <string.h>
+#include "track_status_codes.h"
+#include "fault_flags.h"
+#include <string.h>
+#define STATUS_NAME(name) #name,
+static const char *const track_status_names[TRACK_STATUS_COUNT] = {TRACK_STATUS_LIST(STATUS_NAME)};
+uint8_t track_status_code(const char *status)
+{
+    if (status == NULL) {
+        return 0u;
+    }
+    for (uint32_t i = 0u; i < TRACK_STATUS_COUNT; i++) {
+        if (strcmp(status, track_status_names[i]) == 0) {
+            return (uint8_t)(i + 1u);
+        }
+    }
+    return 0u;
+}
+bool track_status_record_encode(const char *status,uint8_t active,uint8_t latched,
+                                uint8_t out[TRACK_STATUS_RECORD_BYTES])
+{
+    if (((active & ~FAULT_ALL) != 0u) || ((latched & ~FAULT_ALL) != 0u)) {
+        return false;
+    }
+    out[0] = track_status_code(status);
+    out[1] = active;
+    out[2] = latched;
+    return true;
+}
 static void put32(uint8_t *b, uint32_t value)
 {
     for (unsigned i=0;i<4;++i) b[i]=(uint8_t)(value>>(8u*i));

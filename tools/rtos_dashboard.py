@@ -82,6 +82,14 @@ def ingest(topic, record):
         note("Barcode", "ok", "Barcode read: " + str(record["barcode"]))
     elif topic == "track_status":
         status = record.get("status")
+        faults = tuple(record.get("faults", ()))
+        if faults != run.get("faults", ()):
+            gone, new = set(run.get("faults", ())) - set(faults), set(faults) - set(run.get("faults", ()))
+            for name in sorted(new):
+                note("Fault", "fault", "Fault raised: " + name)
+            for name in sorted(gone):
+                note("Fault", "ok", "Fault cleared: " + name)
+            run["faults"] = faults
         if status != run.get("track_status"):
             run["track_status"] = status
             # Only the exceptional states are worth an event; normal driving states repeat constantly.

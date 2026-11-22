@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-22",
+  "topics": [
+    {
+      "topic": "motion",
+      "binary_bytes": 13,
+      "json_bytes": 191,
+      "saving_percent": 93.2
+    },
+    {
+      "topic": "line",
+      "binary_bytes": 9,
+      "json_bytes": 86,
+      "saving_percent": 89.5
+    },
+    {
+      "topic": "barcode",
+      "binary_bytes": 5,
+      "json_bytes": 103,
+      "saving_percent": 95.1
+    },
+    {
+      "topic": "status",
+      "binary_bytes": 10,
+      "json_bytes": 115,
+      "saving_percent": 91.3
+    },
+    {
+      "topic": "terrain",
+      "binary_bytes": 10,
+      "json_bytes": 198,
+      "saving_percent": 94.9
+    },
+    {
+      "topic": "hump_event",
+      "binary_bytes": 8,
+      "json_bytes": 82,
+      "saving_percent": 90.2
+    },
+    {
+      "topic": "obstacle",
+      "binary_bytes": 10,
+      "json_bytes": 174,
+      "saving_percent": 94.3
+    },
+    {
+      "topic": "track_status",
+      "binary_bytes": 3,
+      "json_bytes": 132,
+      "saving_percent": 97.7
+    }
+  ],
+  "track_status_before_after": {
+    "old_ascii_bytes_min": 4,
+    "old_ascii_bytes_mean": 18.4,
+    "old_ascii_bytes_max": 37,
+    "new_binary_bytes": 3,
+    "note": "The new record also carries the active and latched fault masks, which the old text did not."
+  },
+  "total_binary": 68,
+  "total_json": 1081
+}

@@ -15,6 +15,7 @@
  * the slow (600 counts/s) hump runs of 2026-11-17: cruise speed wanders by +/-100 counts/s from
  * the PI controller, the launch ramp reaches 500 counts/s in about 1.5 s, and line steering
  * produces under about 10 deg/s while a pivot turn produces about 30 deg/s. */
+#include "control_representation.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -45,14 +46,27 @@ typedef enum {
 } motion_class_t;
 
 typedef struct {
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    /* Observer task owns this state alone: five flags and two 3-bit states (0..6) in 11 bits. */
+    bool have_last:1;
+    bool moving:1;
+    bool turning:1;
+    bool hump_descending:1;
+    bool hump_was_active:1;
+    unsigned state:3;
+    unsigned candidate:3;
+#else
     bool have_last;
+#endif
     uint32_t last_ms;
     int32_t last_left;
     int32_t last_right;
     float speed_mm_s;      /* smoothed mean wheel speed, forward positive */
     float turn_dps;        /* smoothed turn rate, positive = turning left (right wheel faster) */
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool moving;
     bool turning;
+#endif
     float hist_v[MOTION_CLASS_HIST];
     uint32_t hist_t[MOTION_CLASS_HIST];
     uint8_t hist_count;
@@ -60,10 +74,12 @@ typedef struct {
     float accel_mm_s2;
     float hump_peak_deg;
     float hump_low_deg;
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool hump_descending;
     bool hump_was_active;
     motion_class_t state;
     motion_class_t candidate;
+#endif
     uint32_t candidate_ms;
 } motion_class_state_t;
 

@@ -17,9 +17,9 @@ endif()
 set(MTK "${MTK_BSP_PATH}")
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated")
 set(RTOS_NETWORK_SETTINGS_FILE "" CACHE FILEPATH "Private network settings header")
-option(RTOS_COMPACT_ADC_STATE "Opt-in minimum-bit ADC/filter candidate; not the accepted default" OFF)
-option(RTOS_COMPACT_CORE_STATE "Opt-in packed baseline and capture coordination state" OFF)
-option(RTOS_COMPACT_CONTROL_STATE "Opt-in Motion-owned controller state and flags" OFF)
+option(RTOS_COMPACT_ADC_STATE "Minimum-bit ADC filter state (default ON; OFF restores the old 36-byte filter)" ON)
+option(RTOS_COMPACT_CORE_STATE "Minimum-bit baseline and capture coordination state (default ON)" ON)
+option(RTOS_COMPACT_CONTROL_STATE "Minimum-bit controller, obstacle, terrain and flag state (default ON)" ON)
 option(RTOS_FIRST_FAILURE_CACHE "Retain duplicate first failed raw waveform for diagnosis" ON)
 option(RTOS_OBSTACLE "Enable experimental USB-selectable obstacle manoeuvring" OFF)
 option(RTOS_TERRAIN "Publish terrain telemetry; the Observer task polls the IMU (hump, tilt, motion state)" OFF)
@@ -65,7 +65,7 @@ target_include_directories(mtkernel PRIVATE "${CMAKE_BINARY_DIR}/generated"
     "${MTK}/config" "${MTK}/include" "${MTK}/kernel/knlinc")
 
 set(BASELINE "${CMAKE_CURRENT_LIST_DIR}/../robot_firmware")
-add_executable(robocar_rtos_motion main.c board.c safety_gate.c motion_record.c motion_runtime.c
+add_executable(robocar_rtos_motion main.c board.c fault_flags.c safety_gate.c motion_record.c motion_runtime.c
     binary_protocol.c network_service.c barcode_actions.c
     track_sensor.c track_runtime.c scan_diagnostic.c runtime_measure.c runtime_report.c port/task_observe.c
     "${BASELINE}/course_control.c" "${BASELINE}/barcode_waveform.c" "${BASELINE}/barcode_decoder.c"
@@ -83,6 +83,8 @@ if(RTOS_COMPACT_CORE_STATE)
 endif()
 if(RTOS_COMPACT_CONTROL_STATE)
     target_compile_definitions(robocar_rtos_motion PRIVATE ROBOCAR_COMPACT_CONTROL_STATE=1)
+else()
+    target_compile_definitions(robocar_rtos_motion PRIVATE ROBOCAR_COMPACT_CONTROL_STATE=0)
 endif()
 if(RTOS_COMPACT_CONTROL_STATE AND NOT RTOS_FIRST_FAILURE_CACHE)
     target_compile_definitions(robocar_rtos_motion PRIVATE RTOS_NO_FIRST_FAILURE_CACHE=1 RTOS_FIRMWARE_VERSION="0.6-dev3-lean")

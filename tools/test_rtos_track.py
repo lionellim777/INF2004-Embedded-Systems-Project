@@ -8,7 +8,7 @@ with tempfile.TemporaryDirectory(prefix='rtos-track-') as name:
     folder=Path(name)
     for header in ['hardware/adc.h','hardware/clocks.h','hardware/pwm.h','hardware/sync.h','pico/stdlib.h']:
         p=folder/header;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('#include "track_test_sdk.h"\n')
-    sources=[APP/n for n in ['board.c','safety_gate.c','motion_record.c','motion_runtime.c','track_sensor.c','track_runtime.c','scan_diagnostic.c']]
+    sources=[APP/n for n in ['board.c','safety_gate.c','motion_record.c','motion_runtime.c','fault_flags.c','track_sensor.c','track_runtime.c','scan_diagnostic.c']]
     sources += [BASE/n for n in ['motion_control.c','course_control.c','barcode_waveform.c','barcode_decoder.c']]
     command=[shutil.which('clang'),'-std=c11','-O1','-g','-Wall','-Wextra','-Werror','-DRTOS_TRACK=1','-DBARCODE_WAVE_RECOVERY_OPTICS=1','-DBARCODE_WAVE_LAST_PASS=1','-DROBOCAR_CENTER_LINE=1','-fsanitize=address,undefined','-fno-omit-frame-pointer']
     if os.environ.get('RTOS_TEST_COMPACT_ADC')=='1':command.append('-DRTOS_COMPACT_ADC_STATE=1')

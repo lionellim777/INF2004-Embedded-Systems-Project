@@ -21,11 +21,20 @@ class TrackStatus(unittest.TestCase):
     TOPIC = "inf2004/aai10/robot1/v1/track_status"
 
     def test_reason_is_decoded(self):
-        record = decode(self.TOPIC, b"CENTER_LINE_NOT_REACQUIRED")
+        from rtos_mqtt_observer import TRACK_STATUS_NAMES
+        code = TRACK_STATUS_NAMES.index("CENTER_LINE_NOT_REACQUIRED") + 1
+        record = decode(self.TOPIC, bytes([code, 0b000101, 0b010101]))
         self.assertEqual(record["status"], "CENTER_LINE_NOT_REACQUIRED")
+        self.assertEqual(record["faults"], ["MOTOR_STALL", "IMU"])
+        self.assertEqual(record["faults_latched"], ["MOTOR_STALL", "IMU", "WIFI_LOSS"])
+
+    def test_unknown_code_zero_is_reported(self):
+        self.assertEqual(decode(self.TOPIC, bytes(3))["status"], "UNKNOWN")
 
     def test_bad_payloads_are_refused(self):
-        for bad in (b"", b"x" * 49, b"bad\x00byte", b"caf\xc3\xa9"):
+        from rtos_mqtt_observer import TRACK_STATUS_NAMES
+        for bad in (b"", bytes([1, 0]), bytes([1, 0, 0, 0]), b"CENTER_LINE_NOT_REACQUIRED",
+                    bytes([1, 0x40, 0]), bytes([1, 0, 0x80]), bytes([len(TRACK_STATUS_NAMES) + 1, 0, 0])):
             with self.assertRaises(ValueError):
                 decode(self.TOPIC, bad)
 
@@ -72,7 +81,7 @@ class ObstacleBoard(unittest.TestCase):
 
     def test_failure_is_a_fault_and_a_new_run_resets_counters(self):
         self.feed(1, detected=1)
-        self.feed(25, detected=1)                      # AVOID_FAILED
+        self.feed(26, detected=1)                      # AVOID_FAILED (25 is AVOID_RESTORE_FORWARD)
         self.assertEqual(self.dash.events[-1]["sev"], "fault")
         self.feed(0, active=False)                     # run ended
         self.feed(1, detected=1)                       # the next run's first obstacle reports again

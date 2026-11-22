@@ -62,7 +62,7 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 .strip div{padding:8px 12px;border-left:1px solid var(--line)}
 .strip div:first-child{border-left:0}
 .strip dt{font-size:.8rem;color:var(--ink-3)}
-.strip dd{margin:2px 0 0;font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums;font-family:var(--board);font-stretch:condensed}
+.strip dd{overflow-wrap:anywhere;margin:2px 0 0;font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums;font-family:var(--board);font-stretch:condensed}
 .strip dd.bad{color:var(--red)}.strip dd.warn{color:var(--amber)}
 .badge{font-family:var(--board);font-stretch:condensed;font-weight:700;font-size:1.9rem;line-height:1.1;letter-spacing:.03em;color:var(--ink-3)}
 #tilt,#motion,#hump{border-width:2px;border-color:var(--line-2)}
@@ -197,6 +197,7 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 <div><dt>Wheels L / R</dt><dd id="motion-wheels">—</dd></div>
 <div><dt>Previous state</dt><dd id="motion-prev">—</dd></div>
 <div><dt>Course status / stop reason</dt><dd id="motion-course">—</dd></div>
+<div><dt>Faults now / seen since boot</dt><dd id="motion-faults">—</dd></div>
 </dl>
 </section>
 
@@ -385,6 +386,8 @@ function render(s){
   el('motion').dataset.state=st>=5?'hump':st===4?'turn':st>=1?'go':'idle';
   set('motion-prev',run.prev_state==null?'—':(s.motion_states[run.prev_state]||'—'));
   set('motion-course',s.topics.track_status?s.topics.track_status.status:'—');
+  {const ts=s.topics.track_status,f=ts&&ts.faults||[],l=ts&&ts.faults_latched||[];
+   set('motion-faults',ts?(f.length?f.join(', '):'none')+' / '+(l.length?l.join(', '):'none'):'—');}
  }
  if(m){
   const speed=(Math.abs(m.left_mm_s)+Math.abs(m.right_mm_s))/2;

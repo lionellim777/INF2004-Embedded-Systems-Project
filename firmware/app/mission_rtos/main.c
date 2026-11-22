@@ -1,4 +1,5 @@
 #include "board.h"
+#include "fault_flags.h"
 #include "encoders.h"
 #include "motion_runtime.h"
 #include "network_service.h"
@@ -95,6 +96,7 @@ static void observer_task(int start_code, void *context)
     uint32_t terrain_settle_until = 0u;
     uint32_t last_terrain_send = 0u;
     bool terrain_was_armed = false;
+    uint32_t imu_errors_seen = 0u;
     uint32_t pickup_since_ms = 0u;
     uint32_t next_calibration_ms = 0u;
 #endif
@@ -201,6 +203,12 @@ static void observer_task(int start_code, void *context)
             encoder_sample_t wheels = encoders_snapshot();
             terrain_motion_update((int32_t)(0u - wheels.left_raw), (int32_t)wheels.right_raw, now);
             const terrain_status_t st = terrain_get_status();
+            if (!st.available || st.read_errors != imu_errors_seen) {
+                fault_set(FAULT_IMU);
+            } else if (st.pitch_valid) {
+                fault_clear(FAULT_IMU);
+            }
+            imu_errors_seen = st.read_errors;
             /* Demo rule: the run ends when the car is picked up, and the motors must stop. Off the ground
              * is read from the three IR sensors: with nothing under the car all three saturate (about
              * 4000 of 4095 on the car), while floor reads about 170 and the centre sensor on tape about

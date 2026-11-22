@@ -1,4 +1,5 @@
 #include "obstacle_io.h"
+#include "fault_flags.h"
 #include "obstacle_trigger.pio.h"
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
@@ -145,6 +146,14 @@ obstacle_range_t obstacle_io_poll(void)
         result.valid = result.cm >= 2.0f && result.cm <= 400.0f;
         result.no_return = result.cm > 400.0f;
         if (result.cm < 2.0f) result.error = "AVOID_SONAR_TOO_CLOSE_OR_BAD_PULSE";
+    }
+    /* A reading with neither a distance nor a long-range "no return" means the sensor produced no echo. */
+    if (result.fresh) {
+        if (result.valid || result.no_return) {
+            fault_clear(FAULT_NO_ECHO);
+        } else {
+            fault_set(FAULT_NO_ECHO);
+        }
     }
     return result;
 }

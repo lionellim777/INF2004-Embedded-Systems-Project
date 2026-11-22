@@ -13,6 +13,7 @@
  * the measured paper-stack range) tips the car about 10 degrees, about 11 combined with pitch, so the
  * alert sits at 15 degrees: it never fires on a hump up to about 25 mm or on driving, but fires on
  * a real slope or tip. */
+#include "control_representation.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -29,9 +30,15 @@ typedef enum {
 } tilt_alert_result_t;
 
 typedef struct {
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    bool active:1;
+    bool above:1;          /* tilt is above ENTER and the alert is not yet raised */
+    bool below:1;          /* tilt is below EXIT and the alert is still raised */
+#else
     bool active;
     bool above;            /* tilt is above ENTER and the alert is not yet raised */
     bool below;            /* tilt is below EXIT and the alert is still raised */
+#endif
     uint32_t since_ms;     /* when tilt first rose above ENTER, or the alert was raised */
     uint32_t below_ms;     /* when tilt first fell below EXIT */
     float peak_deg;        /* largest combined tilt since it first rose above ENTER */

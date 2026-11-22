@@ -17,7 +17,18 @@ OBSTACLE_PHASES=("AVOID_FOLLOW","AVOID_WAIT","AVOID_TURN_OUT","AVOID_SCAN_OUT","
     "AVOID_TURN_ALONG","AVOID_RETURN_LINE","AVOID_VERIFY","AVOID_CHECK_TAPE","AVOID_TAPE_PROBE",
     "AVOID_AXLE_ADVANCE","AVOID_ALIGN_TURN","AVOID_ALIGN_CONFIRM","AVOID_SCAN_INITIAL","AVOID_CHECK_LEFT",
     "AVOID_CLEAR_TAIL","AVOID_TURN_RETURN","AVOID_SCAN_RETURN","AVOID_TURN_CLEARANCE","AVOID_TURN_TO_LINE",
-    "AVOID_FAILED")
+    "AVOID_RESTORE_FORWARD","AVOID_FAILED")
+
+# Status strings and fault bits shared with the firmware (single source: the generated/real headers).
+_MISSION = Path(__file__).resolve().parents[1] / "firmware/app/mission_rtos"
+TRACK_STATUS_NAMES = tuple(__import__("re").findall(
+    r"X\(([A-Z0-9_]+)\)", (_MISSION / "track_status_codes.h").read_text(encoding="utf8")))
+FAULT_BITS = ("MOTOR_STALL", "ENCODER", "IMU", "NO_ECHO", "WIFI_LOSS", "MQTT_LOSS")
+FAULT_ALL = (1 << len(FAULT_BITS)) - 1
+
+
+def fault_names(mask):
+    return [name for bit, name in enumerate(FAULT_BITS) if mask >> bit & 1]
 
 
 def decode(topic, payload):
@@ -80,10 +91,14 @@ def decode(topic, payload):
                     barcode=chr(64+code) if 1 <= code <= 26 else None,
                     unreadable=code == 27, valid=valid, simulated=simulated)
     if kind == "track_status":
-        # ASCII status / stop reason of the course controller (e.g. CENTER_LINE_NOT_REACQUIRED).
-        if not 1 <= len(payload) <= 48 or not all(32 <= b < 127 for b in payload):
+        # 3 bytes: status code (firmware/app/mission_rtos/track_status_codes.h, 0 = unknown), active fault
+        # bits, latched fault bits (fault_flags.h bits 0..5). Binary, never text.
+        if len(payload) != 3 or payload[1] & ~FAULT_ALL or payload[2] & ~FAULT_ALL:
             raise ValueError("Invalid track status")
-        return dict(type=kind, status=payload.decode("ascii"))
+        if payload[0] > len(TRACK_STATUS_NAMES):
+            raise ValueError("Unknown track status code")
+        return dict(type=kind, status=TRACK_STATUS_NAMES[payload[0] - 1] if payload[0] else "UNKNOWN",
+                    status_code=payload[0], faults=fault_names(payload[1]), faults_latched=fault_names(payload[2]))
     if kind == "barcode_actions":
         # 13 bytes of 4-bit action codes (letter A is the low nibble of byte 0), then the result of the
         # latest set_barcode_actions command (firmware/app/mission_rtos/barcode_actions.h).

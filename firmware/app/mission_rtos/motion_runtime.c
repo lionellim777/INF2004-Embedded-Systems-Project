@@ -1,5 +1,6 @@
 #include "motion_runtime.h"
 #include "board.h"
+#include "fault_flags.h"
 #include <string.h>
 #if ROBOCAR_COMPACT_CONTROL_STATE
 _Static_assert(MOTION_TRACK_FAULT<8,"Track fault no longer fits compact motion fault state");
@@ -61,6 +62,7 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
                  * during this press must cancel its pending start. */
                 if (board_ready_to_start() && board_start(&r->token)) {
                     bool began;
+                    fault_clear(FAULT_MOTOR_STALL | FAULT_ENCODER); /* a new run starts without last run's drive faults */
 #ifdef RTOS_TRACK
                     uint8_t selected=board_selected();
                     if(selected==MOTION_COURSE
@@ -101,6 +103,12 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
                 r->track.status="TRACK_TIME_LIMIT";
                 r->motion.phase=MOTION_DONE;board_stop(STOP_COMPLETE);track_runtime_end();
             }else if(out.stop){
+                if ((out.state != NULL) &&
+                    ((strstr(out.state, "STALL") != NULL) || (strstr(out.state, "NO_ENCODER_PROGRESS") != NULL))) {
+                    fault_set(FAULT_MOTOR_STALL);
+                } else if ((out.state != NULL) && (strstr(out.state, "ENCODER") != NULL)) {
+                    fault_set(FAULT_ENCODER);
+                }
                 r->motion.phase=MOTION_FAULT;r->motion.fault=(motion_fault_t)MOTION_TRACK_FAULT;
                 board_stop(STOP_MOTION);track_runtime_end();
             }else (void)board_apply(r->token,out.left,out.right);
@@ -108,6 +116,11 @@ void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now
 #endif
         {
         motion_poll(&r->motion, enc, now);
+        if (r->motion.fault == MOTION_STALLED) {
+            fault_set(FAULT_MOTOR_STALL);
+        } else if (r->motion.fault == MOTION_ENCODER_INVALID) {
+            fault_set(FAULT_ENCODER);
+        }
         if (r->motion.phase == MOTION_ACTIVE)
             (void)board_apply(r->token, r->motion.left.throttle, r->motion.right.throttle);
         else board_stop(r->motion.phase == MOTION_DONE ? STOP_COMPLETE : STOP_MOTION);

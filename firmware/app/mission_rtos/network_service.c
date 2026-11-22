@@ -3,6 +3,7 @@
  * are reused; text serialization and large generic sample/event stores are
  * replaced by validated binary snapshots. No networking in Motion or IRQs. */
 #include "network_service.h"
+#include "fault_flags.h"
 #include "binary_protocol.h"
 #include "board.h"
 #include "port/mtk_bridge.h"
@@ -294,15 +295,29 @@ const char *rtos_track_status(void);
 static const char track_status_topic[]=RTOS_TOPIC_PREFIX "track_status";
 static const char *track_status_last;
 static uint32_t track_status_ms;
-/* ASCII status / stop reason of the course controller. Sent when it changes
- * and every 2 s, so the reason a run ended is in the log without USB. The
- * caller skips passes that already published a burst (lwIP has few handles). */
+static uint8_t track_status_faults;
+/* Binary status code of the course controller plus the shared fault bitmask (3 bytes, see
+ * binary_protocol.h). Sent when the status or an active fault changes and every 2 s, so the reason a
+ * run ended is in the log without USB. The caller skips passes that already published a burst
+ * (lwIP has few handles). */
+#define TRACK_STATUS_REPEAT_MS 2000u /* re-send an unchanged status this often */
 static void track_status_publish(uint32_t now)
 {
-    const char *s=rtos_track_status();
-    if(s==track_status_last && (uint32_t)(now-track_status_ms)<2000u)return;
-    size_t n=strlen(s);if(n>48u)n=48u;
-    if(publish(track_status_topic,(const uint8_t *)s,n,0)){track_status_last=s;track_status_ms=now;}
+    const char *s = rtos_track_status();
+    uint8_t active = fault_active();
+    uint8_t record[TRACK_STATUS_RECORD_BYTES];
+    if ((s == track_status_last) && (active == track_status_faults) &&
+        ((uint32_t)(now - track_status_ms) < TRACK_STATUS_REPEAT_MS)) {
+        return;
+    }
+    if (!track_status_record_encode(s, active, fault_latched(), record)) {
+        return;
+    }
+    if (publish(track_status_topic, record, sizeof record, 0)) {
+        track_status_last = s;
+        track_status_faults = active;
+        track_status_ms = now;
+    }
 }
 #endif
 #ifdef RTOS_RUNTIME_EVIDENCE
@@ -353,6 +368,11 @@ static void step(uint32_t now)
     uint8_t current=network_state();
     int link=cyw43_tcpip_link_status(&cyw43_state,CYW43_ITF_STA);
     wifi_link=(int8_t)link;
+    if (link==CYW43_LINK_UP) {
+        fault_clear(FAULT_WIFI_LOSS);
+    } else if (current!=NETWORK_UNCONFIGURED && current!=NETWORK_JOINING) {
+        fault_set(FAULT_WIFI_LOSS);
+    }
     if ((flags&FAILED) || (current!=NETWORK_JOINING && current!=NETWORK_RETRYING && link!=CYW43_LINK_UP)) {
         fail(now,(flags&FAILED)?network_error():4); return;
     }
@@ -382,7 +402,12 @@ static void step(uint32_t now)
 #endif
         } else if ((uint32_t)(now-state_ms)>=10000u) fail(now,10);
     } else if (current==NETWORK_ONLINE) {
-        if (!mqtt_client_is_connected(client)) { fail(now,11); return; }
+        fault_clear(FAULT_MQTT_LOSS);
+        if (!mqtt_client_is_connected(client)) {
+            fault_set(FAULT_MQTT_LOSS);
+            fail(now,11);
+            return;
+        }
         if ((uint32_t)(now-online_ms)>=30000u) flags&=(uint16_t)~RETRY_MASK;
 #ifdef RTOS_BARCODE_ACTIONS
         if (!(flags&ACTIONS_SUBSCRIBED) &&

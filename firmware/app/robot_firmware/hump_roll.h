@@ -20,6 +20,7 @@
  * countdown) it converges quickly (time constant 0.33 s); after that it follows only very
  * slowly (10 s) and only while within EXIT of itself, so it cannot chase a slow ramp or a
  * hump. The level calibration is just its starting value. */
+#include "control_representation.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -49,8 +50,17 @@ typedef enum {
 } hump_roll_phase_t;
 
 typedef struct {
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    /* Observer task owns this state alone. phase 0..2:2 bits, sign -1/+1:2 bits, three flags:3 bits. */
+    unsigned phase:2;
+    signed int sign:2;     /* -1 right wheel raised, +1 left wheel raised */
+    bool below:1;
+    bool need_clear:1;     /* after a timeout: ignore until roll returns below EXIT */
+    bool holdoff_active:1; /* launch hold-off armed by hump_roll_motion_go() */
+#else
     hump_roll_phase_t phase;
     int8_t sign;           /* -1 right wheel raised, +1 left wheel raised */
+#endif
     float baseline_deg;    /* adapting level reference, relative to the calibration */
     uint16_t fast_left;    /* samples of fast baseline convergence still to go */
     float peak_deg;        /* largest |roll change| this event, from the baseline */
@@ -58,9 +68,11 @@ typedef struct {
     uint16_t count;        /* number of those samples */
     uint32_t start_ms;
     uint32_t below_ms;     /* when roll first fell under EXIT, 0 if not below */
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool below;
     bool need_clear;       /* after a timeout: ignore until roll returns below EXIT */
     bool holdoff_active;   /* launch hold-off armed by hump_roll_motion_go() */
+#endif
     uint32_t holdoff_until_ms;
 } hump_roll_t;
 

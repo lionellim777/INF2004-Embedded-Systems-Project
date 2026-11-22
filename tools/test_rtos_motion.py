@@ -30,7 +30,7 @@ def main():
                         "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
                         "-I", str(APP), "-I", str(BASE), "-I", str(TEST), "-I", str(temp),
                         str(APP / "board.c"), str(APP / "safety_gate.c"), str(APP / "motion_record.c"),
-                        str(APP / "motion_runtime.c"), str(BASE / "motion_control.c"),
+                        str(APP / "motion_runtime.c"), str(APP / "fault_flags.c"), str(BASE / "motion_control.c"),
                         str(TEST / "foundation_test.c"), "-o", str(temp / "test")], check=True)
         output = subprocess.check_output([str(temp / "test")], text=True)
         print(output, end="")

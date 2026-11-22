@@ -1,6 +1,12 @@
 #include "obstacle_bypass.h"
 #include <math.h>
 #include <string.h>
+/* Saturating increment for the two-bit decision counters (only compared against 1, 2 or 3). */
+#define SAT2_MAX 3u
+static unsigned sat2_inc(unsigned v)
+{
+    return (v < SAT2_MAX) ? (v + 1u) : SAT2_MAX;
+}
 
 /* Initial calibration values, not a guarantee of chassis clearance. Geometry
  * uses a parallel return as fallback; confirmed tape can interrupt the detour. Unknown object
@@ -370,7 +376,9 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
     }
     if(a->phase==AVOID_FOLLOW||a->phase==AVOID_VERIFY){
         if(a->phase==AVOID_VERIFY){
-            if(fresh)a->close_count=valid&&cm<=30?a->close_count+1:0;
+            if(fresh){
+                a->close_count=(valid&&cm<=30)?sat2_inc(a->close_count):0u;
+            }
             if(a->close_count>=2)return fail(a,"AVOID_RETURN_BLOCKED");
         }else{
             /* Retain a near target when a narrow bottle drops out of the beam.
@@ -586,7 +594,7 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
                 a->plan.angle_deg=a->departure_deg;
                 a->plan.travel_mm=a->departure_travel_mm;
                 a->plan.forward_mm=a->departure_forward_mm;
-                a->clearance_adjustments++;
+                a->clearance_adjustments=sat2_inc(a->clearance_adjustments);
                 wait_for(a,AVOID_TURN_CLEARANCE,now);return quiet(a);
             }
             if(a->scan_center_clear<2&&a->scan_center_no_return<3)
@@ -655,7 +663,9 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
              * empty swept volume; all movement obstacle/stale guards remain. */
             else if((a->side_seen||a->plan.left_edge_known)&&a->along_mm>=MIN_ALONG_MM&&
                 a->along_mm>=a->last_side_seen_mm+ALONG_STEP_MM&&
-                (a->scan_center_clear>=2||a->scan_far_rays>=2||a->scan_center_no_return>=3))a->clear_checks++;
+                (a->scan_center_clear>=2||a->scan_far_rays>=2||a->scan_center_no_return>=3)){
+                a->clear_checks=sat2_inc(a->clear_checks);
+            }
             else a->clear_checks=0;
             if((a->side_seen||a->plan.left_edge_known)&&a->clear_checks>=2&&a->along_mm>=MIN_ALONG_MM)
                 wait_for(a,a->return_deg<90?AVOID_TURN_RETURN:AVOID_SCAN_RETURN,now);
@@ -672,8 +682,8 @@ line_check_output_t obstacle_bypass_step(obstacle_bypass_t *a,ir_roles_t ir,
         }
         if(now-a->range_us>RANGE_STALE_US)return fail(a,"AVOID_RANGE_STALE");
         if(fresh){
-            a->close_count=valid&&cm<=20?a->close_count+1:0;
-            a->moving_invalid=(valid||a->no_return)?0:a->moving_invalid+1;
+            a->close_count=(valid&&cm<=20)?sat2_inc(a->close_count):0u;
+            a->moving_invalid=(valid||a->no_return)?0u:sat2_inc(a->moving_invalid);
         }
         if((fresh&&valid&&cm<=12)||a->close_count>=2)return fail(a,"AVOID_PATH_OBSTACLE_STOP");
         if(a->moving_invalid>=3&&(a->phase==AVOID_MOVE_OUT||a->phase==AVOID_MOVE_ALONG||

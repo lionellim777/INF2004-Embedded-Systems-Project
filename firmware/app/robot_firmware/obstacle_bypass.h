@@ -36,11 +36,27 @@ typedef struct {
     motion_control_t leg, saved_leg;
     encoder_sample_t origin;
     obstacle_encoder_origin_t tape_origin, episode_origin, align_origin;
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    /* Ten Boolean decisions, owned by the Motion task alone (no ISR or other task writes them). */
+    bool probe_black:1;
+    bool probe_gap:1;
+    bool contact_set:1;
+    bool edge_shift_active:1;
+    bool angled_probe:1;
+    bool approach_pending:1;
+    bool approach_warning:1;
+    bool rejoin_armed:1;
+    bool no_return:1;
+    bool sonar_wait:1;
+#else
     bool probe_black, probe_gap;
+#endif
     unsigned probe_first_black_mm;
     obstacle_encoder_origin_t contact_origin; /* where the centre sensor first reached the tape */
     unsigned pre_probe_black_mm;              /* black already travelled before the probe started */
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool contact_set;
+#endif
     int route_heading_deg;
     obstacle_plan_t plan;
     float plan_cm[OBSTACLE_PLAN_RAYS];
@@ -52,8 +68,15 @@ typedef struct {
     unsigned departure_forward_mm : 10;
     unsigned departure_done_mm : 10;
     unsigned departure_step_mm : 7;
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    unsigned edge_shift_count;
+    unsigned clearance_adjustments:2; /* compared with 2 only; saturates at 3 */
+#else
     unsigned edge_shift_count, clearance_adjustments;
+#endif
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool edge_shift_active, angled_probe;
+#endif
     unsigned clearance_step_planned : 1;
     unsigned left_samples : 2;
     unsigned left_far : 2;
@@ -66,7 +89,9 @@ typedef struct {
     uint64_t align_hit_us;
     unsigned align_rejected;
     unsigned fast_clear : 2;
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool approach_pending, approach_warning;
+#endif
     obstacle_encoder_origin_t approach_origin;
     float approach_estimate_cm, approach_anchor_cm, approach_yaw_rad;
     uint64_t approach_us;
@@ -79,12 +104,16 @@ typedef struct {
     unsigned resume_servo : 7;
     unsigned rejoin_good : 2;
     unsigned rejoin_attempts, rejoin_rejected;
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool rejoin_armed;
     bool no_return; /* Fresh completed no-return pulse, not NO_RISE or a sensor fault. */
+#endif
     const char *tape_decision;
     uint64_t phase_us, last_us, episode_us, range_us, hit_us;
     uint64_t wall_us, active_us, sonar_wait_us;
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool sonar_wait;
+#endif
     unsigned sonar_good : 2;
     unsigned sonar_retries, sonar_resumes;
     uint32_t encoder_seen[2];
@@ -107,7 +136,13 @@ typedef struct {
     unsigned scan_core_blocked : 1;
     unsigned side_seen : 1;
     unsigned echo_valid : 1;
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    unsigned close_count:2;     /* counters below are compared with 1..3 only; saturate at 3 */
+    unsigned moving_invalid:2;
+    unsigned clear_checks:2;
+#else
     unsigned close_count, moving_invalid, clear_checks;
+#endif
     unsigned last_side_seen_mm : 11;
     unsigned along_mm : 11;
     unsigned offset_mm : 10;
