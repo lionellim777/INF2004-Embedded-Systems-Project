@@ -14,7 +14,8 @@
 #if defined(ROBOCAR_MEASUREMENT_DIAG) || defined(ROBOCAR_MEASUREMENTS)
 #define CAL_HAVE_MEAS 1
 #endif
-typedef struct {
+typedef struct
+{
     char log[CAL_LOG_CAPACITY];
     uint32_t written;
     char line[CAL_LINE_CAPACITY];
@@ -42,11 +43,12 @@ typedef struct {
     bool selection_allowed;
 } calibration_core_t;
 
-void calibration_capture(calibration_core_t *c, const char *data, size_t length);
-size_t calibration_read(const calibration_core_t *c, uint32_t since,
-                        char *out, size_t capacity, uint32_t *next, bool *gap);
+void calibration_capture(calibration_core_t *c, const char *data,
+                         size_t length);
+size_t calibration_read(const calibration_core_t *c, uint32_t since, char *out,
+                        size_t capacity, uint32_t *next, bool *gap);
 /* Only f/l/r/u/t/b/s select; x stops. There is deliberately no remote start. */
-bool calibration_course_command(calibration_core_t *c,const char *path);
+bool calibration_course_command(calibration_core_t *c, const char *path);
 bool calibration_command(calibration_core_t *c, char command);
 int calibration_take_command(calibration_core_t *c);
 bool calibration_parse_cursor(const char *text, uint32_t *value);

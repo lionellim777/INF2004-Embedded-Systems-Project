@@ -72,7 +72,6 @@ def decode(topic, payload):
     if kind=='obstacle':
         if len(payload)!=10:raise ValueError('Invalid obstacle record length')
         fields=int.from_bytes(payload[4:],'little')
-        if fields>>42:raise ValueError('Invalid obstacle padding')
         active,phase,servo=bool(fields&1),(fields>>1)&31,(fields>>6)&127
         range_valid,range_mm=bool(fields&(1<<13)),(fields>>14)&4095
         if not active and fields:raise ValueError('Inactive obstacle record has values')
@@ -80,7 +79,7 @@ def decode(topic, payload):
         if phase>=len(OBSTACLE_PHASES):raise ValueError('Unknown obstacle phase')
         return dict(type=kind,captured_ms=int.from_bytes(payload[:4],'little'),active=active,phase=phase,
                     phase_name=OBSTACLE_PHASES[phase],servo_deg=servo,range_valid=range_valid,range_mm=range_mm,
-                    detected=(fields>>26)&255,completed=(fields>>34)&255)
+                    detected=(fields>>26)&255,completed=(fields>>34)&255,width_cm=(fields>>42)&63)
     if kind == "barcode":
         if len(payload) != 5 or payload[4] & 128:
             raise ValueError("Invalid barcode length/padding")

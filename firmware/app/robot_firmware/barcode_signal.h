@@ -8,17 +8,26 @@
 #ifndef BARCODE_FILTER_SAMPLES
 #define BARCODE_FILTER_SAMPLES 12u
 #endif
-typedef struct {
+typedef struct
+{
     uint16_t samples[BARCODE_FILTER_SAMPLES];
     uint32_t sum;
-    unsigned next,count;
+    unsigned next;
+    unsigned count;
 } barcode_signal_t;
-static inline uint16_t barcode_signal_update(barcode_signal_t *s,uint16_t raw)
+static inline uint16_t barcode_signal_update(barcode_signal_t *s, uint16_t raw)
 {
-    if(s->count==BARCODE_FILTER_SAMPLES)s->sum-=s->samples[s->next];
-    else s->count++;
-    s->samples[s->next]=raw;s->sum+=raw;
-    s->next=(s->next+1u)%BARCODE_FILTER_SAMPLES;
-    return (uint16_t)(s->sum/s->count);
+    if (s->count == BARCODE_FILTER_SAMPLES)
+    {
+        s->sum -= s->samples[s->next];
+    }
+    else
+    {
+        s->count++;
+    }
+    s->samples[s->next] = raw;
+    s->sum += raw;
+    s->next = (s->next + 1u) % BARCODE_FILTER_SAMPLES;
+    return (uint16_t)(s->sum / s->count);
 }
 #endif

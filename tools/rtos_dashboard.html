@@ -178,7 +178,8 @@ button.primary{background:var(--ink);color:var(--dark);border-color:var(--ink)}
 <div id="obs-badge" class="badge" role="status" aria-live="polite">WAITING FOR CAR</div>
 <p id="obs-now" class="empty-note" style="margin:6px 0 0">The car reports a detour here while it goes around an obstacle.</p>
 <div class="stages" aria-label="Detour stages"><span id="st0">Detect</span><span id="st1">Leave line</span><span id="st2">Pass it</span><span id="st3">Rejoin</span></div>
-<dl class="strip" style="--n:4">
+<dl class="strip" style="--n:5">
+<div><dt>Obstacle width</dt><dd id="obs-width">—</dd></div>
 <div><dt>Sonar range</dt><dd id="obs-range">—</dd></div>
 <div><dt>Servo angle</dt><dd id="obs-servo">—</dd></div>
 <div><dt>Detected</dt><dd id="obs-det">—</dd></div>
@@ -309,7 +310,7 @@ const OBS={AVOID_FOLLOW:['Following the line',-1],AVOID_WAIT:['Stopped, letting 
  AVOID_ALIGN_TURN:['Aligning with the tape',3],AVOID_ALIGN_CONFIRM:['Confirming the tape heading',3],
  AVOID_VERIFY:['Checking it is back on the line',3],AVOID_RESTORE_FORWARD:['Facing forward again',3],
  AVOID_FAILED:['Detour failed',-1]};
-let obsPhase=null,obsSteps=[];
+let obsPhase=null,obsSteps=[],obsWidth=0,obsDet=0;
 function renderObstacle(o,run){
  const live=o&&o.age<3&&run.active&&o.active;
  const info=live?(OBS[o.phase_name]||[o.phase_name,-1]):null;
@@ -327,6 +328,9 @@ function renderObstacle(o,run){
     following?'Following the line. Sonar looks straight ahead.':info[0]+'.');
  const stage=detour?info[1]:-1;
  for(let i=0;i<4;i++){const n=el('st'+i);n.className=detour&&i===stage?'on':detour&&i<stage?'done':''}
+ if(o&&o.detected!==obsDet){obsDet=o.detected;obsWidth=0}   /* a new obstacle: forget the last width */
+ if(o&&o.width_cm)obsWidth=o.width_cm;
+ set('obs-width',obsWidth?(obsWidth>=63?'63+ cm':obsWidth+' cm'):'—');
  set('obs-range',live&&o.range_valid?(o.range_mm/10).toFixed(1)+' cm':'—');
  set('obs-servo',live?o.servo_deg+'°':'—');
  set('obs-det',o?o.detected:'—');set('obs-done',o?o.completed:'—');

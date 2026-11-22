@@ -4,19 +4,29 @@
 #ifdef RTOS_TRACK
 #include "track_runtime.h"
 #endif
-typedef struct {
+typedef struct
+{
     motion_control_t motion; /* unchanged validated working controller */
-    uint32_t previous_left, previous_right, previous_us, changed_us;
-    volatile uint32_t max_gap_us; /* one writer; atomic aligned diagnostic read */
+    uint32_t previous_left;
+    uint32_t previous_right;
+    uint32_t previous_us;
+    uint32_t changed_us;
+    volatile uint32_t
+        max_gap_us; /* one writer; atomic aligned diagnostic read */
     uint16_t token;
-    uint8_t buttons; /* raw:0, stable:1, pending start:2; one task owns all bits */
+    uint8_t
+        buttons; /* raw:0, stable:1, pending start:2; one task owns all bits */
 #ifdef RTOS_TERRAIN
-    volatile bool long_straight; /* hump test: next straight move is 500 mm at the slow profile; set by Observer, read by Motion */
+    volatile bool
+        long_straight; /* hump test: next straight move is 500 mm at the slow
+                          profile; set by Observer, read by Motion */
 #endif
 #ifdef RTOS_TRACK
     track_runtime_t track;
 #endif
 } motion_runtime_t;
-void motion_runtime_init(motion_runtime_t *r, encoder_sample_t enc, uint32_t us, bool down);
-void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc, uint64_t now, bool down);
+void motion_runtime_init(motion_runtime_t *r, encoder_sample_t enc, uint32_t us,
+                         bool down);
+void motion_runtime_step(motion_runtime_t *r, encoder_sample_t enc,
+                         uint64_t now, bool down);
 #endif

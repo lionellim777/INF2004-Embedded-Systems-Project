@@ -56,7 +56,7 @@ run = {"active": False, "start": None, "end": None, "max_roll": 0.0, "reads": []
 last_link = None
 last_barcode_ms = None
 last_tilt_alerts = 0
-obst = {"phase": None, "detected": 0, "completed": 0}
+obst = {"phase": None, "detected": 0, "completed": 0, "width_cm": 0}
 
 
 def note(system, sev, text):
@@ -101,17 +101,21 @@ def ingest(topic, record):
         detected, completed = record.get("detected", 0), record.get("completed", 0)
         phase = record.get("phase_name")
         if not record.get("active"):
-            obst.update(phase=None, detected=0, completed=0)
+            obst.update(phase=None, detected=0, completed=0, width_cm=0)
         else:
             if detected < obst["detected"] or completed < obst["completed"]:
                 obst.update(detected=0, completed=0)  # a new run restarted the car's counters
             if detected > obst["detected"]:
+                obst["width_cm"] = 0
                 note("Obstacle", "warn", "Obstacle #%d detected, leaving the line to go around it" % detected)
+            width = record.get("width_cm", 0)
+            if width and not obst["width_cm"]:
+                note("Obstacle", "ok", "Obstacle #%d width measured: %d cm%s" % (detected, width, " or more" if width == 63 else ""))
             if completed > obst["completed"]:
                 note("Obstacle", "ok", "Detour #%d complete, back on the line" % completed)
             if phase == "AVOID_FAILED" and obst["phase"] != "AVOID_FAILED":
                 note("Obstacle", "fault", "Detour failed")
-            obst.update(phase=phase, detected=detected, completed=completed)
+            obst.update(phase=phase, detected=detected, completed=completed, width_cm=width or obst["width_cm"])
     elif topic == "hump_event":
         note("Terrain", "ok", "Hump #%d detected, height %.1f mm" % (record["index"], record["height_dmm"] / 10))
     elif topic == "terrain":

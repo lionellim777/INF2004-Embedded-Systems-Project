@@ -21,299 +21,472 @@
 #endif
 #ifdef RTOS_RUNTIME_EVIDENCE
 #include "runtime_report.h"
-static const char runtime_topic[]=RTOS_TOPIC_PREFIX "runtime_diag";
+static const char runtime_topic[] = RTOS_TOPIC_PREFIX "runtime_diag";
 static uint32_t runtime_ms;
 static uint8_t runtime_slot;
 #endif
 static mqtt_client_t *client;
 #ifdef RTOS_TRACK
 #include "track_sensor.h"
-static const char scan_topic[]=RTOS_TOPIC_PREFIX "scan_diag";
-static uint16_t scan_run,scan_flight_run;
+static const char scan_topic[] = RTOS_TOPIC_PREFIX "scan_diag";
+static uint16_t scan_run;
+static uint16_t scan_flight_run;
 static unsigned scan_index;
 static bool scan_pending;
-static void scan_ack(void *context,err_t error)
+static void scan_ack(void *context, err_t error)
 {
     (void)context;
-    if(scan_pending && error==ERR_OK && scan_flight_run==scan_run)scan_index++;
-    scan_pending=false;
+    if (scan_pending && error == ERR_OK && scan_flight_run == scan_run)
+    {
+        scan_index++;
+    }
+    scan_pending = false;
 }
 static void scan_export(void)
 {
-    uint16_t run=track_scan_run();
-    if(run!=scan_run){scan_run=run;scan_index=0;}
-    if(scan_pending)return;
-    uint8_t bytes[SCAN_PACKET_BYTES];size_t length=track_scan_export(run,scan_index,bytes);
-    if(!length)return;
-    scan_flight_run=run;scan_pending=true;
+    uint16_t run = track_scan_run();
+    if (run != scan_run)
+    {
+        scan_run = run;
+        scan_index = 0;
+    }
+    if (scan_pending)
+    {
+        return;
+    }
+    uint8_t bytes[SCAN_PACKET_BYTES];
+    size_t length = track_scan_export(run, scan_index, bytes);
+    if (!length)
+    {
+        return;
+    }
+    scan_flight_run = run;
+    scan_pending = true;
     /* One QoS1 request in flight. Advance only on PUBACK; reconnect starts a
      * replay. This low-priority task does no waveform work while driving. */
-    if(mqtt_publish(client,scan_topic,bytes,(u16_t)length,1,0,scan_ack,NULL)!=ERR_OK)scan_pending=false;
+    if (mqtt_publish(client, scan_topic, bytes, (u16_t)length, 1, 0, scan_ack,
+                     NULL) != ERR_OK)
+    {
+        scan_pending = false;
+    }
 }
 #endif
 
-enum { INITIALIZED=1u, CONNECTED=2u, FAILED=4u, FORCE_STATUS=8u,
-       SUB_SHIFT=4u, SUB_MASK=48u, RESULT_PENDING=64u, RETRY_SHIFT=7u, RETRY_MASK=896u,
-       ERROR_SHIFT=10u,ERROR_MASK=15360u,
-       /* Barcode-action preset (RTOS_BARCODE_ACTIONS): its own subscription, made once online so the
-        * three-subscription start-up count above is unchanged, and a report waiting to be published. */
-       ACTIONS_SUBSCRIBED=16384u, ACTIONS_REPORT_PENDING=32768u };
+enum
+{
+    INITIALIZED = 1u,
+    CONNECTED = 2u,
+    FAILED = 4u,
+    FORCE_STATUS = 8u,
+    SUB_SHIFT = 4u,
+    SUB_MASK = 48u,
+    RESULT_PENDING = 64u,
+    RETRY_SHIFT = 7u,
+    RETRY_MASK = 896u,
+    ERROR_SHIFT = 10u,
+    ERROR_MASK = 15360u,
+    /* Barcode-action preset (RTOS_BARCODE_ACTIONS): its own subscription, made
+     * once online so the three-subscription start-up count above is unchanged,
+     * and a report waiting to be published. */
+    ACTIONS_SUBSCRIBED = 16384u,
+    ACTIONS_REPORT_PENDING = 32768u
+};
 /* policy: period bits0..12 (200..5000), state13..15. flags: above, error10..13;
  * bits14..15 only with RTOS_BARCODE_ACTIONS, otherwise zero.
  * Network task is the sole writer; observer reads an aligned halfword. */
-static volatile uint16_t policy=200u;
+static volatile uint16_t policy = 200u;
 /* Keep the complete radio path compiled even in the default unconfigured
- * candidate. No radio init/association is attempted until local configuration. */
-static const volatile uint8_t network_configured=RTOS_NETWORK_CONFIGURED;
-static volatile uint16_t flags; /* one network writer; aligned diagnostic reads */
+ * candidate. No radio init/association is attempted until local configuration.
+ */
+static const volatile uint8_t network_configured = RTOS_NETWORK_CONFIGURED;
+static volatile uint16_t
+    flags; /* one network writer; aligned diagnostic reads */
 static volatile int8_t wifi_link; /* SDK states -3..3; USB diagnostic only */
-static volatile int8_t wifi_pm_result=INT8_MIN; /* not attempted, then SDK result */
-static uint32_t state_ms, status_ms, motion_ms, online_ms, boot_id;
-static uint8_t barcode_latest[BARCODE_RECORD_BYTES],line_latest[LINE_RECORD_BYTES], result;
+static volatile int8_t wifi_pm_result =
+    INT8_MIN; /* not attempted, then SDK result */
+static uint32_t state_ms;
+static uint32_t status_ms;
+static uint32_t motion_ms;
+static uint32_t online_ms;
+static uint32_t boot_id;
+static uint8_t barcode_latest[BARCODE_RECORD_BYTES];
+static uint8_t line_latest[LINE_RECORD_BYTES];
+static uint8_t result;
 #ifdef RTOS_TERRAIN
 #include "terrain_telemetry.h"
 static uint8_t terrain_latest[TERRAIN_RECORD_BYTES];
-static const char terrain_topic[]=RTOS_TOPIC_PREFIX "terrain";
-static const char hump_topic[]=RTOS_TOPIC_PREFIX "hump_event";
-static hump_queue_t humps; /* producer task pushes, network task pops; IRQ lock */
+static const char terrain_topic[] = RTOS_TOPIC_PREFIX "terrain";
+static const char hump_topic[] = RTOS_TOPIC_PREFIX "hump_event";
+static hump_queue_t
+    humps; /* producer task pushes, network task pops; IRQ lock */
 static bool hump_pending;
 static uint8_t hump_flight_index;
 #endif
 #ifdef RTOS_OBSTACLE
 static uint8_t obstacle_latest[OBSTACLE_RECORD_BYTES];
-static const char obstacle_topic[]=RTOS_TOPIC_PREFIX "obstacle";
+static const char obstacle_topic[] = RTOS_TOPIC_PREFIX "obstacle";
 #endif
 static binary_command_frame_t command_frame;
 static struct mqtt_connect_client_info_t info;
 static ip_addr_t address;
-static const char motion_topic[]=RTOS_TOPIC_PREFIX "motion";
-static const char barcode_topic[]=RTOS_TOPIC_PREFIX "barcode";
-static const char line_topic[]=RTOS_TOPIC_PREFIX "line";
-static const char status_topic[]=RTOS_TOPIC_PREFIX "status";
-static const char link_topic[]=RTOS_TOPIC_PREFIX "link";
-static const char status_command[]=RTOS_TOPIC_PREFIX "command/get_status";
-static const char period_command[]=RTOS_TOPIC_PREFIX "command/set_period_ms";
-static const char stop_command[]=RTOS_TOPIC_PREFIX "command/stop";
-static const char result_topic[]=RTOS_TOPIC_PREFIX "command_result";
+static const char motion_topic[] = RTOS_TOPIC_PREFIX "motion";
+static const char barcode_topic[] = RTOS_TOPIC_PREFIX "barcode";
+static const char line_topic[] = RTOS_TOPIC_PREFIX "line";
+static const char status_topic[] = RTOS_TOPIC_PREFIX "status";
+static const char link_topic[] = RTOS_TOPIC_PREFIX "link";
+static const char status_command[] = RTOS_TOPIC_PREFIX "command/get_status";
+static const char period_command[] = RTOS_TOPIC_PREFIX "command/set_period_ms";
+static const char stop_command[] = RTOS_TOPIC_PREFIX "command/stop";
+static const char result_topic[] = RTOS_TOPIC_PREFIX "command_result";
 #ifdef RTOS_BARCODE_ACTIONS
 #include "barcode_actions.h"
-static const char actions_command[]=RTOS_TOPIC_PREFIX "command/set_barcode_actions";
-static const char actions_topic[]=RTOS_TOPIC_PREFIX "barcode_actions";
+static const char actions_command[] =
+    RTOS_TOPIC_PREFIX "command/set_barcode_actions";
+static const char actions_topic[] = RTOS_TOPIC_PREFIX "barcode_actions";
 static uint8_t actions_buffer[BARCODE_ACTION_PACKED_BYTES];
 static size_t actions_received;
-static bool actions_active, actions_bad;
+static bool actions_active;
+static bool actions_bad;
 #endif
 
-uint8_t network_state(void) { return (uint8_t)(policy>>13u); }
-uint8_t network_error(void) { return (uint8_t)((flags&ERROR_MASK)>>ERROR_SHIFT); }
-int8_t network_wifi_link(void) { return wifi_link; }
-int8_t network_wifi_pm_result(void) { return wifi_pm_result; }
+uint8_t network_state(void)
+{
+    return (uint8_t)(policy >> 13u);
+}
+uint8_t network_error(void)
+{
+    return (uint8_t)((flags & ERROR_MASK) >> ERROR_SHIFT);
+}
+int8_t network_wifi_link(void)
+{
+    return wifi_link;
+}
+int8_t network_wifi_pm_result(void)
+{
+    return wifi_pm_result;
+}
 static void error_code(uint8_t code)
-{ flags=(uint16_t)((flags&~ERROR_MASK) | ((uint16_t)code<<ERROR_SHIFT)); }
-static void state(uint8_t value,uint32_t now)
-{ policy=(uint16_t)((policy&8191u) | ((uint16_t)value<<13u)); state_ms=now; }
-bool network_barcode(uint32_t ms,char letter,bool valid,bool simulated)
+{
+    flags = (uint16_t)((flags & ~ERROR_MASK) | ((uint16_t)code << ERROR_SHIFT));
+}
+static void state(uint8_t value, uint32_t now)
+{
+    policy = (uint16_t)((policy & 8191u) | ((uint16_t)value << 13u));
+    state_ms = now;
+}
+bool network_barcode(uint32_t ms, char letter, bool valid, bool simulated)
 {
     uint8_t bytes[BARCODE_RECORD_BYTES];
-    if (!barcode_record_encode(ms,letter,valid,simulated,bytes)) return false;
-    uint32_t irq=save_and_disable_interrupts();
-    memcpy(barcode_latest,bytes,sizeof bytes);
-    restore_interrupts(irq); return true;
+    if (!barcode_record_encode(ms, letter, valid, simulated, bytes))
+    {
+        return false;
+    }
+    uint32_t irq = save_and_disable_interrupts();
+    memcpy(barcode_latest, bytes, sizeof bytes);
+    restore_interrupts(irq);
+    return true;
 }
 static void read_barcode(uint8_t bytes[BARCODE_RECORD_BYTES])
 {
-    uint32_t irq=save_and_disable_interrupts();
-    memcpy(bytes,barcode_latest,BARCODE_RECORD_BYTES);
+    uint32_t irq = save_and_disable_interrupts();
+    memcpy(bytes, barcode_latest, BARCODE_RECORD_BYTES);
     restore_interrupts(irq);
 }
-bool network_line(uint32_t ms,const uint16_t raw[3],uint8_t pattern,bool valid)
+bool network_line(uint32_t ms, const uint16_t raw[3], uint8_t pattern,
+                  bool valid)
 {
     uint8_t b[LINE_RECORD_BYTES];
-    if(!line_record_encode(ms,raw,pattern,valid,b))return false;
-    uint32_t irq=save_and_disable_interrupts();memcpy(line_latest,b,sizeof b);
-    restore_interrupts(irq);return true;
+    if (!line_record_encode(ms, raw, pattern, valid, b))
+    {
+        return false;
+    }
+    uint32_t irq = save_and_disable_interrupts();
+    memcpy(line_latest, b, sizeof b);
+    restore_interrupts(irq);
+    return true;
 }
 static void read_line(uint8_t b[LINE_RECORD_BYTES])
 {
-    uint32_t irq=save_and_disable_interrupts();memcpy(b,line_latest,LINE_RECORD_BYTES);
+    uint32_t irq = save_and_disable_interrupts();
+    memcpy(b, line_latest, LINE_RECORD_BYTES);
     restore_interrupts(irq);
 }
 #ifdef RTOS_TERRAIN
 bool network_terrain(const terrain_reading_t *reading)
 {
     uint8_t b[TERRAIN_RECORD_BYTES];
-    if(!terrain_record_encode(reading,b))return false;
-    uint32_t irq=save_and_disable_interrupts();memcpy(terrain_latest,b,sizeof b);
-    restore_interrupts(irq);return true;
+    if (!terrain_record_encode(reading, b))
+    {
+        return false;
+    }
+    uint32_t irq = save_and_disable_interrupts();
+    memcpy(terrain_latest, b, sizeof b);
+    restore_interrupts(irq);
+    return true;
 }
 static void read_terrain(uint8_t b[TERRAIN_RECORD_BYTES])
 {
-    uint32_t irq=save_and_disable_interrupts();memcpy(b,terrain_latest,TERRAIN_RECORD_BYTES);
+    uint32_t irq = save_and_disable_interrupts();
+    memcpy(b, terrain_latest, TERRAIN_RECORD_BYTES);
     restore_interrupts(irq);
 }
-bool network_hump_event(uint32_t ms,uint8_t index,uint16_t height_dmm)
+bool network_hump_event(uint32_t ms, uint8_t index, uint16_t height_dmm)
 {
-    uint32_t irq=save_and_disable_interrupts();
-    bool queued=hump_queue_push(&humps,ms,index,height_dmm);
-    restore_interrupts(irq);return queued;
+    uint32_t irq = save_and_disable_interrupts();
+    bool queued = hump_queue_push(&humps, ms, index, height_dmm);
+    restore_interrupts(irq);
+    return queued;
 }
-static void hump_ack(void *context,err_t error)
+static void hump_ack(void *context, err_t error)
 {
     (void)context;
     uint8_t head[HUMP_EVENT_BYTES];
-    uint32_t irq=save_and_disable_interrupts();
+    uint32_t irq = save_and_disable_interrupts();
     /* Overflow during flight may have replaced the head; pop only the event
      * the broker actually acknowledged, otherwise send the new head. */
-    if(hump_pending && error==ERR_OK && hump_queue_peek(&humps,head) && head[4]==hump_flight_index)
+    if (hump_pending && error == ERR_OK && hump_queue_peek(&humps, head) &&
+        head[4] == hump_flight_index)
+    {
         hump_queue_pop(&humps);
+    }
     restore_interrupts(irq);
-    hump_pending=false;
+    hump_pending = false;
 }
 static void hump_export(void)
 {
-    if(hump_pending)return;
+    if (hump_pending)
+    {
+        return;
+    }
     uint8_t b[HUMP_EVENT_BYTES];
-    uint32_t irq=save_and_disable_interrupts();
-    bool any=hump_queue_peek(&humps,b);
+    uint32_t irq = save_and_disable_interrupts();
+    bool any = hump_queue_peek(&humps, b);
     restore_interrupts(irq);
-    if(!any)return;
-    hump_flight_index=b[4];hump_pending=true;
-    if(mqtt_publish(client,hump_topic,b,sizeof b,1,0,hump_ack,NULL)!=ERR_OK)hump_pending=false;
+    if (!any)
+    {
+        return;
+    }
+    hump_flight_index = b[4];
+    hump_pending = true;
+    if (mqtt_publish(client, hump_topic, b, sizeof b, 1, 0, hump_ack, NULL) !=
+        ERR_OK)
+    {
+        hump_pending = false;
+    }
 }
 #endif
 #ifdef RTOS_OBSTACLE
 bool network_obstacle(const obstacle_reading_t *reading)
 {
     uint8_t b[OBSTACLE_RECORD_BYTES];
-    if(!obstacle_record_encode(reading,b))return false;
-    uint32_t irq=save_and_disable_interrupts();memcpy(obstacle_latest,b,sizeof b);
-    restore_interrupts(irq);return true;
+    if (!obstacle_record_encode(reading, b))
+    {
+        return false;
+    }
+    uint32_t irq = save_and_disable_interrupts();
+    memcpy(obstacle_latest, b, sizeof b);
+    restore_interrupts(irq);
+    return true;
 }
 static void read_obstacle(uint8_t b[OBSTACLE_RECORD_BYTES])
 {
-    uint32_t irq=save_and_disable_interrupts();memcpy(b,obstacle_latest,OBSTACLE_RECORD_BYTES);
+    uint32_t irq = save_and_disable_interrupts();
+    memcpy(b, obstacle_latest, OBSTACLE_RECORD_BYTES);
     restore_interrupts(irq);
 }
 #endif
-static void fail(uint32_t now,uint8_t code)
+static void fail(uint32_t now, uint8_t code)
 {
-    if (client!=NULL) mqtt_disconnect(client);
-    flags&=(uint16_t)~(CONNECTED|FAILED|SUB_MASK|RESULT_PENDING|ACTIONS_SUBSCRIBED);
-    error_code(code); /* cancellation callbacks must not replace the root cause */
-    command_frame.state=0;
+    if (client != NULL)
+    {
+        mqtt_disconnect(client);
+    }
+    flags &= (uint16_t)~(CONNECTED | FAILED | SUB_MASK | RESULT_PENDING |
+                         ACTIONS_SUBSCRIBED);
+    error_code(
+        code); /* cancellation callbacks must not replace the root cause */
+    command_frame.state = 0;
 #ifdef RTOS_BARCODE_ACTIONS
-    actions_active=false;
+    actions_active = false;
 #endif
-    state(NETWORK_RETRYING,now);
+    state(NETWORK_RETRYING, now);
 #ifdef RTOS_TRACK
-    scan_pending=false;scan_index=0;
+    scan_pending = false;
+    scan_index = 0;
 #endif
 #ifdef RTOS_TERRAIN
-    hump_pending=false;
+    hump_pending = false;
 #endif
 }
-static void connection(mqtt_client_t *c,void *context,mqtt_connection_status_t result_code)
+static void connection(mqtt_client_t *c, void *context,
+                       mqtt_connection_status_t result_code)
 {
-    (void)c; (void)context;
-    if (network_state()!=NETWORK_CONNECTING) return;
-    if (result_code==MQTT_CONNECT_ACCEPTED) flags|=CONNECTED;
-    else {
-        error_code(result_code==MQTT_CONNECT_TIMEOUT?9:
-            result_code==MQTT_CONNECT_DISCONNECTED?11:7);
-        flags|=FAILED;
+    (void)c;
+    (void)context;
+    if (network_state() != NETWORK_CONNECTING)
+    {
+        return;
+    }
+    if (result_code == MQTT_CONNECT_ACCEPTED)
+    {
+        flags |= CONNECTED;
+    }
+    else
+    {
+        error_code(result_code == MQTT_CONNECT_TIMEOUT        ? 9
+                   : result_code == MQTT_CONNECT_DISCONNECTED ? 11
+                                                              : 7);
+        flags |= FAILED;
     }
 }
-static void subscribed(void *context,err_t error)
+static void subscribed(void *context, err_t error)
 {
     (void)context;
-    if (network_state()!=NETWORK_SUBSCRIBING) return;
-    unsigned count=(flags&SUB_MASK)>>SUB_SHIFT;
-    if (error!=ERR_OK || count>=3) { error_code(8);flags|=FAILED; }
-    else flags=(uint16_t)((flags&~SUB_MASK) | ((count+1u)<<SUB_SHIFT));
+    if (network_state() != NETWORK_SUBSCRIBING)
+    {
+        return;
+    }
+    unsigned count = (flags & SUB_MASK) >> SUB_SHIFT;
+    if (error != ERR_OK || count >= 3)
+    {
+        error_code(8);
+        flags |= FAILED;
+    }
+    else
+    {
+        flags = (uint16_t)((flags & ~SUB_MASK) | ((count + 1u) << SUB_SHIFT));
+    }
 }
 #ifdef RTOS_BARCODE_ACTIONS
-static void actions_subscribed(void *context,err_t error)
+static void actions_subscribed(void *context, err_t error)
 {
     (void)context;
-    /* Best effort: if the broker refuses, clear the flag so the next step asks again. */
-    if (error!=ERR_OK) flags&=(uint16_t)~ACTIONS_SUBSCRIBED;
+    /* Best effort: if the broker refuses, clear the flag so the next step asks
+     * again. */
+    if (error != ERR_OK)
+    {
+        flags &= (uint16_t)~ACTIONS_SUBSCRIBED;
+    }
 }
 #endif
-static void incoming(void *context,const char *topic,u32_t length)
+static void incoming(void *context, const char *topic, u32_t length)
 {
     (void)context;
 #ifdef RTOS_BARCODE_ACTIONS
-    actions_active=(topic!=NULL && !strcmp(topic,actions_command));
-    if (actions_active) { actions_received=0; actions_bad=(length!=BARCODE_ACTION_PACKED_BYTES); }
+    actions_active = (topic != NULL && !strcmp(topic, actions_command));
+    if (actions_active)
+    {
+        actions_received = 0;
+        actions_bad = (length != BARCODE_ACTION_PACKED_BYTES);
+    }
 #endif
-    uint8_t kind=topic==NULL?0:!strcmp(topic,status_command)?BINARY_COMMAND_STATUS:
-        !strcmp(topic,period_command)?BINARY_COMMAND_PERIOD:
-        !strcmp(topic,stop_command)?BINARY_COMMAND_STOP:0;
-    (void)binary_command_begin(&command_frame,kind,length);
+    uint8_t kind = topic == NULL                    ? 0
+                   : !strcmp(topic, status_command) ? BINARY_COMMAND_STATUS
+                   : !strcmp(topic, period_command) ? BINARY_COMMAND_PERIOD
+                   : !strcmp(topic, stop_command)   ? BINARY_COMMAND_STOP
+                                                    : 0;
+    (void)binary_command_begin(&command_frame, kind, length);
 }
-static void data(void *context,const u8_t *bytes,u16_t length,u8_t data_flags)
+static void data(void *context, const u8_t *bytes, u16_t length,
+                 u8_t data_flags)
 {
     (void)context;
-    bool last=(data_flags&MQTT_DATA_FLAG_LAST)!=0;
+    bool last = (data_flags & MQTT_DATA_FLAG_LAST) != 0;
 #ifdef RTOS_BARCODE_ACTIONS
-    if (actions_active) {
-        if (!actions_bad && bytes!=NULL && length<=sizeof actions_buffer-actions_received) {
-            memcpy(actions_buffer+actions_received,bytes,length); actions_received+=length;
-        } else actions_bad=true;
-        if (last) {
-            /* An invalid command is recorded as such; either way the car reports its table. */
-            if (!actions_bad && actions_received==sizeof actions_buffer)
-                (void)barcode_actions_apply(actions_buffer,actions_received);
-            else (void)barcode_actions_apply(NULL,0);
-            actions_active=false; flags|=ACTIONS_REPORT_PENDING;
+    if (actions_active)
+    {
+        if (!actions_bad && bytes != NULL &&
+            length <= sizeof actions_buffer - actions_received)
+        {
+            memcpy(actions_buffer + actions_received, bytes, length);
+            actions_received += length;
+        }
+        else
+        {
+            actions_bad = true;
+        }
+        if (last)
+        {
+            /* An invalid command is recorded as such; either way the car
+             * reports its table. */
+            if (!actions_bad && actions_received == sizeof actions_buffer)
+            {
+                (void)barcode_actions_apply(actions_buffer, actions_received);
+            }
+            else
+            {
+                (void)barcode_actions_apply(NULL, 0);
+            }
+            actions_active = false;
+            flags |= ACTIONS_REPORT_PENDING;
         }
         return;
     }
 #endif
-    uint8_t kind=command_frame.state&3u;
+    uint8_t kind = command_frame.state & 3u;
     binary_command_t command;
-    bool accepted=binary_command_append(&command_frame,bytes,length,last,&command);
-    if (last) {
-        result=(uint8_t)((kind<<1u) | (accepted?1u:0u));
-        flags|=RESULT_PENDING;
-        if (accepted) {
-            if (command.kind==BINARY_COMMAND_STOP) board_stop(STOP_BUTTON);
-            else if (command.kind==BINARY_COMMAND_STATUS) flags|=FORCE_STATUS;
-            else if (command.kind==BINARY_COMMAND_PERIOD)
-                policy=(uint16_t)((policy&0xe000u) | command.period_ms);
+    bool accepted =
+        binary_command_append(&command_frame, bytes, length, last, &command);
+    if (last)
+    {
+        result = (uint8_t)((kind << 1u) | (accepted ? 1u : 0u));
+        flags |= RESULT_PENDING;
+        if (accepted)
+        {
+            if (command.kind == BINARY_COMMAND_STOP)
+            {
+                board_stop(STOP_BUTTON);
+            }
+            else if (command.kind == BINARY_COMMAND_STATUS)
+            {
+                flags |= FORCE_STATUS;
+            }
+            else if (command.kind == BINARY_COMMAND_PERIOD)
+            {
+                policy = (uint16_t)((policy & 0xe000u) | command.period_ms);
+            }
         }
     }
 }
-static bool publish(const char *topic,const uint8_t *bytes,size_t length,uint8_t retain)
+static bool publish(const char *topic, const uint8_t *bytes, size_t length,
+                    uint8_t retain)
 {
     /* Length is bytes, never strlen: valid packets routinely contain zeros.
-     * lwIP copies the supplied bytes into its MQTT output ring before return. */
-    return length<=UINT16_MAX && mqtt_publish(client,topic,bytes,(u16_t)length,0,retain,NULL,NULL)==ERR_OK;
+     * lwIP copies the supplied bytes into its MQTT output ring before return.
+     */
+    return length <= UINT16_MAX &&
+           mqtt_publish(client, topic, bytes, (u16_t)length, 0, retain, NULL,
+                        NULL) == ERR_OK;
 }
 #ifdef RTOS_TRACK
 const char *rtos_track_status(void);
-static const char track_status_topic[]=RTOS_TOPIC_PREFIX "track_status";
+static const char track_status_topic[] = RTOS_TOPIC_PREFIX "track_status";
 static const char *track_status_last;
 static uint32_t track_status_ms;
 static uint8_t track_status_faults;
-/* Binary status code of the course controller plus the shared fault bitmask (3 bytes, see
- * binary_protocol.h). Sent when the status or an active fault changes and every 2 s, so the reason a
- * run ended is in the log without USB. The caller skips passes that already published a burst
- * (lwIP has few handles). */
-#define TRACK_STATUS_REPEAT_MS 2000u /* re-send an unchanged status this often */
+/* Binary status code of the course controller plus the shared fault bitmask (3
+ * bytes, see binary_protocol.h). Sent when the status or an active fault
+ * changes and every 2 s, so the reason a run ended is in the log without USB.
+ * The caller skips passes that already published a burst (lwIP has few
+ * handles). */
+/* re-send an unchanged status this often */
+#define TRACK_STATUS_REPEAT_MS 2000u
 static void track_status_publish(uint32_t now)
 {
     const char *s = rtos_track_status();
     uint8_t active = fault_active();
     uint8_t record[TRACK_STATUS_RECORD_BYTES];
     if ((s == track_status_last) && (active == track_status_faults) &&
-        ((uint32_t)(now - track_status_ms) < TRACK_STATUS_REPEAT_MS)) {
+        ((uint32_t)(now - track_status_ms) < TRACK_STATUS_REPEAT_MS))
+    {
         return;
     }
-    if (!track_status_record_encode(s, active, fault_latched(), record)) {
+    if (!track_status_record_encode(s, active, fault_latched(), record))
+    {
         return;
     }
-    if (publish(track_status_topic, record, sizeof record, 0)) {
+    if (publish(track_status_topic, record, sizeof record, 0))
+    {
         track_status_last = s;
         track_status_faults = active;
         track_status_ms = now;
@@ -326,144 +499,276 @@ static void runtime_publish(uint32_t now)
     /* lwIP allocates one of its four request handles even for QoS0. Sending
      * five records in the status burst starves every record after summary.
      * Pace one row and retry that row on backpressure, after motion traffic. */
-    if((uint32_t)(now-runtime_ms)<250u)return;
-    uint8_t bytes[RUNTIME_PACKET_BYTES];size_t length=runtime_report_packet(runtime_slot,now,bytes);
-    if(length && publish(runtime_topic,bytes,length,0)){
-        runtime_ms=now;runtime_slot=(uint8_t)((runtime_slot+1u)%(RUNTIME_TASKS+1u));
+    if ((uint32_t)(now - runtime_ms) < 250u)
+    {
+        return;
+    }
+    uint8_t bytes[RUNTIME_PACKET_BYTES];
+    size_t length = runtime_report_packet(runtime_slot, now, bytes);
+    if (length && publish(runtime_topic, bytes, length, 0))
+    {
+        runtime_ms = now;
+        runtime_slot = (uint8_t)((runtime_slot + 1u) % (RUNTIME_TASKS + 1u));
     }
 }
 #endif
 static void join(uint32_t now)
 {
-    if (cyw43_arch_wifi_connect_async(RTOS_WIFI_SSID,RTOS_WIFI_PASSWORD,CYW43_AUTH_WPA2_AES_PSK)==0)
-        state(NETWORK_JOINING,now);
-    else fail(now,2);
+    if (cyw43_arch_wifi_connect_async(RTOS_WIFI_SSID, RTOS_WIFI_PASSWORD,
+                                      CYW43_AUTH_WPA2_AES_PSK) == 0)
+    {
+        state(NETWORK_JOINING, now);
+    }
+    else
+    {
+        fail(now, 2);
+    }
 }
 static void connect_broker(uint32_t now)
 {
-    if (client==NULL) client=mqtt_client_new();
-    if (client==NULL || !ipaddr_aton(RTOS_BROKER_IPV4,&address)) { fail(now,5); return; }
+    if (client == NULL)
+    {
+        client = mqtt_client_new();
+    }
+    if (client == NULL || !ipaddr_aton(RTOS_BROKER_IPV4, &address))
+    {
+        fail(now, 5);
+        return;
+    }
     /* SDK2.1.1 lwIP only accepts a NUL-terminated will. A one-byte binary
      * link code avoids embedded-NUL truncation without modifying the SDK:
      * 0 unknown, 1 offline, 2 online. Numeric code, not an ASCII digit. */
-    info=(struct mqtt_connect_client_info_t){.client_id="aai10-rtos-motion",
-        /* lwIP rejects empty credential strings (ERR_VAL); NULL means an anonymous broker. */
-        .client_user=RTOS_BROKER_USER[0]?RTOS_BROKER_USER:NULL,
-        .client_pass=RTOS_BROKER_PASSWORD[0]?RTOS_BROKER_PASSWORD:NULL,
-        .keep_alive=15,.will_topic=link_topic,.will_msg="\x01",
-        .will_qos=1,.will_retain=1};
-    mqtt_set_inpub_callback(client,incoming,data,NULL);
-    flags&=(uint16_t)~(CONNECTED|FAILED|SUB_MASK);
-    state(NETWORK_CONNECTING,now);
+    info = (struct mqtt_connect_client_info_t){
+        .client_id = "aai10-rtos-motion",
+        /* lwIP rejects empty credential strings (ERR_VAL); NULL means an
+           anonymous broker. */
+        .client_user = RTOS_BROKER_USER[0] ? RTOS_BROKER_USER : NULL,
+        .client_pass = RTOS_BROKER_PASSWORD[0] ? RTOS_BROKER_PASSWORD : NULL,
+        .keep_alive = 15,
+        .will_topic = link_topic,
+        .will_msg = "\x01",
+        .will_qos = 1,
+        .will_retain = 1};
+    mqtt_set_inpub_callback(client, incoming, data, NULL);
+    flags &= (uint16_t)~(CONNECTED | FAILED | SUB_MASK);
+    state(NETWORK_CONNECTING, now);
 #ifdef RTOS_HUMP_TEST_BOOT
-    err_t connect_error=mqtt_client_connect(client,&address,RTOS_BROKER_PORT,connection,NULL,&info);
-    printf("[NET_DIAG] mqtt_client_connect err=%d ip=%s\n",(int)connect_error,ipaddr_ntoa(netif_ip4_addr(netif_default)));
-    if (connect_error!=ERR_OK) fail(now,6);
+    err_t connect_error = mqtt_client_connect(
+        client, &address, RTOS_BROKER_PORT, connection, NULL, &info);
+    printf("[NET_DIAG] mqtt_client_connect err=%d ip=%s\n", (int)connect_error,
+           ipaddr_ntoa(netif_ip4_addr(netif_default)));
+    if (connect_error != ERR_OK)
+    {
+        fail(now, 6);
+    }
 #else
-    if (mqtt_client_connect(client,&address,RTOS_BROKER_PORT,connection,NULL,&info)!=ERR_OK) fail(now,6);
+    if (mqtt_client_connect(client, &address, RTOS_BROKER_PORT, connection,
+                            NULL, &info) != ERR_OK)
+    {
+        fail(now, 6);
+    }
 #endif
 }
 static void step(uint32_t now)
 {
-    uint8_t current=network_state();
-    int link=cyw43_tcpip_link_status(&cyw43_state,CYW43_ITF_STA);
-    wifi_link=(int8_t)link;
-    if (link==CYW43_LINK_UP) {
+    uint8_t current = network_state();
+    int link = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+    wifi_link = (int8_t)link;
+    if (link == CYW43_LINK_UP)
+    {
         fault_clear(FAULT_WIFI_LOSS);
-    } else if (current!=NETWORK_UNCONFIGURED && current!=NETWORK_JOINING) {
+    }
+    else if (current != NETWORK_UNCONFIGURED && current != NETWORK_JOINING)
+    {
         fault_set(FAULT_WIFI_LOSS);
     }
-    if ((flags&FAILED) || (current!=NETWORK_JOINING && current!=NETWORK_RETRYING && link!=CYW43_LINK_UP)) {
-        fail(now,(flags&FAILED)?network_error():4); return;
+    if ((flags & FAILED) ||
+        (current != NETWORK_JOINING && current != NETWORK_RETRYING &&
+         link != CYW43_LINK_UP))
+    {
+        fail(now, (flags & FAILED) ? network_error() : 4);
+        return;
     }
-    if (current==NETWORK_JOINING) {
-        if (link==CYW43_LINK_UP) connect_broker(now);
-        else if ((uint32_t)(now-state_ms)>=15000u) fail(now,3);
-    } else if (current==NETWORK_CONNECTING) {
-        if (flags&CONNECTED) {
-            flags&=(uint16_t)~SUB_MASK; state(NETWORK_SUBSCRIBING,now);
-            if (mqtt_subscribe(client,status_command,1,subscribed,NULL)!=ERR_OK ||
-                mqtt_subscribe(client,period_command,1,subscribed,NULL)!=ERR_OK ||
-                mqtt_subscribe(client,stop_command,1,subscribed,NULL)!=ERR_OK) fail(now,8);
-        } else if ((uint32_t)(now-state_ms)>=10000u) fail(now,9);
-    } else if (current==NETWORK_SUBSCRIBING) {
-        if (((flags&SUB_MASK)>>SUB_SHIFT)==3u) {
-            state(NETWORK_ONLINE,now); online_ms=now; status_ms=now; motion_ms=now;
-            flags|=FORCE_STATUS;
+    if (current == NETWORK_JOINING)
+    {
+        if (link == CYW43_LINK_UP)
+        {
+            connect_broker(now);
+        }
+        else if ((uint32_t)(now - state_ms) >= 15000u)
+        {
+            fail(now, 3);
+        }
+    }
+    else if (current == NETWORK_CONNECTING)
+    {
+        if (flags & CONNECTED)
+        {
+            flags &= (uint16_t)~SUB_MASK;
+            state(NETWORK_SUBSCRIBING, now);
+            if (mqtt_subscribe(client, status_command, 1, subscribed, NULL) !=
+                    ERR_OK ||
+                mqtt_subscribe(client, period_command, 1, subscribed, NULL) !=
+                    ERR_OK ||
+                mqtt_subscribe(client, stop_command, 1, subscribed, NULL) !=
+                    ERR_OK)
+            {
+                fail(now, 8);
+            }
+        }
+        else if ((uint32_t)(now - state_ms) >= 10000u)
+        {
+            fail(now, 9);
+        }
+    }
+    else if (current == NETWORK_SUBSCRIBING)
+    {
+        if (((flags & SUB_MASK) >> SUB_SHIFT) == 3u)
+        {
+            state(NETWORK_ONLINE, now);
+            online_ms = now;
+            status_ms = now;
+            motion_ms = now;
+            flags |= FORCE_STATUS;
 #ifdef RTOS_BARCODE_ACTIONS
-            flags|=ACTIONS_REPORT_PENDING; /* tell the dashboard what table this boot is using */
+            flags |= ACTIONS_REPORT_PENDING; /* tell the dashboard what table
+                                                this boot is using */
 #endif
             error_code(0);
 #ifdef RTOS_RUNTIME_EVIDENCE
-            runtime_slot=0;runtime_ms=now-250u;
+            runtime_slot = 0;
+            runtime_ms = now - 250u;
 #endif
 #ifdef RTOS_TRACK
-            scan_index=0;scan_pending=false;
+            scan_index = 0;
+            scan_pending = false;
 #endif
-        } else if ((uint32_t)(now-state_ms)>=10000u) fail(now,10);
-    } else if (current==NETWORK_ONLINE) {
+        }
+        else if ((uint32_t)(now - state_ms) >= 10000u)
+        {
+            fail(now, 10);
+        }
+    }
+    else if (current == NETWORK_ONLINE)
+    {
         fault_clear(FAULT_MQTT_LOSS);
-        if (!mqtt_client_is_connected(client)) {
+        if (!mqtt_client_is_connected(client))
+        {
             fault_set(FAULT_MQTT_LOSS);
-            fail(now,11);
+            fail(now, 11);
             return;
         }
-        if ((uint32_t)(now-online_ms)>=30000u) flags&=(uint16_t)~RETRY_MASK;
+        if ((uint32_t)(now - online_ms) >= 30000u)
+        {
+            flags &= (uint16_t)~RETRY_MASK;
+        }
 #ifdef RTOS_BARCODE_ACTIONS
-        if (!(flags&ACTIONS_SUBSCRIBED) &&
-            mqtt_subscribe(client,actions_command,1,actions_subscribed,NULL)==ERR_OK) flags|=ACTIONS_SUBSCRIBED;
-        if (flags&ACTIONS_REPORT_PENDING) {
-            uint8_t report[BARCODE_ACTION_REPORT_BYTES]; barcode_actions_report(report);
-            if (publish(actions_topic,report,sizeof report,1)) flags&=(uint16_t)~ACTIONS_REPORT_PENDING;
+        if (!(flags & ACTIONS_SUBSCRIBED) &&
+            mqtt_subscribe(client, actions_command, 1, actions_subscribed,
+                           NULL) == ERR_OK)
+        {
+            flags |= ACTIONS_SUBSCRIBED;
         }
-#endif
-        bool burst=false;
-        if ((flags&FORCE_STATUS) || (uint32_t)(now-status_ms)>=1000u) {
-            burst=true;
-            uint8_t barcode[5],status_bytes[10],motion[MOTION_RECORD_BYTES],line[LINE_RECORD_BYTES]; read_barcode(barcode);read_line(line);
-            board_read(motion);
-            uint8_t available=(uint8_t)((motion[12]&1u) | ((barcode[4]&32u)?2u:0u) | ((line[8]&128u)?4u:0u));
-#ifdef RTOS_TERRAIN
-            uint8_t terrain[TERRAIN_RECORD_BYTES];read_terrain(terrain);
-            if(terrain[4]&1u)available|=8u;
-#endif
-#ifdef RTOS_OBSTACLE
-            uint8_t obstacle[OBSTACLE_RECORD_BYTES];read_obstacle(obstacle);
-            if(obstacle[4]&1u)available|=16u;
-#endif
-            uint8_t simulated=(barcode[4]&64u)?2u:0u;
-            (void)status_record_encode(now,boot_id,available,simulated,NETWORK_ONLINE,status_bytes);
-            uint8_t online_code=2;
-            bool status_ok=publish(status_topic,status_bytes,sizeof status_bytes,1);
-            bool link_ok=publish(link_topic,&online_code,1,1);
-            if (status_ok && link_ok) {
-                flags&=(uint16_t)~FORCE_STATUS; status_ms=now;
+        if (flags & ACTIONS_REPORT_PENDING)
+        {
+            uint8_t report[BARCODE_ACTION_REPORT_BYTES];
+            barcode_actions_report(report);
+            if (publish(actions_topic, report, sizeof report, 1))
+            {
+                flags &= (uint16_t)~ACTIONS_REPORT_PENDING;
             }
-            (void)publish(barcode_topic,barcode,sizeof barcode,0);
-#ifdef RTOS_TRACK
-            uint8_t scan[SCAN_PACKET_BYTES];size_t scan_length=track_scan_state(scan);
-            if(scan_length)(void)publish(scan_topic,scan,scan_length,0);
-#endif
         }
-        if (flags&RESULT_PENDING)
-            if (publish(result_topic,&result,1,0)) flags&=(uint16_t)~RESULT_PENDING;
-        if ((uint32_t)(now-motion_ms)>=(policy&8191u)) {
-            burst=true;
-            uint8_t motion[MOTION_RECORD_BYTES]; board_read(motion);
-            if (publish(motion_topic,motion,sizeof motion,0)) motion_ms=now;
-            uint8_t line[LINE_RECORD_BYTES];read_line(line);
-            (void)publish(line_topic,line,sizeof line,0);
+#endif
+        bool burst = false;
+        if ((flags & FORCE_STATUS) || (uint32_t)(now - status_ms) >= 1000u)
+        {
+            burst = true;
+            uint8_t barcode[5];
+            uint8_t status_bytes[10];
+            uint8_t motion[MOTION_RECORD_BYTES];
+            uint8_t line[LINE_RECORD_BYTES];
+            read_barcode(barcode);
+            read_line(line);
+            board_read(motion);
+            uint8_t available =
+                (uint8_t)((motion[12] & 1u) | ((barcode[4] & 32u) ? 2u : 0u) |
+                          ((line[8] & 128u) ? 4u : 0u));
 #ifdef RTOS_TERRAIN
-            uint8_t terrain[TERRAIN_RECORD_BYTES];read_terrain(terrain);
-            (void)publish(terrain_topic,terrain,sizeof terrain,0);
+            uint8_t terrain[TERRAIN_RECORD_BYTES];
+            read_terrain(terrain);
+            if (terrain[4] & 1u)
+            {
+                available |= 8u;
+            }
 #endif
 #ifdef RTOS_OBSTACLE
-            uint8_t obstacle[OBSTACLE_RECORD_BYTES];read_obstacle(obstacle);
-            if(obstacle[4]&1u)(void)publish(obstacle_topic,obstacle,sizeof obstacle,0);
+            uint8_t obstacle[OBSTACLE_RECORD_BYTES];
+            read_obstacle(obstacle);
+            if (obstacle[4] & 1u)
+            {
+                available |= 16u;
+            }
+#endif
+            uint8_t simulated = (barcode[4] & 64u) ? 2u : 0u;
+            (void)status_record_encode(now, boot_id, available, simulated,
+                                       NETWORK_ONLINE, status_bytes);
+            uint8_t online_code = 2;
+            bool status_ok =
+                publish(status_topic, status_bytes, sizeof status_bytes, 1);
+            bool link_ok = publish(link_topic, &online_code, 1, 1);
+            if (status_ok && link_ok)
+            {
+                flags &= (uint16_t)~FORCE_STATUS;
+                status_ms = now;
+            }
+            (void)publish(barcode_topic, barcode, sizeof barcode, 0);
+#ifdef RTOS_TRACK
+            uint8_t scan[SCAN_PACKET_BYTES];
+            size_t scan_length = track_scan_state(scan);
+            if (scan_length)
+            {
+                (void)publish(scan_topic, scan, scan_length, 0);
+            }
+#endif
+        }
+        if (flags & RESULT_PENDING)
+        {
+            if (publish(result_topic, &result, 1, 0))
+            {
+                flags &= (uint16_t)~RESULT_PENDING;
+            }
+        }
+        if ((uint32_t)(now - motion_ms) >= (policy & 8191u))
+        {
+            burst = true;
+            uint8_t motion[MOTION_RECORD_BYTES];
+            board_read(motion);
+            if (publish(motion_topic, motion, sizeof motion, 0))
+            {
+                motion_ms = now;
+            }
+            uint8_t line[LINE_RECORD_BYTES];
+            read_line(line);
+            (void)publish(line_topic, line, sizeof line, 0);
+#ifdef RTOS_TERRAIN
+            uint8_t terrain[TERRAIN_RECORD_BYTES];
+            read_terrain(terrain);
+            (void)publish(terrain_topic, terrain, sizeof terrain, 0);
+#endif
+#ifdef RTOS_OBSTACLE
+            uint8_t obstacle[OBSTACLE_RECORD_BYTES];
+            read_obstacle(obstacle);
+            if (obstacle[4] & 1u)
+            {
+                (void)publish(obstacle_topic, obstacle, sizeof obstacle, 0);
+            }
 #endif
         }
 #ifdef RTOS_TRACK
-        if(!burst)track_status_publish(now);
+        if (!burst)
+        {
+            track_status_publish(now);
+        }
 #else
         (void)burst;
 #endif
@@ -476,46 +781,85 @@ static void step(uint32_t now)
 #ifdef RTOS_TERRAIN
         hump_export();
 #endif
-    } else if (current==NETWORK_RETRYING) {
-        unsigned shift=(flags&RETRY_MASK)>>RETRY_SHIFT;
-        uint32_t delay=1000u<<shift; if (delay>30000u) delay=30000u;
-        if ((uint32_t)(now-state_ms)>=delay) {
-            if (shift<5) flags=(uint16_t)((flags&~RETRY_MASK) | ((shift+1u)<<RETRY_SHIFT));
-            if (link==CYW43_LINK_UP) connect_broker(now); else join(now);
+    }
+    else if (current == NETWORK_RETRYING)
+    {
+        unsigned shift = (flags & RETRY_MASK) >> RETRY_SHIFT;
+        uint32_t delay = 1000u << shift;
+        if (delay > 30000u)
+        {
+            delay = 30000u;
+        }
+        if ((uint32_t)(now - state_ms) >= delay)
+        {
+            if (shift < 5)
+            {
+                flags = (uint16_t)((flags & ~RETRY_MASK) |
+                                   ((shift + 1u) << RETRY_SHIFT));
+            }
+            if (link == CYW43_LINK_UP)
+            {
+                connect_broker(now);
+            }
+            else
+            {
+                join(now);
+            }
         }
     }
 }
 static bool initialize_radio(void)
 {
-    if (cyw43_arch_init()!=0) return false;
+    if (cyw43_arch_init() != 0)
+    {
+        return false;
+    }
     cyw43_arch_enable_sta_mode();
     /* Robot command latency takes precedence over radio power saving.
      * SDK requires this after STA setup. Failure remains visible over USB
      * without preventing otherwise usable Wi-Fi association. */
-    wifi_pm_result=(int8_t)cyw43_wifi_pm(&cyw43_state,CYW43_NONE_PM);
+    wifi_pm_result = (int8_t)cyw43_wifi_pm(&cyw43_state, CYW43_NONE_PM);
     return true;
 }
-void network_task(int start_code,void *context)
+void network_task(int start_code, void *context)
 {
-    (void)start_code; (void)context;
-    boot_id=get_rand_32();
-    for (;;) {
+    (void)start_code;
+    (void)context;
+    boot_id = get_rand_32();
+    for (;;)
+    {
 #ifdef RTOS_RUNTIME_EVIDENCE
-        runtime_span_t span=runtime_measure_begin(RUNTIME_NETWORK,time_us_32());
+        runtime_span_t span =
+            runtime_measure_begin(RUNTIME_NETWORK, time_us_32());
 #endif
-        uint32_t now=to_ms_since_boot(get_absolute_time());
-        if (network_configured) {
-            if (!(flags&INITIALIZED)) {
-                if (network_state()!=NETWORK_RETRYING || (uint32_t)(now-state_ms)>=1000u) {
-                    if (initialize_radio()) {
-                        flags|=INITIALIZED; join(now);
-                    } else fail(now,1);
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        if (network_configured)
+        {
+            if (!(flags & INITIALIZED))
+            {
+                if (network_state() != NETWORK_RETRYING ||
+                    (uint32_t)(now - state_ms) >= 1000u)
+                {
+                    if (initialize_radio())
+                    {
+                        flags |= INITIALIZED;
+                        join(now);
+                    }
+                    else
+                    {
+                        fail(now, 1);
+                    }
                 }
-            } else { cyw43_arch_poll(); step(now); }
+            }
+            else
+            {
+                cyw43_arch_poll();
+                step(now);
+            }
         }
 #ifdef RTOS_RUNTIME_EVIDENCE
-        runtime_measure_end(RUNTIME_NETWORK,span,time_us_32());
+        runtime_measure_end(RUNTIME_NETWORK, span, time_us_32());
 #endif
-        mtk_bridge_delay_ms(network_configured?5:1000);
+        mtk_bridge_delay_ms(network_configured ? 5 : 1000);
     }
 }

@@ -4,9 +4,8 @@
 
 #include <tk/tkernel.h>
 
-bool
-mtk_bridge_start_task(void (*p_task)(int, void *),
-                      int priority, int stack_size)
+bool mtk_bridge_start_task(void (*p_task)(int, void *), int priority,
+                           int stack_size)
 {
     bool b_is_started = false;
     ID task_id = 0;
@@ -32,8 +31,7 @@ mtk_bridge_start_task(void (*p_task)(int, void *),
     return (b_is_started);
 }
 
-int32_t
-mtk_bridge_create_mutex(void)
+int32_t mtk_bridge_create_mutex(void)
 {
     T_CMTX mutex_config = {0};
 
@@ -41,14 +39,12 @@ mtk_bridge_create_mutex(void)
     return ((int32_t)tk_cre_mtx(&mutex_config));
 }
 
-void
-mtk_bridge_delete_mutex(int32_t mutex_id)
+void mtk_bridge_delete_mutex(int32_t mutex_id)
 {
     (void)tk_del_mtx((ID)mutex_id);
 }
 
-bool
-mtk_bridge_lock_mutex(int32_t mutex_id, bool b_wait)
+bool mtk_bridge_lock_mutex(int32_t mutex_id, bool b_wait)
 {
     TMO timeout = TMO_POL;
 
@@ -60,20 +56,17 @@ mtk_bridge_lock_mutex(int32_t mutex_id, bool b_wait)
     return (E_OK == tk_loc_mtx((ID)mutex_id, timeout));
 }
 
-void
-mtk_bridge_unlock_mutex(int32_t mutex_id)
+void mtk_bridge_unlock_mutex(int32_t mutex_id)
 {
     (void)tk_unl_mtx((ID)mutex_id);
 }
 
-void
-mtk_bridge_delay_ms(uint32_t delay_ms)
+void mtk_bridge_delay_ms(uint32_t delay_ms)
 {
     (void)tk_dly_tsk((RELTIM)delay_ms);
 }
 
-void
-mtk_bridge_sleep_forever(void)
+void mtk_bridge_sleep_forever(void)
 {
     (void)tk_slp_tsk(TMO_FEVR);
 }

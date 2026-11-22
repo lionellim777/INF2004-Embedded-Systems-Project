@@ -28,6 +28,14 @@ TYPES = [
     ("tilt_alert_t", "tilt_alert.h", "tilt_alert_t", []),
     ("motion_class_state_t", "motion_class.h", "motion_class_state_t", []),
     ("terrain_status_t", "terrain.h", "terrain_status_t", []),
+    ("barcode_sample_stats_t", "barcode_acquisition.h", "barcode_sample_stats_t", []),
+    ("barcode_sampler_t", "barcode_acquisition.h", "barcode_sampler_t", []),
+    ("barcode_capture_t", "barcode_acquisition.h", "barcode_capture_t", []),
+    ("barcode_reader_t", "barcode_reader.h", "barcode_reader_t", []),
+    ("barcode_waveform_t", "barcode_waveform.h", "barcode_waveform_t", []),
+    ("ir_roles_t", "line_check.h", "ir_roles_t", []),
+    ("scan_state_t", "scan_diagnostic.h", "scan_state_t", []),
+    ("obstacle_range_t", "obstacle_io.h", "obstacle_range_t", []),
 ]
 
 

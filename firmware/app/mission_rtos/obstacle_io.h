@@ -1,13 +1,15 @@
 #ifndef RTOS_OBSTACLE_IO_H
 #define RTOS_OBSTACLE_IO_H
 #include <stdbool.h>
+#include "control_representation.h"
 
-typedef struct {
+typedef struct
+{
     float cm;
     const char *error;
-    bool fresh;
-    bool valid;
-    bool no_return;
+    bool fresh ROBOCAR_BIT1;
+    bool valid ROBOCAR_BIT1;
+    bool no_return ROBOCAR_BIT1;
 } obstacle_range_t;
 
 bool obstacle_io_init(void);

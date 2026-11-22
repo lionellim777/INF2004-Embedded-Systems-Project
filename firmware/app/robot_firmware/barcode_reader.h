@@ -3,19 +3,22 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "control_representation.h"
 
 #include "barcode_decoder.h"
 
-typedef struct {
+typedef struct
+{
     uint32_t edge_us;
     uint32_t last_emit_us;
     barcode_runs_t runs;
     uint8_t run_count;
     char last_letter;
-    bool level_black;
-    bool active;
-    bool armed;
-    bool search_frames; /* independent optical stream: slide past rejected prefixes */
+    bool level_black ROBOCAR_BIT1;
+    bool active ROBOCAR_BIT1;
+    bool armed ROBOCAR_BIT1;
+    bool search_frames ROBOCAR_BIT1; /* independent optical stream: slide past
+                           rejected prefixes */
 } barcode_reader_t;
 
 void barcode_reader_init(barcode_reader_t *reader);

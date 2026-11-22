@@ -61,6 +61,54 @@
       "before": 68,
       "after": 60,
       "saved": 8
+    },
+    {
+      "type": "barcode_sample_stats_t",
+      "before": 56,
+      "after": 52,
+      "saved": 4
+    },
+    {
+      "type": "barcode_sampler_t",
+      "before": 904,
+      "after": 896,
+      "saved": 8
+    },
+    {
+      "type": "barcode_capture_t",
+      "before": 408,
+      "after": 396,
+      "saved": 12
+    },
+    {
+      "type": "barcode_reader_t",
+      "before": 88,
+      "after": 84,
+      "saved": 4
+    },
+    {
+      "type": "barcode_waveform_t",
+      "before": 73596,
+      "after": 73588,
+      "saved": 8
+    },
+    {
+      "type": "ir_roles_t",
+      "before": 3,
+      "after": 1,
+      "saved": 2
+    },
+    {
+      "type": "scan_state_t",
+      "before": 52,
+      "after": 48,
+      "saved": 4
+    },
+    {
+      "type": "obstacle_range_t",
+      "before": 12,
+      "after": 12,
+      "saved": 0
     }
   ],
   "note": "Nested types are counted inside their containers; do not add the rows together."

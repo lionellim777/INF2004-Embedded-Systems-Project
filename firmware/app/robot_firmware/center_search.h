@@ -7,104 +7,231 @@
  * limits an uncommanded search; it is not a guarantee of barcode clearance.
  * Encoder caps
  * limit sweep, time/stall checks limit a blocked or disconnected drive. */
-typedef struct {
-    uint64_t start_us,stage_us,last_us,left_us,right_us,confirm_us;
-    int32_t origin_l,origin_r,peak_l,peak_r;
-    int32_t confirm_l,confirm_r,settle_l,settle_r,coast_l,coast_r;
-    uint64_t still_us,black_us,white_us;
+typedef struct
+{
+    uint64_t start_us;
+    uint64_t stage_us;
+    uint64_t last_us;
+    uint64_t left_us;
+    uint64_t right_us;
+    uint64_t confirm_us;
+    int32_t origin_l;
+    int32_t origin_r;
+    int32_t peak_l;
+    int32_t peak_r;
+    int32_t confirm_l;
+    int32_t confirm_r;
+    int32_t settle_l;
+    int32_t settle_r;
+    int32_t coast_l;
+    int32_t coast_r;
+    uint64_t still_us;
+    uint64_t black_us;
+    uint64_t white_us;
 #if ROBOCAR_COMPACT_CONTROL_STATE
-    bool black_tracking:1,reversed:1,confirming:1,found:1;
-    bool retry_confirmation:1,extended_recovery:1;
+    bool black_tracking : 1;
+    bool reversed : 1;
+    bool confirming : 1;
+    bool found : 1;
+    bool retry_confirmation : 1;
+    bool extended_recovery : 1;
 #else
     bool black_tracking;
 #endif
     int direction;
     int32_t limit;
 #if !ROBOCAR_COMPACT_CONTROL_STATE
-    bool reversed,confirming,found;
-    bool retry_confirmation,extended_recovery;
+    bool reversed;
+    bool confirming;
+    bool found;
+    bool retry_confirmation;
+    bool extended_recovery;
 #endif
-    unsigned confirmation_retries,sweep;
-    uint32_t budget_us; /* total search time before CENTER_LINE_NOT_REACQUIRED */
+    unsigned confirmation_retries;
+    unsigned sweep;
+    uint32_t
+        budget_us; /* total search time before CENTER_LINE_NOT_REACQUIRED */
 } center_search_t;
-static inline void center_search_begin(center_search_t *s,int direction,
-                                      int32_t l,int32_t r,uint64_t now)
+static inline void center_search_begin(center_search_t *s, int direction,
+                                       int32_t l, int32_t r, uint64_t now)
 {
-    *s=(center_search_t){.start_us=now,.stage_us=now,.last_us=now,
-        .left_us=now,.right_us=now,.origin_l=l,.origin_r=r,.direction=direction,.limit=120,.budget_us=3000000u};
+    *s = (center_search_t){.start_us = now,
+                           .stage_us = now,
+                           .last_us = now,
+                           .left_us = now,
+                           .right_us = now,
+                           .origin_l = l,
+                           .origin_r = r,
+                           .direction = direction,
+                           .limit = 120,
+                           .budget_us = 3000000u};
 }
-static inline line_check_output_t center_search_step(center_search_t *s,bool center,
-                                                   int32_t l,int32_t r,uint64_t now)
+static inline line_check_output_t center_search_step(center_search_t *s,
+                                                     bool center, int32_t l,
+                                                     int32_t r, uint64_t now)
 {
-    if(now<s->last_us || now-s->last_us>250000u)
-        return (line_check_output_t){0,0,true,"CENTER_SEARCH_CONTROL_LATE"};
-    s->last_us=now;
-    if(now-s->start_us>=s->budget_us)
-        return (line_check_output_t){0,0,true,"CENTER_LINE_NOT_REACQUIRED"};
+    if (now < s->last_us || now - s->last_us > 250000u)
+    {
+        return (line_check_output_t){0, 0, true, "CENTER_SEARCH_CONTROL_LATE"};
+    }
+    s->last_us = now;
+    if (now - s->start_us >= s->budget_us)
+    {
+        return (line_check_output_t){0, 0, true, "CENTER_LINE_NOT_REACQUIRED"};
+    }
     /* Once a candidate is seen WITHIN the sweep budget, hold zero power.
      * A separate, bounded settling window may cross the soft sweep boundary;
      * it can never add powered travel or reverse while confirming. */
-    if(s->confirming){
-        int64_t cl=(int64_t)l-s->confirm_l,cr=(int64_t)r-s->confirm_r;
-        if(cl<0)cl=-cl;
-        if(cr<0)cr=-cr;
-        if(cl>s->coast_l)s->coast_l=(int32_t)cl;
-        if(cr>s->coast_r)s->coast_r=(int32_t)cr;
-        if(cl>80 || cr>80)return (line_check_output_t){0,0,true,"CENTER_SETTLE_TRAVEL_LIMIT"};
-        int64_t ml=(int64_t)l-s->settle_l,mr=(int64_t)r-s->settle_r;
-        if(ml>2 || ml< -2 || mr>2 || mr< -2){
-            s->settle_l=l;s->settle_r=r;s->still_us=now;
+    if (s->confirming)
+    {
+        int64_t cl = (int64_t)l - s->confirm_l, cr = (int64_t)r - s->confirm_r;
+        if (cl < 0)
+        {
+            cl = -cl;
         }
-        if(!center){if(s->black_tracking)s->white_us=now;s->black_tracking=false;}
-        else if(!s->black_tracking){s->black_tracking=true;s->black_us=now;}
-        if(center && now-s->still_us>=50000u && now-s->black_us>=30000u){
-            s->found=true;return (line_check_output_t){0,0,false,"CENTER_LINE_REACQUIRED"};
+        if (cr < 0)
+        {
+            cr = -cr;
         }
-        if(s->retry_confirmation && !center && now-s->white_us>=30000u && now-s->confirm_us>=80000u && now-s->still_us>=50000u){
+        if (cl > s->coast_l)
+        {
+            s->coast_l = (int32_t)cl;
+        }
+        if (cr > s->coast_r)
+        {
+            s->coast_r = (int32_t)cr;
+        }
+        if (cl > 80 || cr > 80)
+        {
+            return (line_check_output_t){0, 0, true,
+                                         "CENTER_SETTLE_TRAVEL_LIMIT"};
+        }
+        int64_t ml = (int64_t)l - s->settle_l, mr = (int64_t)r - s->settle_r;
+        if (ml > 2 || ml < -2 || mr > 2 || mr < -2)
+        {
+            s->settle_l = l;
+            s->settle_r = r;
+            s->still_us = now;
+        }
+        if (!center)
+        {
+            if (s->black_tracking)
+            {
+                s->white_us = now;
+            }
+            s->black_tracking = false;
+        }
+        else if (!s->black_tracking)
+        {
+            s->black_tracking = true;
+            s->black_us = now;
+        }
+        if (center && now - s->still_us >= 50000u &&
+            now - s->black_us >= 30000u)
+        {
+            s->found = true;
+            return (line_check_output_t){0, 0, false, "CENTER_LINE_REACQUIRED"};
+        }
+        if (s->retry_confirmation && !center && now - s->white_us >= 30000u &&
+            now - s->confirm_us >= 80000u && now - s->still_us >= 50000u)
+        {
             /* Keep original sweep origins, stage deadline and total3s budget.
              * Return zero power this tick; next tick resumes bounded search. */
-            s->confirming=false;s->black_tracking=false;s->confirmation_retries++;
-            s->left_us=s->right_us=now;
-            return (line_check_output_t){0,0,false,"CENTER_CONFIRM_RETRY"};
+            s->confirming = false;
+            s->black_tracking = false;
+            s->confirmation_retries++;
+            s->left_us = s->right_us = now;
+            return (line_check_output_t){0, 0, false, "CENTER_CONFIRM_RETRY"};
         }
-        if(now-s->confirm_us>=300000u)
-            return (line_check_output_t){0,0,true,"CENTER_CONFIRMATION_TIMEOUT"};
-        return (line_check_output_t){0,0,false,"CENTER_STOP_CONFIRM"};
+        if (now - s->confirm_us >= 300000u)
+        {
+            return (line_check_output_t){0, 0, true,
+                                         "CENTER_CONFIRMATION_TIMEOUT"};
+        }
+        return (line_check_output_t){0, 0, false, "CENTER_STOP_CONFIRM"};
     }
     /* Right pivot: left forward, right reverse. Left pivot is the inverse. */
-    int32_t dl=(l-s->origin_l)*s->direction;
-    int32_t dr=-(r-s->origin_r)*s->direction;
-    if(dl< -64 || dr< -64)
-        return (line_check_output_t){0,0,true,"CENTER_SEARCH_WRONG_DIRECTION"};
-    if(dl>s->peak_l){s->peak_l=dl;s->left_us=now;}
-    if(dr>s->peak_r){s->peak_r=dr;s->right_us=now;}
-    if(now-s->left_us>=1000000u || now-s->right_us>=1000000u)
-        return (line_check_output_t){0,0,true,"CENTER_SEARCH_ENCODER_STALL"};
-    int32_t cap=s->sweep>=2?(int32_t)(2*s->sweep)*s->limit:s->reversed?2*s->limit:s->limit;
-    if(center && dl<cap && dr<cap){
-        s->confirming=true;s->confirm_us=s->still_us=s->black_us=now;
-        s->confirm_l=s->settle_l=l;s->confirm_r=s->settle_r=r;s->black_tracking=true;
-        return (line_check_output_t){0,0,false,"CENTER_STOP_CONFIRM"};
+    int32_t dl = (l - s->origin_l) * s->direction;
+    int32_t dr = -(r - s->origin_r) * s->direction;
+    if (dl < -64 || dr < -64)
+    {
+        return (line_check_output_t){0, 0, true,
+                                     "CENTER_SEARCH_WRONG_DIRECTION"};
     }
-    if(dl>=cap || dr>=cap || now-s->stage_us>=1200000u){
-        if(s->reversed && (!s->extended_recovery || s->sweep>=3))return (line_check_output_t){0,0,true,"CENTER_LINE_NOT_REACQUIRED"};
-        bool widening=s->reversed;s->sweep=widening?s->sweep+1u:1u;
-        s->reversed=true;s->direction=-s->direction;
-        s->origin_l=l;s->origin_r=r;s->peak_l=s->peak_r=0;
-        s->stage_us=s->left_us=s->right_us=now;
-        return (line_check_output_t){0,0,false,widening?"CENTER_SEARCH_WIDEN":"CENTER_SEARCH_REVERSE"};
+    if (dl > s->peak_l)
+    {
+        s->peak_l = dl;
+        s->left_us = now;
     }
-    if(now-s->stage_us<50000u)return (line_check_output_t){0,0,false,"CENTER_SEARCH_BRAKE"};
+    if (dr > s->peak_r)
+    {
+        s->peak_r = dr;
+        s->right_us = now;
+    }
+    if (now - s->left_us >= 1000000u || now - s->right_us >= 1000000u)
+    {
+        return (line_check_output_t){0, 0, true, "CENTER_SEARCH_ENCODER_STALL"};
+    }
+    int32_t cap = s->sweep >= 2 ? (int32_t)(2 * s->sweep) * s->limit
+                  : s->reversed ? 2 * s->limit
+                                : s->limit;
+    if (center && dl < cap && dr < cap)
+    {
+        s->confirming = true;
+        s->confirm_us = s->still_us = s->black_us = now;
+        s->confirm_l = s->settle_l = l;
+        s->confirm_r = s->settle_r = r;
+        s->black_tracking = true;
+        return (line_check_output_t){0, 0, false, "CENTER_STOP_CONFIRM"};
+    }
+    if (dl >= cap || dr >= cap || now - s->stage_us >= 1200000u)
+    {
+        if (s->reversed && (!s->extended_recovery || s->sweep >= 3))
+        {
+            return (line_check_output_t){0, 0, true,
+                                         "CENTER_LINE_NOT_REACQUIRED"};
+        }
+        bool widening = s->reversed;
+        s->sweep = widening ? s->sweep + 1u : 1u;
+        s->reversed = true;
+        s->direction = -s->direction;
+        s->origin_l = l;
+        s->origin_r = r;
+        s->peak_l = s->peak_r = 0;
+        s->stage_us = s->left_us = s->right_us = now;
+        return (line_check_output_t){0, 0, false,
+                                     widening ? "CENTER_SEARCH_WIDEN"
+                                              : "CENTER_SEARCH_REVERSE"};
+    }
+    if (now - s->stage_us < 50000u)
+    {
+        return (line_check_output_t){0, 0, false, "CENTER_SEARCH_BRAKE"};
+    }
     /* v5.33 physical pivot stalled with BOTH wheels free at fixed18% duty.
      * Raise only a non-progressing wheel after150ms, capped at28%. Fresh
      * progress restores18%; stall deadline and sweep caps never extend. */
-    uint64_t ll=now-s->left_us,rr=now-s->right_us;
-    float ld=0.18f,rd=0.18f;
-    if(ll>150000u)ld+=0.20f*(float)(ll-150000u)/1000000.0f;
-    if(rr>150000u)rd+=0.20f*(float)(rr-150000u)/1000000.0f;
-    if(ld>0.28f)ld=0.28f;
-    if(rd>0.28f)rd=0.28f;
-    return (line_check_output_t){ld*s->direction,-rd*s->direction,false,
-        ld>0.18f||rd>0.18f?"CENTER_SEARCH_ASSIST":s->direction<0?"CENTER_SEARCH_LEFT":"CENTER_SEARCH_RIGHT"};
+    uint64_t ll = now - s->left_us, rr = now - s->right_us;
+    float ld = 0.18f, rd = 0.18f;
+    if (ll > 150000u)
+    {
+        ld += 0.20f * (float)(ll - 150000u) / 1000000.0f;
+    }
+    if (rr > 150000u)
+    {
+        rd += 0.20f * (float)(rr - 150000u) / 1000000.0f;
+    }
+    if (ld > 0.28f)
+    {
+        ld = 0.28f;
+    }
+    if (rd > 0.28f)
+    {
+        rd = 0.28f;
+    }
+    return (line_check_output_t){ld * s->direction, -rd * s->direction, false,
+                                 ld > 0.18f || rd > 0.18f
+                                     ? "CENTER_SEARCH_ASSIST"
+                                 : s->direction < 0 ? "CENTER_SEARCH_LEFT"
+                                                    : "CENTER_SEARCH_RIGHT"};
 }
 #endif

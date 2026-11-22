@@ -25,11 +25,20 @@ bool measurement_command(int ch, bool idle, uint64_t now_us);
 /* Call every main-loop iteration. Cheap when inactive. */
 void measurement_poll(bool idle, uint64_t now_us);
 #else
-static inline void measurement_init(void) {}
+static inline void measurement_init(void)
+{
+}
 static inline bool measurement_command(int ch, bool idle, uint64_t now_us)
 {
-    (void)ch; (void)idle; (void)now_us; return false;
+    (void)ch;
+    (void)idle;
+    (void)now_us;
+    return false;
 }
-static inline void measurement_poll(bool idle, uint64_t now_us) { (void)idle; (void)now_us; }
+static inline void measurement_poll(bool idle, uint64_t now_us)
+{
+    (void)idle;
+    (void)now_us;
+}
 #endif
 #endif

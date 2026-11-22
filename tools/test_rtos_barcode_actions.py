@@ -39,11 +39,11 @@ class TrackStatus(unittest.TestCase):
                 decode(self.TOPIC, bad)
 
 
-def obstacle_payload(phase, servo=90, range_mm=None, detected=0, completed=0, active=True):
+def obstacle_payload(phase, servo=90, range_mm=None, detected=0, completed=0, active=True, width_cm=0):
     """Same bit layout as obstacle_record_encode in binary_protocol.c."""
     fields = 0
     if active:
-        fields = 1 | phase << 1 | servo << 6 | detected << 26 | completed << 34
+        fields = 1 | phase << 1 | servo << 6 | detected << 26 | completed << 34 | width_cm << 42
         if range_mm is not None:
             fields |= 1 << 13 | range_mm << 14
     return (1000).to_bytes(4, "little") + fields.to_bytes(6, "little")
@@ -67,6 +67,18 @@ class ObstacleBoard(unittest.TestCase):
         record = self.feed(2, servo=45, range_mm=183, detected=1)
         self.assertEqual(record["phase_name"], "AVOID_TURN_OUT")
         self.assertEqual((record["servo_deg"], record["range_mm"], record["detected"]), (45, 183, 1))
+
+    def test_width_is_decoded_and_reported_once_per_obstacle(self):
+        self.assertEqual(self.feed(0)["width_cm"], 0)
+        self.feed(1, detected=1)
+        self.assertEqual(self.feed(2, detected=1, width_cm=37)["width_cm"], 37)
+        self.feed(3, detected=1, width_cm=37)
+        self.feed(0, detected=1, completed=1)
+        texts = [e["text"] for e in self.dash.events if "width" in e["text"]]
+        self.assertEqual(texts, ["Obstacle #1 width measured: 37 cm"])
+        self.assertEqual(self.dash.obst["width_cm"], 37)
+        self.feed(1, detected=2)                       # a new obstacle forgets the old width
+        self.assertEqual(self.dash.obst["width_cm"], 0)
 
     def test_a_detour_makes_events_once(self):
         self.feed(0)                                   # following, nothing to report

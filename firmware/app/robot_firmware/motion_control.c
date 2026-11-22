@@ -3,9 +3,18 @@
 #include <string.h>
 
 /* Batch 5 calibration, copied from the tested standalone controller. */
-enum { CPR = 2543, CONTROL_US = 100000, TIMEOUT_US = 12000000,
-       TURN_STOP_EARLY = 290, LEFT_90_EXTRA = 65, RIGHT_90_EXTRA = 58, RIGHT_180_SHORTEN = 60,
-       LATE_POLL_US = 250000, STALL_US = 1000000 };
+enum
+{
+    CPR = 2543,
+    CONTROL_US = 100000,
+    TIMEOUT_US = 12000000,
+    TURN_STOP_EARLY = 290,
+    LEFT_90_EXTRA = 65,
+    RIGHT_90_EXTRA = 58,
+    RIGHT_180_SHORTEN = 60,
+    LATE_POLL_US = 250000,
+    STALL_US = 1000000
+};
 static const float PI_VALUE = 3.14159265f;
 static const float WHEEL_MM = 60.0f;
 static const float TRACK_MM = 115.0f;
@@ -23,23 +32,29 @@ static const float STRAIGHT_BALANCE_PWM_LIMIT = 0.04f;
  * 3779-242=3537. This includes the observed residual rolling; it does not
  * claim a new mechanical CPR, and must not be applied to other distances.
  * Validate the v3 ground result. Turn targets and PI tuning are unchanged. */
-enum { STRAIGHT_30CM_STOP_COUNTS = 3537 };
+enum
+{
+    STRAIGHT_30CM_STOP_COUNTS = 3537
+};
 
-/* Straight-move launch ramp. The first control tick used to step the drive from 0 to about
- * 0.47 PWM at once, launching the car at nearly twice the 1800 cps target and jerking it hard
- * enough to miss encoder edges. Limit the RISE: start at a breakaway floor, then add at most
- * START_RAMP_PWM_PER_S. Decreases are never limited, so overspeed still cuts power at once.
- * Applies to straight moves only; turns and the slow/bypass paths are untouched. */
+/* Straight-move launch ramp. The first control tick used to step the drive from
+ * 0 to about 0.47 PWM at once, launching the car at nearly twice the 1800 cps
+ * target and jerking it hard enough to miss encoder edges. Limit the RISE:
+ * start at a breakaway floor, then add at most START_RAMP_PWM_PER_S. Decreases
+ * are never limited, so overspeed still cuts power at once. Applies to straight
+ * moves only; turns and the slow/bypass paths are untouched. */
 static const float START_FLOOR_PWM = 0.30f;
-/* A lower left floor (0.28) was tried against the right veer at launch and reverted: the
- * [LAUNCH] traces of 2026-11-17 showed it only made the RIGHT wheel lead by 15-50 counts in the
- * first 350 ms, while the left lead (peak 43-61 counts at 650-750 ms) was unchanged. That lead
- * comes from the feedforward, see STRAIGHT_RIGHT_FEEDFORWARD. */
+/* A lower left floor (0.28) was tried against the right veer at launch and
+ * reverted: the [LAUNCH] traces of 2026-11-17 showed it only made the RIGHT
+ * wheel lead by 15-50 counts in the first 350 ms, while the left lead (peak
+ * 43-61 counts at 650-750 ms) was unchanged. That lead comes from the
+ * feedforward, see STRAIGHT_RIGHT_FEEDFORWARD. */
 static const float START_FLOOR_LEFT_PWM = 0.30f;
-/* Right-wheel feedforward scale. 0.95 is the batch 5 calibration and stays for turns. On straight
- * moves it gave about 40% left / 37% right PWM while accelerating, and the left wheel then ran
- * about 7% faster (5 traces, 2026-11-17); at cruise the wheels match only with the right about
- * 2 points ABOVE the left. Straight moves therefore use equal feedforward. */
+/* Right-wheel feedforward scale. 0.95 is the batch 5 calibration and stays for
+ * turns. On straight moves it gave about 40% left / 37% right PWM while
+ * accelerating, and the left wheel then ran about 7% faster (5 traces,
+ * 2026-11-17); at cruise the wheels match only with the right about 2 points
+ * ABOVE the left. Straight moves therefore use equal feedforward. */
 static const float TURN_RIGHT_FEEDFORWARD = 0.95f;
 static const float STRAIGHT_RIGHT_FEEDFORWARD = 1.0f;
 static const float START_RAMP_PWM_PER_S = 0.9f;
@@ -49,30 +64,37 @@ static float clamp(float value, float low, float high)
     return value < low ? low : (value > high ? high : value);
 }
 
-/* previous and next are signed throttles; direction is +1 or -1. Returns the ramped throttle. */
-static float ramp_throttle(float previous, float next, int direction, float dt, float floor_pwm)
+/* previous and next are signed throttles; direction is +1 or -1. Returns the
+ * ramped throttle. */
+static float ramp_throttle(float previous, float next, int direction, float dt,
+                           float floor_pwm)
 {
     float prev_mag = previous * (float)direction;
     float next_mag = next * (float)direction;
-    float limit = prev_mag < floor_pwm ? floor_pwm : prev_mag + START_RAMP_PWM_PER_S * dt;
+    float limit =
+        prev_mag < floor_pwm ? floor_pwm : prev_mag + START_RAMP_PWM_PER_S * dt;
     return (next_mag > limit ? limit : next_mag) * (float)direction;
 }
 
 static int32_t delta(uint32_t current, uint32_t start)
 {
     uint32_t difference = current - start;
-    return difference <= INT32_MAX ? (int32_t)difference :
-        (int32_t)((int64_t)difference - INT64_C(4294967296));
+    return difference <= INT32_MAX
+               ? (int32_t)difference
+               : (int32_t)((int64_t)difference - INT64_C(4294967296));
 }
 
-int32_t motion_left_position(const motion_control_t *motion, encoder_sample_t sample)
+int32_t motion_left_position(const motion_control_t *motion,
+                             encoder_sample_t sample)
 {
     /* Left raw encoder decreases during forward travel. Subtract in unsigned
-     * space before signed conversion, preserving wrap without resetting ISR data. */
+     * space before signed conversion, preserving wrap without resetting ISR
+     * data. */
     return delta(motion->start.left_raw, sample.left_raw);
 }
 
-int32_t motion_right_position(const motion_control_t *motion, encoder_sample_t sample)
+int32_t motion_right_position(const motion_control_t *motion,
+                              encoder_sample_t sample)
 {
     return delta(sample.right_raw, motion->start.right_raw);
 }
@@ -89,7 +111,8 @@ static int32_t turn_counts(float degrees)
 
 void motion_init(motion_control_t *motion)
 {
-    if (motion != NULL) {
+    if (motion != NULL)
+    {
         memset(motion, 0, sizeof(*motion));
     }
 }
@@ -98,7 +121,8 @@ bool motion_begin(motion_control_t *motion, motion_kind_t kind,
                   encoder_sample_t sample, uint64_t now_us)
 {
     if (motion == NULL || motion->phase == MOTION_ACTIVE ||
-        kind < MOTION_STRAIGHT_30CM || kind > MOTION_RIGHT_180) {
+        kind < MOTION_STRAIGHT_30CM || kind > MOTION_RIGHT_180)
+    {
         return false;
     }
     motion_init(motion);
@@ -107,7 +131,8 @@ bool motion_begin(motion_control_t *motion, motion_kind_t kind,
     motion->start_us = motion->control_us = now_us;
     motion->left.last_progress_us = motion->right.last_progress_us = now_us;
     int32_t count;
-    switch (kind) {
+    switch (kind)
+    {
     case MOTION_STRAIGHT_30CM:
         motion->left.target = motion->right.target = STRAIGHT_30CM_STOP_COUNTS;
         break;
@@ -119,7 +144,8 @@ bool motion_begin(motion_control_t *motion, motion_kind_t kind,
     case MOTION_RIGHT_90:
         /* Two completed v5.1 R90 runs settled at mean magnitudes 991/996.
          * Operator estimated ~85 degrees: round(993.5 * 5 / 85) = 58
-         * additional counts. Provisional R90-only trim, not a global yaw scale. */
+         * additional counts. Provisional R90-only trim, not a global yaw scale.
+         */
         count = turn_counts(90.0f) + RIGHT_90_EXTRA;
         motion->left.target = count;
         motion->right.target = -count;
@@ -139,9 +165,13 @@ bool motion_begin(motion_control_t *motion, motion_kind_t kind,
 bool motion_begin_distance(motion_control_t *motion, unsigned mm,
                            encoder_sample_t sample, uint64_t now_us)
 {
-    if(mm<1||mm>700||!motion_begin(motion,MOTION_STRAIGHT_30CM,sample,now_us))return false;
-    motion->left.target=motion->right.target=mm_counts((float)mm);
-    motion->slow_distance=true;
+    if (mm < 1 || mm > 700 ||
+        !motion_begin(motion, MOTION_STRAIGHT_30CM, sample, now_us))
+    {
+        return false;
+    }
+    motion->left.target = motion->right.target = mm_counts((float)mm);
+    motion->slow_distance = true;
     return true;
 }
 
@@ -154,14 +184,17 @@ static void fail(motion_control_t *motion, motion_fault_t fault)
 
 void motion_abort(motion_control_t *motion)
 {
-    if (motion != NULL) {
+    if (motion != NULL)
+    {
         motion->phase = MOTION_ABORTED;
         motion->left.throttle = motion->right.throttle = 0.0f;
     }
 }
 
 static bool wheel_update(motion_wheel_t *wheel, int32_t position, float dt,
-                          uint64_t now_us, bool right, float adjustment, bool slow, bool slow_turn, bool alignment, bool transit, bool straight)
+                         uint64_t now_us, bool right, float adjustment,
+                         bool slow, bool slow_turn, bool alignment,
+                         bool transit, bool straight)
 {
     int direction = wheel->target < 0 ? -1 : 1;
     int64_t progress = (int64_t)position * direction;
@@ -169,65 +202,98 @@ static bool wheel_update(motion_wheel_t *wheel, int32_t position, float dt,
     int64_t remaining = target - progress;
     wheel->position = position;
     wheel->cps = (float)((int64_t)position - wheel->previous) * direction / dt;
-    if (position != wheel->previous) {
+    if (position != wheel->previous)
+    {
         wheel->last_progress_us = now_us;
     }
     wheel->previous = position;
-    wheel->no_progress_ms=(uint32_t)((now_us-wheel->last_progress_us)/1000u);
-    if (wheel->finished) {
+    wheel->no_progress_ms =
+        (uint32_t)((now_us - wheel->last_progress_us) / 1000u);
+    if (wheel->finished)
+    {
         return true;
     }
     /* All target completion is handled by check_endpoint before this update. */
-    if (now_us - wheel->last_progress_us >= STALL_US) {
+    if (now_us - wheel->last_progress_us >= STALL_US)
+    {
         return false;
     }
-    float target_cps = (remaining > 2200 ? 1800.0f :
-                        (remaining > 700 ? 1200.0f : 600.0f)) + adjustment;
-    if(slow){
+    float target_cps =
+        (remaining > 2200 ? 1800.0f : (remaining > 700 ? 1200.0f : 600.0f)) +
+        adjustment;
+    if (slow)
+    {
         /* Match the low-speed course controller's scale. The old 25% floor
          * defeated the slow target whenever the unloaded wheels ran faster.
          * Permit zero drive on overspeed, cap power and ramp increases. */
-        target_cps=(remaining>400?600.0f:450.0f)+adjustment;
-        if(transit&&remaining>900)target_cps=800.0f+adjustment;
-        wheel->requested_cps=target_cps;
-        float error=target_cps-wheel->cps;
-        bool endpoint_assist=!slow_turn&&remaining<=400;
-        float integral_cap=slow_turn?2750.0f:(alignment||endpoint_assist)?1200.0f:700.0f;
-        wheel->integral=clamp(wheel->integral+error*dt,-integral_cap,integral_cap);
-        float requested=clamp((right?0.142f:0.157f)*target_cps/1200.0f+
-                              0.000040f*error+0.0002f*wheel->integral,0.0f,slow_turn?0.60f:(alignment||endpoint_assist)?0.32f:transit?0.28f:0.24f);
+        target_cps = (remaining > 400 ? 600.0f : 450.0f) + adjustment;
+        if (transit && remaining > 900)
+        {
+            target_cps = 800.0f + adjustment;
+        }
+        wheel->requested_cps = target_cps;
+        float error = target_cps - wheel->cps;
+        bool endpoint_assist = !slow_turn && remaining <= 400;
+        float integral_cap = slow_turn                        ? 2750.0f
+                             : (alignment || endpoint_assist) ? 1200.0f
+                                                              : 700.0f;
+        wheel->integral =
+            clamp(wheel->integral + error * dt, -integral_cap, integral_cap);
+        float requested =
+            clamp((right ? 0.142f : 0.157f) * target_cps / 1200.0f +
+                      0.000040f * error + 0.0002f * wheel->integral,
+                  0.0f,
+                  slow_turn                        ? 0.60f
+                  : (alignment || endpoint_assist) ? 0.32f
+                  : transit                        ? 0.28f
+                                                   : 0.24f);
         /* A stopped wheel near a turn endpoint may need more starting
          * torque than the speed PI can supply. Bounded turn-only assist;
-         * PI retains loaded effort after progress; retain the one-second stall stop. */
-        if(slow_turn&&now_us-wheel->last_progress_us>=250000)
-            requested=0.60f;
+         * PI retains loaded effort after progress; retain the one-second stall
+         * stop. */
+        if (slow_turn && now_us - wheel->last_progress_us >= 250000)
+        {
+            requested = 0.60f;
+        }
         /* Alignment stopped physically at 24% in both v5.44 runs. Allow
          * the PI to retain the effort needed under load, and briefly request
          * breakaway effort after 300 ms without progress. Speed target stays
-         * 450/600 cps; overspeed still removes drive, no permanent PWM floor. */
-        if((alignment||endpoint_assist)&&now_us-wheel->last_progress_us>=300000)requested=0.32f;
-        float previous=wheel->throttle*direction;
-        wheel->throttle=clamp(requested,0.0f,previous+(slow_turn?1.2f:0.4f)*dt)*direction;
+         * 450/600 cps; overspeed still removes drive, no permanent PWM floor.
+         */
+        if ((alignment || endpoint_assist) &&
+            now_us - wheel->last_progress_us >= 300000)
+        {
+            requested = 0.32f;
+        }
+        float previous = wheel->throttle * direction;
+        wheel->throttle =
+            clamp(requested, 0.0f, previous + (slow_turn ? 1.2f : 0.4f) * dt) *
+            direction;
         return true;
     }
-    wheel->requested_cps=target_cps;
+    wheel->requested_cps = target_cps;
     float error = target_cps - wheel->cps;
     wheel->integral = clamp(wheel->integral + error * dt, -2500.0f, 2500.0f);
     float feedforward = 0.30f + 0.000055f * target_cps;
-    if (right) {
-        feedforward *= straight ? STRAIGHT_RIGHT_FEEDFORWARD : TURN_RIGHT_FEEDFORWARD;
+    if (right)
+    {
+        feedforward *=
+            straight ? STRAIGHT_RIGHT_FEEDFORWARD : TURN_RIGHT_FEEDFORWARD;
     }
-    wheel->throttle = clamp(feedforward + KP * error + KI * wheel->integral,
-                             0.25f, 0.65f) * direction;
+    wheel->throttle =
+        clamp(feedforward + KP * error + KI * wheel->integral, 0.25f, 0.65f) *
+        direction;
     return true;
 }
 
 static void check_endpoint(motion_wheel_t *wheel, int32_t position,
-                            uint32_t elapsed_us)
+                           uint32_t elapsed_us)
 {
     wheel->position = position;
-    bool reached = wheel->target > 0 ? position >= wheel->target : position <= wheel->target;
-    if (!wheel->finished && reached) {
+    bool reached = wheel->target > 0 ? position >= wheel->target
+                                     : position <= wheel->target;
+    if (!wheel->finished && reached)
+    {
         wheel->cutoff_position = position;
         wheel->cutoff_elapsed_us = elapsed_us;
         wheel->finished = true;
@@ -235,22 +301,31 @@ static void check_endpoint(motion_wheel_t *wheel, int32_t position,
     }
 }
 
-void motion_poll(motion_control_t *motion, encoder_sample_t sample, uint64_t now_us)
+void motion_poll(motion_control_t *motion, encoder_sample_t sample,
+                 uint64_t now_us)
 {
-    if (motion == NULL || motion->phase != MOTION_ACTIVE) {
+    if (motion == NULL || motion->phase != MOTION_ACTIVE)
+    {
         return;
     }
-    if (now_us < motion->control_us || now_us - motion->start_us >= (motion->slow_distance?30000000u:TIMEOUT_US)) {
+    if (now_us < motion->control_us ||
+        now_us - motion->start_us >=
+            (motion->slow_distance ? 30000000u : TIMEOUT_US))
+    {
         fail(motion, MOTION_TIMED_OUT);
         return;
     }
-    if (sample.left_invalid - motion->start.left_invalid > MOTION_ENCODER_INVALID_TOLERANCE ||
-        sample.right_invalid - motion->start.right_invalid > MOTION_ENCODER_INVALID_TOLERANCE) {
+    if (sample.left_invalid - motion->start.left_invalid >
+            MOTION_ENCODER_INVALID_TOLERANCE ||
+        sample.right_invalid - motion->start.right_invalid >
+            MOTION_ENCODER_INVALID_TOLERANCE)
+    {
         fail(motion, MOTION_ENCODER_INVALID);
         return;
     }
     uint64_t elapsed = now_us - motion->control_us;
-    if (elapsed > LATE_POLL_US) {
+    if (elapsed > LATE_POLL_US)
+    {
         fail(motion, MOTION_LATE_POLL);
         return;
     }
@@ -259,114 +334,173 @@ void motion_poll(motion_control_t *motion, encoder_sample_t sample, uint64_t now
     int left_direction = motion->left.target < 0 ? -1 : 1;
     int right_direction = motion->right.target < 0 ? -1 : 1;
     if ((int64_t)left * left_direction < -64 ||
-        (int64_t)right * right_direction < -64) {
+        (int64_t)right * right_direction < -64)
+    {
         fail(motion, MOTION_WRONG_DIRECTION);
         return;
     }
     /* Endpoints are checked at every polling opportunity, independently of the
-     * calibrated 100 ms PI interval. Never wait another whole PI tick to stop. */
+     * calibrated 100 ms PI interval. Never wait another whole PI tick to stop.
+     */
     uint32_t move_elapsed_us = (uint32_t)(now_us - motion->start_us);
     check_endpoint(&motion->left, left, move_elapsed_us);
     check_endpoint(&motion->right, right, move_elapsed_us);
-    if (motion->left.finished && motion->right.finished) {
+    if (motion->left.finished && motion->right.finished)
+    {
         motion->phase = MOTION_DONE;
         return;
     }
-    if (elapsed < CONTROL_US) {
+    if (elapsed < CONTROL_US)
+    {
         return;
     }
     float sync = 0.0f;
-    if (motion->kind == MOTION_STRAIGHT_30CM &&
-        !motion->left.finished && !motion->right.finished) {
+    if (motion->kind == MOTION_STRAIGHT_30CM && !motion->left.finished &&
+        !motion->right.finished)
+    {
         int64_t skew = (int64_t)left - right;
-        if (skew > INT32_MAX || skew < INT32_MIN) {
+        if (skew > INT32_MAX || skew < INT32_MIN)
+        {
             fail(motion, MOTION_WRONG_DIRECTION);
             return;
         }
         int64_t previous_peak = motion->peak_skew;
         if ((skew < 0 ? -skew : skew) >
-            (previous_peak < 0 ? -previous_peak : previous_peak)) {
+            (previous_peak < 0 ? -previous_peak : previous_peak))
+        {
             motion->peak_skew = (int32_t)skew;
         }
         sync = clamp((float)skew * 1.5f, -120.0f, 120.0f);
     }
     float dt = (float)elapsed / 1000000.0f;
-    bool slow=motion->slow_distance||motion->slow_turn;
+    bool slow = motion->slow_distance || motion->slow_turn;
     const float previous_left_throttle = motion->left.throttle;
     const float previous_right_throttle = motion->right.throttle;
-    bool left_ok=wheel_update(&motion->left, left, dt, now_us, false, -sync, slow, motion->slow_turn, motion->alignment_drive, motion->transit_drive, motion->kind == MOTION_STRAIGHT_30CM);
-    bool right_ok=wheel_update(&motion->right, right, dt, now_us, true, sync, slow, motion->slow_turn, motion->alignment_drive, motion->transit_drive, motion->kind == MOTION_STRAIGHT_30CM);
-    if (!left_ok || !right_ok) {
-        motion->stalled_wheels=(!left_ok?1u:0u)|(!right_ok?2u:0u);
+    bool left_ok = wheel_update(&motion->left, left, dt, now_us, false, -sync,
+                                slow, motion->slow_turn,
+                                motion->alignment_drive, motion->transit_drive,
+                                motion->kind == MOTION_STRAIGHT_30CM);
+    bool right_ok = wheel_update(&motion->right, right, dt, now_us, true, sync,
+                                 slow, motion->slow_turn,
+                                 motion->alignment_drive, motion->transit_drive,
+                                 motion->kind == MOTION_STRAIGHT_30CM);
+    if (!left_ok || !right_ok)
+    {
+        motion->stalled_wheels = (!left_ok ? 1u : 0u) | (!right_ok ? 2u : 0u);
         fail(motion, MOTION_STALLED);
         return;
     }
-    if (motion->kind == MOTION_STRAIGHT_30CM &&
-        !motion->left.finished && !motion->right.finished) {
-        float balance = clamp((float)((int64_t)left - right) *
-                              STRAIGHT_BALANCE_PWM_PER_COUNT,
-                              -STRAIGHT_BALANCE_PWM_LIMIT, STRAIGHT_BALANCE_PWM_LIMIT);
+    if (motion->kind == MOTION_STRAIGHT_30CM && !motion->left.finished &&
+        !motion->right.finished)
+    {
+        float balance = clamp(
+            (float)((int64_t)left - right) * STRAIGHT_BALANCE_PWM_PER_COUNT,
+            -STRAIGHT_BALANCE_PWM_LIMIT, STRAIGHT_BALANCE_PWM_LIMIT);
         /* Speed synchronisation already balances cautious legs. An additional
          * PWM trim would bypass their acceleration ramp. */
-        if(!slow){
-            motion->left.throttle = clamp(motion->left.throttle - balance, 0.0f, 0.65f);
-            motion->right.throttle = clamp(motion->right.throttle + balance, 0.0f, 0.65f);
+        if (!slow)
+        {
+            motion->left.throttle =
+                clamp(motion->left.throttle - balance, 0.0f, 0.65f);
+            motion->right.throttle =
+                clamp(motion->right.throttle + balance, 0.0f, 0.65f);
         }
     }
-    if (motion->kind == MOTION_STRAIGHT_30CM && !slow) {
-        if (!motion->left.finished) {
-            motion->left.throttle = ramp_throttle(previous_left_throttle, motion->left.throttle, left_direction, dt, START_FLOOR_LEFT_PWM);
+    if (motion->kind == MOTION_STRAIGHT_30CM && !slow)
+    {
+        if (!motion->left.finished)
+        {
+            motion->left.throttle =
+                ramp_throttle(previous_left_throttle, motion->left.throttle,
+                              left_direction, dt, START_FLOOR_LEFT_PWM);
         }
-        if (!motion->right.finished) {
-            motion->right.throttle = ramp_throttle(previous_right_throttle, motion->right.throttle, right_direction, dt, START_FLOOR_PWM);
+        if (!motion->right.finished)
+        {
+            motion->right.throttle =
+                ramp_throttle(previous_right_throttle, motion->right.throttle,
+                              right_direction, dt, START_FLOOR_PWM);
         }
     }
-    motion->left.held=motion->right.held=false;
-    if((motion->alignment_drive||motion->slow_turn)&&!motion->left.finished&&!motion->right.finished){
+    motion->left.held = motion->right.held = false;
+    if ((motion->alignment_drive || motion->slow_turn) &&
+        !motion->left.finished && !motion->right.finished)
+    {
         /* Do not swing away from the recorded tape point while the other
          * wheel is overcoming static friction. A deliberately held leading
          * wheel gets a fresh stall baseline; the lagging wheel does not. */
-        int64_t skew=(int64_t)left*left_direction-(int64_t)right*right_direction;
-        motion_wheel_t *held=skew>120?&motion->left:skew< -120?&motion->right:NULL;
-        if(held){
-            held->throttle=0;held->held=true;held->last_progress_us=now_us;
+        int64_t skew =
+            (int64_t)left * left_direction - (int64_t)right * right_direction;
+        motion_wheel_t *held = skew > 120    ? &motion->left
+                               : skew < -120 ? &motion->right
+                                             : NULL;
+        if (held)
+        {
+            held->throttle = 0;
+            held->held = true;
+            held->last_progress_us = now_us;
             /* Preserve learned loaded effort on turns. Do not integrate error
              * while held: undo this tick's increment to prevent wind-up. */
-            if(motion->slow_turn)held->integral=clamp(held->integral-(held->requested_cps-held->cps)*dt,-2750.0f,2750.0f);
-            else held->integral=0;
+            if (motion->slow_turn)
+            {
+                held->integral = clamp(
+                    held->integral - (held->requested_cps - held->cps) * dt,
+                    -2750.0f, 2750.0f);
+            }
+            else
+            {
+                held->integral = 0;
+            }
         }
     }
-    motion->left.applied_pwm=motion->left.throttle;
-    motion->right.applied_pwm=motion->right.throttle;
+    motion->left.applied_pwm = motion->left.throttle;
+    motion->right.applied_pwm = motion->right.throttle;
     motion->control_us = now_us;
-    if (motion->left.finished && motion->right.finished) {
+    if (motion->left.finished && motion->right.finished)
+    {
         motion->phase = MOTION_DONE;
     }
 }
 
 const char *motion_name(motion_kind_t kind)
 {
-    switch (kind) {
-    case MOTION_STRAIGHT_30CM: return "STRAIGHT_30CM";
-    case MOTION_LEFT_90: return "LEFT_90";
-    case MOTION_RIGHT_90: return "RIGHT_90";
-    case MOTION_RIGHT_180: return "RIGHT_180";
-    case MOTION_BARCODE: return "BARCODE_PASS";
-    case MOTION_COURSE: return "COURSE_TEST";
-    case MOTION_AVOID: return "OBSTACLE_BYPASS";
-    case MOTION_CONTINUOUS: return "CONTINUOUS_SCAN";
-    default: return "LINE_CHECK";
+    switch (kind)
+    {
+    case MOTION_STRAIGHT_30CM:
+        return "STRAIGHT_30CM";
+    case MOTION_LEFT_90:
+        return "LEFT_90";
+    case MOTION_RIGHT_90:
+        return "RIGHT_90";
+    case MOTION_RIGHT_180:
+        return "RIGHT_180";
+    case MOTION_BARCODE:
+        return "BARCODE_PASS";
+    case MOTION_COURSE:
+        return "COURSE_TEST";
+    case MOTION_AVOID:
+        return "OBSTACLE_BYPASS";
+    case MOTION_CONTINUOUS:
+        return "CONTINUOUS_SCAN";
+    default:
+        return "LINE_CHECK";
     }
 }
 
 const char *motion_fault_name(motion_fault_t fault)
 {
-    switch (fault) {
-    case MOTION_ENCODER_INVALID: return "ENCODER_INVALID";
-    case MOTION_WRONG_DIRECTION: return "WRONG_DIRECTION";
-    case MOTION_STALLED: return "NO_ENCODER_PROGRESS_1S";
-    case MOTION_LATE_POLL: return "CONTROL_DELAY_OVER_250MS";
-    case MOTION_TIMED_OUT: return "MOTION_TIMEOUT";
-    default: return "NONE";
+    switch (fault)
+    {
+    case MOTION_ENCODER_INVALID:
+        return "ENCODER_INVALID";
+    case MOTION_WRONG_DIRECTION:
+        return "WRONG_DIRECTION";
+    case MOTION_STALLED:
+        return "NO_ENCODER_PROGRESS_1S";
+    case MOTION_LATE_POLL:
+        return "CONTROL_DELAY_OVER_250MS";
+    case MOTION_TIMED_OUT:
+        return "MOTION_TIMEOUT";
+    default:
+        return "NONE";
     }
 }

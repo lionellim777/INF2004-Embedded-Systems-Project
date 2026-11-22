@@ -5,10 +5,17 @@
  * nonpreemptible by tasks. Do not reuse this contract on a second core.
  * head/tail0..511:9 each; event indices0..7:3 each; enabled:1; divider0..3:2.
  *27 application bits in the minimum four-byte aligned container. */
-typedef struct {
-    unsigned head:9,tail:9,event_head:3,event_tail:3,enabled:1,divider:2;
-    unsigned :5;
+typedef struct
+{
+    unsigned head : 9;
+    unsigned tail : 9;
+    unsigned event_head : 3;
+    unsigned event_tail : 3;
+    unsigned enabled : 1;
+    unsigned divider : 2;
+    unsigned : 5;
 } track_control_t;
-_Static_assert(sizeof(track_control_t)==4,"Track control layout changed");
-_Static_assert(_Alignof(track_control_t)>=4,"Track control needs word alignment");
+_Static_assert(sizeof(track_control_t) == 4, "Track control layout changed");
+_Static_assert(_Alignof(track_control_t) >= 4,
+               "Track control needs word alignment");
 #endif

@@ -1,17 +1,26 @@
-/* Diagnostic HTTP transport; callbacks stay on the core owning the polled radio.
- * No network callback can touch motors, start a move, or wait for a client.
+/* Diagnostic HTTP transport; callbacks stay on the core owning the polled
+ * radio. No network callback can touch motors, start a move, or wait for a
+ * client.
  */
 #include "calibration_wifi.h"
 #include "calibration_core.h"
 #ifdef ROBOCAR_MEASUREMENT_DIAG
 #include "measurement_page.h"
-#define CAL_RESULT_TITLE "measurement dashboard v1 / motors OFF / encoder distance + IMU orientation"
+#define CAL_RESULT_TITLE                                                       \
+    "measurement dashboard v1 / motors OFF / encoder distance + IMU "          \
+    "orientation"
 #elif defined(ROBOCAR_STATIONARY_BARCODE)
 #include "stationary_page.h"
-#define CAL_RESULT_TITLE "v5.7 stationary barcode / motors OFF / black>250 white<=220"
+#define CAL_RESULT_TITLE                                                       \
+    "v5.7 stationary barcode / motors OFF / black>250 white<=220"
 #else
 #include "calibration_page.h"
-#define CAL_RESULT_TITLE "v5.63-left-bypass-dev wireless / motion-aware GP26 barcode widths + per-attempt diagnostics, timed right-edge arc gate / obstacle mode disables barcodes / frozen scan export available / course reader=LOCAL_EXTREMA grey500Hz mean12 2kHz / GP28=center GP27=right GP26=barcode / avoidance-adaptive600..1000cps bounded-search"
+#define CAL_RESULT_TITLE                                                       \
+    "v5.63-left-bypass-dev wireless / motion-aware GP26 barcode widths + "     \
+    "per-attempt diagnostics, timed right-edge arc gate / obstacle mode "      \
+    "disables barcodes / frozen scan export available / course "               \
+    "reader=LOCAL_EXTREMA grey500Hz mean12 2kHz / GP28=center GP27=right "     \
+    "GP26=barcode / avoidance-adaptive600..1000cps bounded-search"
 #endif
 #include "dhcpserver.h"
 #include "pico/cyw43_arch.h"
@@ -52,15 +61,32 @@ static mutex_t shared_lock;
 static semaphore_t network_started;
 _Alignas(8) static uint32_t network_stack[2048];
 static bool shared_initialized;
-static void shared_init(void){
-    if(!shared_initialized){mutex_init(&shared_lock);shared_initialized=true;}
+static void shared_init(void)
+{
+    if (!shared_initialized)
+    {
+        mutex_init(&shared_lock);
+        shared_initialized = true;
+    }
 }
-static void shared_enter(void){mutex_enter_blocking(&shared_lock);}
-static void shared_exit(void){mutex_exit(&shared_lock);}
+static void shared_enter(void)
+{
+    mutex_enter_blocking(&shared_lock);
+}
+static void shared_exit(void)
+{
+    mutex_exit(&shared_lock);
+}
 #else
-static void shared_init(void){}
-static void shared_enter(void){}
-static void shared_exit(void){}
+static void shared_init(void)
+{
+}
+static void shared_enter(void)
+{
+}
+static void shared_exit(void)
+{
+}
 #endif
 
 #define AP_NAME "AAI10-Calibrate"
@@ -68,13 +94,18 @@ static void shared_exit(void){}
 #define CLIENT_COUNT 3u
 #define REQUEST_CAPACITY 1536u
 #define BODY_CAPACITY 10240u
-_Static_assert(BODY_CAPACITY > 12u*CAL_LINE_CAPACITY+256u+sizeof(CAL_RESULT_TITLE)+180u, "retained results must fit HTTP body");
+_Static_assert(BODY_CAPACITY > 12u * CAL_LINE_CAPACITY + 256u +
+                                   sizeof(CAL_RESULT_TITLE) + 180u,
+               "retained results must fit HTTP body");
 #define CLIENT_TIMEOUT_US 5000000u
 #ifdef CAL_HAVE_MEAS
-_Static_assert(BODY_CAPACITY > CAL_MEAS_CAPACITY+sizeof(CAL_RESULT_TITLE)+128u+320u, "retained measurements must fit HTTP body");
+_Static_assert(BODY_CAPACITY >
+                   CAL_MEAS_CAPACITY + sizeof(CAL_RESULT_TITLE) + 128u + 320u,
+               "retained measurements must fit HTTP body");
 #endif
 
-typedef struct {
+typedef struct
+{
     struct tcp_pcb *pcb;
     uint64_t opened_us;
     size_t request_length;
@@ -96,33 +127,42 @@ static bool ready;
 static uint32_t boot_id;
 static uint32_t max_poll_us;
 #ifdef ROBOCAR_WIFI_STATION
-static bool station_mode;        /* true: joined the configured network */
-static bool station_announce;    /* address changed; core 0 reprints it */
-static int station_join_result;  /* SDK error from the boot-time join */
-static int station_join_link;    /* radio link status when the join gave up */
+static bool station_mode;       /* true: joined the configured network */
+static bool station_announce;   /* address changed; core 0 reprints it */
+static int station_join_result; /* SDK error from the boot-time join */
+static int station_join_link;   /* radio link status when the join gave up */
 static char station_ip[16];
 #endif
 static const uint16_t *export_samples;
 static const char *export_details;
 static unsigned export_count;
-static uint32_t export_id,export_checksum;
-void calibration_wifi_set_waveform(const uint16_t *samples,unsigned count,
-    const char *details,uint32_t id,uint32_t checksum)
+static uint32_t export_id;
+static uint32_t export_checksum;
+void calibration_wifi_set_waveform(const uint16_t *samples, unsigned count,
+                                   const char *details, uint32_t id,
+                                   uint32_t checksum)
 {
     shared_enter();
-    bool valid=samples && details && count && count<=16384u;
-    export_samples=valid?samples:NULL;export_details=valid?details:NULL;
-    export_count=valid?count:0;export_id=id;export_checksum=checksum;
+    bool valid = samples && details && count && count <= 16384u;
+    export_samples = valid ? samples : NULL;
+    export_details = valid ? details : NULL;
+    export_count = valid ? count : 0;
+    export_id = id;
+    export_checksum = checksum;
     shared_exit();
 }
 
 static void capture(const char *data, int length)
 {
     /* Limit each lock hold even when stdio supplies a long optical dump. */
-    while(length>0){
-        int n=length>128?128:length;
-        shared_enter();calibration_capture(&core,data,(size_t)n);shared_exit();
-        data+=n;length-=n;
+    while (length > 0)
+    {
+        int n = length > 128 ? 128 : length;
+        shared_enter();
+        calibration_capture(&core, data, (size_t)n);
+        shared_exit();
+        data += n;
+        length -= n;
     }
 }
 static stdio_driver_t log_driver = {.out_chars = capture};
@@ -134,30 +174,53 @@ void calibration_wifi_capture_init(void)
 }
 void calibration_wifi_help(void)
 {
-    shared_enter();bool available=ready;shared_exit();
+    shared_enter();
+    bool available = ready;
+    shared_exit();
 #ifdef ROBOCAR_WIFI_STATION
-    shared_enter();bool station=station_mode;int join=station_join_result;int link=station_join_link;
-    char ip[sizeof station_ip];memcpy(ip,station_ip,sizeof ip);shared_exit();
-    if(available && station){
-        printf("[WIFI] READY (station) | joined the configured network | open http://%s/ from a computer on the same network (host name %s)\n",
-               ip[0]?ip:"(address pending)",CYW43_HOST_NAME);
-        printf("[WIFI] Browser selects only; GP20 starts/aborts. Network loss does not restart motion.\n");
+    shared_enter();
+    bool station = station_mode;
+    int join = station_join_result;
+    int link = station_join_link;
+    char ip[sizeof station_ip];
+    memcpy(ip, station_ip, sizeof ip);
+    shared_exit();
+    if (available && station)
+    {
+        printf(
+            "[WIFI] READY (station) | joined the configured network | open "
+            "http://%s/ from a computer on the same network (host name %s)\n",
+            ip[0] ? ip : "(address pending)", CYW43_HOST_NAME);
+        printf("[WIFI] Browser selects only; GP20 starts/aborts. Network loss "
+               "does not restart motion.\n");
         return;
     }
-    if(available){
-        const char *why=link==CYW43_LINK_NONET?"network name not found (wrong name, 5 GHz only, or out of range)":
-            link==CYW43_LINK_BADAUTH?"wrong password or unsupported security":
-            link==CYW43_LINK_NOIP?"joined but never got an IP address (DHCP or client isolation)":
-            link==CYW43_LINK_JOIN?"association never completed (security mode or signal)":
-            link==CYW43_LINK_FAIL?"join failed":
-            link==CYW43_LINK_UP?"joined, but the web server could not start":
-            link==CYW43_LINK_DOWN?"radio never associated":"unknown";
-        printf("[WIFI] Could not join the configured network (SDK error %d, link status %d: %s); using the access point instead.\n",join,link,why);
+    if (available)
+    {
+        const char *why =
+            link == CYW43_LINK_NONET ? "network name not found (wrong name, 5 "
+                                       "GHz only, or out of range)"
+            : link == CYW43_LINK_BADAUTH
+                ? "wrong password or unsupported security"
+            : link == CYW43_LINK_NOIP ? "joined but never got an IP address "
+                                        "(DHCP or client isolation)"
+            : link == CYW43_LINK_JOIN
+                ? "association never completed (security mode or signal)"
+            : link == CYW43_LINK_FAIL ? "join failed"
+            : link == CYW43_LINK_UP
+                ? "joined, but the web server could not start"
+            : link == CYW43_LINK_DOWN ? "radio never associated"
+                                      : "unknown";
+        printf("[WIFI] Could not join the configured network (SDK error %d, "
+               "link status %d: %s); using the access point instead.\n",
+               join, link, why);
     }
 #endif
     printf("[WIFI] %s | network=%s password=%s | http://192.168.4.1\n",
-           available ? "READY" : "OFFLINE (USB still available)", AP_NAME, AP_PASSWORD);
-    printf("[WIFI] Browser selects only; GP20 starts/aborts. Network loss does not restart motion.\n");
+           available ? "READY" : "OFFLINE (USB still available)", AP_NAME,
+           AP_PASSWORD);
+    printf("[WIFI] Browser selects only; GP20 starts/aborts. Network loss does "
+           "not restart motion.\n");
 }
 
 /* After tcp_abort, callbacks must return ERR_ABRT. Error callbacks get a freed
@@ -171,7 +234,11 @@ static err_t close_client(client_t *c)
     tcp_err(pcb, NULL);
     tcp_poll(pcb, NULL, 0);
     c->pcb = NULL;
-    if (tcp_close(pcb) != ERR_OK) { tcp_abort(pcb); return ERR_ABRT; }
+    if (tcp_close(pcb) != ERR_OK)
+    {
+        tcp_abort(pcb);
+        return ERR_ABRT;
+    }
     return ERR_OK;
 }
 static void client_error(void *arg, err_t err)
@@ -181,25 +248,51 @@ static void client_error(void *arg, err_t err)
 }
 static err_t send_chunk(client_t *c)
 {
-    if (!c->responding) { return ERR_OK; }
+    if (!c->responding)
+    {
+        return ERR_OK;
+    }
     size_t total = c->header_length + c->body_length;
-    if (c->acknowledged == total) { return close_client(c); }
-    if (c->queued == total) { return ERR_OK; }
+    if (c->acknowledged == total)
+    {
+        return close_client(c);
+    }
+    if (c->queued == total)
+    {
+        return ERR_OK;
+    }
     const char *source;
     size_t n;
-    if (c->queued < c->header_length) {
+    if (c->queued < c->header_length)
+    {
         source = c->header + c->queued;
         n = c->header_length - c->queued;
-    } else {
+    }
+    else
+    {
         source = c->body + c->queued - c->header_length;
         n = total - c->queued;
     }
-    if (n > 1024u) { n = 1024u; }
-    if (n > tcp_sndbuf(c->pcb)) { n = tcp_sndbuf(c->pcb); }
-    if (n != 0u) {
+    if (n > 1024u)
+    {
+        n = 1024u;
+    }
+    if (n > tcp_sndbuf(c->pcb))
+    {
+        n = tcp_sndbuf(c->pcb);
+    }
+    if (n != 0u)
+    {
         err_t err = tcp_write(c->pcb, source, (u16_t)n, TCP_WRITE_FLAG_COPY);
-        if (err == ERR_OK) { c->queued += n; (void)tcp_output(c->pcb); }
-        else if (err != ERR_MEM) { return close_client(c); }
+        if (err == ERR_OK)
+        {
+            c->queued += n;
+            (void)tcp_output(c->pcb);
+        }
+        else if (err != ERR_MEM)
+        {
+            return close_client(c);
+        }
     }
     return ERR_OK;
 }
@@ -214,7 +307,10 @@ static err_t client_poll(void *arg, struct tcp_pcb *pcb)
 {
     (void)pcb;
     client_t *c = arg;
-    if (time_us_64() - c->opened_us > CLIENT_TIMEOUT_US) { return close_client(c); }
+    if (time_us_64() - c->opened_us > CLIENT_TIMEOUT_US)
+    {
+        return close_client(c);
+    }
     return send_chunk(c);
 }
 
@@ -223,13 +319,18 @@ static void response(client_t *c, const char *status, const char *type,
 {
     c->body = body;
     c->body_length = length;
-    shared_enter();bool allowed=core.selection_allowed;shared_exit();
-    int n = snprintf(c->header, sizeof(c->header),
-        "HTTP/1.1 %s\r\nContent-Type: %s; charset=utf-8\r\nContent-Length: %u\r\n"
-        "Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n"
+    shared_enter();
+    bool allowed = core.selection_allowed;
+    shared_exit();
+    int n = snprintf(
+        c->header, sizeof(c->header),
+        "HTTP/1.1 %s\r\nContent-Type: %s; charset=utf-8\r\nContent-Length: "
+        "%u\r\n"
+        "Connection: close\r\nCache-Control: "
+        "no-store\r\nX-Content-Type-Options: nosniff\r\n"
         "X-Boot: %08lx\r\nX-Next: %lu\r\nX-Gap: %u\r\nX-Idle: %u\r\n\r\n",
-        status, type, (unsigned)length, (unsigned long)boot_id, (unsigned long)next,
-        gap ? 1u : 0u, allowed ? 1u : 0u);
+        status, type, (unsigned)length, (unsigned long)boot_id,
+        (unsigned long)next, gap ? 1u : 0u, allowed ? 1u : 0u);
     c->header_length = (size_t)n;
     c->responding = true;
 }
@@ -242,19 +343,34 @@ static bool control_header(const char *request)
     /* Match a complete header, case-insensitively. Custom header prevents a
      * foreign web page from issuing a simple cross-origin POST. No CORS. */
     const char *line = strstr(request, "\r\n");
-    while (line != NULL) {
+    while (line != NULL)
+    {
         line += 2;
         const char *end = strstr(line, "\r\n");
-        if (end == NULL || end == line) { break; }
+        if (end == NULL || end == line)
+        {
+            break;
+        }
         const char expected[] = "x-calibrate: 1";
-        if ((size_t)(end - line) == sizeof(expected) - 1u) {
+        if ((size_t)(end - line) == sizeof(expected) - 1u)
+        {
             bool equal = true;
-            for (size_t i = 0; i < sizeof(expected) - 1u; ++i) {
+            for (size_t i = 0; i < sizeof(expected) - 1u; ++i)
+            {
                 char ch = line[i];
-                if (ch >= 'A' && ch <= 'Z') { ch += 'a' - 'A'; }
-                if (ch != expected[i]) { equal = false; }
+                if (ch >= 'A' && ch <= 'Z')
+                {
+                    ch += 'a' - 'A';
+                }
+                if (ch != expected[i])
+                {
+                    equal = false;
+                }
             }
-            if (equal) { return true; }
+            if (equal)
+            {
+                return true;
+            }
         }
         line = end;
     }
@@ -262,120 +378,251 @@ static bool control_header(const char *request)
 }
 static void handle_request(client_t *c)
 {
-    char method[8], path[96], protocol[16], extra;
+    char method[8];
+    char path[96];
+    char protocol[16];
+    char extra;
     char *end = strstr(c->request, "\r\n");
-    if (end == NULL) { plain(c, "400 Bad Request", "Malformed request.\n"); return; }
-    *end = '\0';
-    int fields = sscanf(c->request, "%7s %95s %15s %c", method, path, protocol, &extra);
-    *end = '\r';
-    if (fields != 3 || (strcmp(protocol, "HTTP/1.1") != 0 && strcmp(protocol, "HTTP/1.0") != 0)) {
-        plain(c, "400 Bad Request", "Malformed request.\n"); return;
+    if (end == NULL)
+    {
+        plain(c, "400 Bad Request", "Malformed request.\n");
+        return;
     }
-    if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0) {
-        response(c, "200 OK", "text/html", calibration_page, sizeof(calibration_page) - 1u, 0u, false);
-    } else if (strcmp(method, "GET") == 0 && strncmp(path, "/logs?since=", 12u) == 0) {
-        uint32_t cursor, next;
+    *end = '\0';
+    int fields =
+        sscanf(c->request, "%7s %95s %15s %c", method, path, protocol, &extra);
+    *end = '\r';
+    if (fields != 3 || (strcmp(protocol, "HTTP/1.1") != 0 &&
+                        strcmp(protocol, "HTTP/1.0") != 0))
+    {
+        plain(c, "400 Bad Request", "Malformed request.\n");
+        return;
+    }
+    if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0)
+    {
+        response(c, "200 OK", "text/html", calibration_page,
+                 sizeof(calibration_page) - 1u, 0u, false);
+    }
+    else if (strcmp(method, "GET") == 0 &&
+             strncmp(path, "/logs?since=", 12u) == 0)
+    {
+        uint32_t cursor;
+        uint32_t next;
         bool gap;
-        if (!calibration_parse_cursor(path + 12u, &cursor)) {
-            plain(c, "400 Bad Request", "Invalid cursor.\n"); return;
+        if (!calibration_parse_cursor(path + 12u, &cursor))
+        {
+            plain(c, "400 Bad Request", "Invalid cursor.\n");
+            return;
         }
         shared_enter();
-        size_t n = calibration_read(&core, cursor, c->data, sizeof(c->data), &next, &gap);
+        size_t n = calibration_read(&core, cursor, c->data, sizeof(c->data),
+                                    &next, &gap);
         shared_exit();
         response(c, "200 OK", "text/plain", c->data, n, next, gap);
 #ifdef ROBOCAR_MEASUREMENTS
-    } else if (strcmp(method, "GET") == 0 && strcmp(path, "/measure") == 0) {
-        /* Live readout first, then every retained [MEAS RESULT] line. Read-only. */
+    }
+    else if (strcmp(method, "GET") == 0 && strcmp(path, "/measure") == 0)
+    {
+        /* Live readout first, then every retained [MEAS RESULT] line.
+         * Read-only. */
         shared_enter();
-        int n = snprintf(c->data, sizeof(c->data), "boot=%08lx\n%s%s", (unsigned long)boot_id, core.live, core.meas);
+        int n = snprintf(c->data, sizeof(c->data), "boot=%08lx\n%s%s",
+                         (unsigned long)boot_id, core.live, core.meas);
         shared_exit();
         response(c, "200 OK", "text/plain", c->data, (size_t)n, 0u, false);
 #endif
-    } else if (strcmp(method,"GET")==0 && strncmp(path,"/waveform?offset=",17u)==0) {
+    }
+    else if (strcmp(method, "GET") == 0 &&
+             strncmp(path, "/waveform?offset=", 17u) == 0)
+    {
         uint32_t offset;
-        if(!calibration_parse_cursor(path+17u,&offset)){
-            plain(c,"400 Bad Request","Invalid waveform offset.\n");return;
+        if (!calibration_parse_cursor(path + 17u, &offset))
+        {
+            plain(c, "400 Bad Request", "Invalid waveform offset.\n");
+            return;
         }
         shared_enter();
-        if(!export_samples){shared_exit();plain(c,"404 Not Found","No frozen scan. Stop and download after a barcode run.\n");return;}
-        if(offset>=export_count){shared_exit();plain(c,"400 Bad Request","Waveform offset outside capture.\n");return;}
-        unsigned count=export_count-offset;if(count>256u)count=256u;
-        int n=snprintf(c->data,sizeof(c->data),"%.*s[WAVEFORM CHUNK] id=%lu offset=%lu count=%u total=%u fnv=%08lx packed=",
-            offset?0:4095,export_details,(unsigned long)export_id,(unsigned long)offset,
-            count,export_count,(unsigned long)export_checksum);
-        for(unsigned i=0;i<count;i++)n+=snprintf(c->data+n,sizeof(c->data)-(size_t)n,"%04x",export_samples[offset+i]);
-        c->data[n++]='\n';c->data[n]=0;
+        if (!export_samples)
+        {
+            shared_exit();
+            plain(c, "404 Not Found",
+                  "No frozen scan. Stop and download after a barcode run.\n");
+            return;
+        }
+        if (offset >= export_count)
+        {
+            shared_exit();
+            plain(c, "400 Bad Request", "Waveform offset outside capture.\n");
+            return;
+        }
+        unsigned count = export_count - offset;
+        if (count > 256u)
+        {
+            count = 256u;
+        }
+        int n = snprintf(c->data, sizeof(c->data),
+                         "%.*s[WAVEFORM CHUNK] id=%lu offset=%lu count=%u "
+                         "total=%u fnv=%08lx packed=",
+                         offset ? 0 : 4095, export_details,
+                         (unsigned long)export_id, (unsigned long)offset, count,
+                         export_count, (unsigned long)export_checksum);
+        for (unsigned i = 0; i < count; i++)
+        {
+            n += snprintf(c->data + n, sizeof(c->data) - (size_t)n, "%04x",
+                          export_samples[offset + i]);
+        }
+        c->data[n++] = '\n';
+        c->data[n] = 0;
         shared_exit();
-        response(c,"200 OK","text/plain",c->data,(size_t)n,0u,false);
+        response(c, "200 OK", "text/plain", c->data, (size_t)n, 0u, false);
 #ifdef ROBOCAR_MEASUREMENT_DIAG
-    } else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0) {
+    }
+    else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0)
+    {
         shared_enter();
-        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n%s",
+        int n = snprintf(c->data, sizeof(c->data),
+                         CAL_RESULT_TITLE " / boot=%08lx\n%s",
                          (unsigned long)boot_id, core.meas);
-        if (core.meas[0] == '\0') {
-            n += snprintf(c->data + n, sizeof(c->data) - (size_t)n,
-                          "No measurement results retained in this boot yet.\n");
+        if (core.meas[0] == '\0')
+        {
+            n +=
+                snprintf(c->data + n, sizeof(c->data) - (size_t)n,
+                         "No measurement results retained in this boot yet.\n");
         }
         shared_exit();
         response(c, "200 OK", "text/plain", c->data, (size_t)n, 0u, false);
 #endif
-    } else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0) {
+    }
+    else if (strcmp(method, "GET") == 0 && strcmp(path, "/result") == 0)
+    {
         shared_enter();
-        int n = snprintf(c->data, sizeof(c->data), CAL_RESULT_TITLE " / boot=%08lx\n[PREVIOUS RUN]\n%s%s[CURRENT RUN]\n%s%s%s%s%s%s%s%s%s%s%s",
-                         (unsigned long)boot_id, core.previous_stop, core.previous_detail, core.stop, core.settled, core.summary, core.timing, core.barcode, core.trace[0], core.trace[1], core.course_result, core.optical_result, core.motion_detail, core.waveform);
-        if (core.stop[0] == '\0' && core.settled[0] == '\0' && core.optical_result[0] == '\0') {
+        int n = snprintf(
+            c->data, sizeof(c->data),
+            CAL_RESULT_TITLE " / boot=%08lx\n[PREVIOUS RUN]\n%s%s[CURRENT "
+                             "RUN]\n%s%s%s%s%s%s%s%s%s%s%s",
+            (unsigned long)boot_id, core.previous_stop, core.previous_detail,
+            core.stop, core.settled, core.summary, core.timing, core.barcode,
+            core.trace[0], core.trace[1], core.course_result,
+            core.optical_result, core.motion_detail, core.waveform);
+        if (core.stop[0] == '\0' && core.settled[0] == '\0' &&
+            core.optical_result[0] == '\0')
+        {
             n += snprintf(c->data + n, sizeof(c->data) - (size_t)n,
-                          "No completed/aborted test result retained in this boot yet.\n");
+                          "No completed/aborted test result retained in this "
+                          "boot yet.\n");
         }
         shared_exit();
         response(c, "200 OK", "text/plain", c->data, (size_t)n, 0u, false);
-    } else if (strcmp(method,"POST")==0 && strncmp(path,"/mission/",9u)==0) {
-        if(!control_header(c->request)){plain(c,"403 Forbidden","Use the calibration page.\n");return;}
+    }
+    else if (strcmp(method, "POST") == 0 && strncmp(path, "/mission/", 9u) == 0)
+    {
+        if (!control_header(c->request))
+        {
+            plain(c, "403 Forbidden", "Use the calibration page.\n");
+            return;
+        }
 #if defined(ROBOCAR_STATIONARY_BARCODE) || defined(ROBOCAR_MEASUREMENT_DIAG)
-        plain(c,"409 Conflict","Stationary build: course driving unavailable.\n");
+        plain(c, "409 Conflict",
+              "Stationary build: course driving unavailable.\n");
 #else
-        shared_enter();bool accepted=calibration_course_command(&core,path);shared_exit();
-        if(accepted)plain(c,"202 Accepted","Barcode mission queued. Wait for [SELECT Y/Z], then GP20.\n");
-        else plain(c,"409 Conflict","Course selection rejected: stop first; check settings and pending request.\n");
+        shared_enter();
+        bool accepted = calibration_course_command(&core, path);
+        shared_exit();
+        if (accepted)
+        {
+            plain(
+                c, "202 Accepted",
+                "Barcode mission queued. Wait for [SELECT Y/Z], then GP20.\n");
+        }
+        else
+        {
+            plain(c, "409 Conflict",
+                  "Course selection rejected: stop first; check settings and "
+                  "pending request.\n");
+        }
 #endif
-    } else if (strcmp(method, "POST") == 0 && strncmp(path, "/command/", 9u) == 0 && strlen(path) == 10u) {
-        if (!control_header(c->request)) { plain(c, "403 Forbidden", "Use the calibration page.\n"); return; }
-        shared_enter();bool accepted=calibration_command(&core,path[9]);shared_exit();
-        if (accepted) {
+    }
+    else if (strcmp(method, "POST") == 0 &&
+             strncmp(path, "/command/", 9u) == 0 && strlen(path) == 10u)
+    {
+        if (!control_header(c->request))
+        {
+            plain(c, "403 Forbidden", "Use the calibration page.\n");
+            return;
+        }
+        shared_enter();
+        bool accepted = calibration_command(&core, path[9]);
+        shared_exit();
+        if (accepted)
+        {
 #ifdef ROBOCAR_MEASUREMENT_DIAG
-            plain(c, "202 Accepted", "Command queued; watch the live readout.\n");
+            plain(c, "202 Accepted",
+                  "Command queued; watch the live readout.\n");
 #else
 #ifdef ROBOCAR_MEASUREMENTS
-            if (strchr("mepghw", path[9]) != NULL) { plain(c, "202 Accepted", "Measurement command queued.\n"); return; }
+            if (strchr("mepghw", path[9]) != NULL)
+            {
+                plain(c, "202 Accepted", "Measurement command queued.\n");
+                return;
+            }
 #endif
-            plain(c, "202 Accepted", path[9] == 'x' ? "Stop queued; check [STOP] in the log. GP20 aborts locally.\n" :
-                  path[9]=='v' ? "Optical capture queued: motors stay off. Wait for [OPTICAL START], then slide paper for 5 seconds.\n" :
-                  "Selection queued. Wait for [SELECT] in the log, then press GP20 on the car.\n");
+            plain(c, "202 Accepted",
+                  path[9] == 'x' ? "Stop queued; check [STOP] in the log. GP20 "
+                                   "aborts locally.\n"
+                  : path[9] == 'v'
+                      ? "Optical capture queued: motors stay off. Wait for "
+                        "[OPTICAL START], then slide paper for 5 seconds.\n"
+                      : "Selection queued. Wait for [SELECT] in the log, then "
+                        "press GP20 on the car.\n");
 #endif
-        } else {
-            plain(c, "409 Conflict", "Selection rejected: running, settling, another request pending, or invalid command.\n");
         }
-    } else {
+        else
+        {
+            plain(c, "409 Conflict",
+                  "Selection rejected: running, settling, another request "
+                  "pending, or invalid command.\n");
+        }
+    }
+    else
+    {
         plain(c, "404 Not Found", "Open http://192.168.4.1/\n");
     }
 }
-static err_t client_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
+static err_t client_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p,
+                         err_t err)
 {
     client_t *c = arg;
-    if (p == NULL) { return close_client(c); }
-    if (err != ERR_OK) { pbuf_free(p); return close_client(c); }
+    if (p == NULL)
+    {
+        return close_client(c);
+    }
+    if (err != ERR_OK)
+    {
+        pbuf_free(p);
+        return close_client(c);
+    }
     size_t n = p->tot_len;
     tcp_recved(pcb, p->tot_len);
-    if (!c->responding) {
-        if (n >= sizeof(c->request) - c->request_length) {
-            plain(c, "431 Request Header Fields Too Large", "Request too large.\n");
-        } else {
+    if (!c->responding)
+    {
+        if (n >= sizeof(c->request) - c->request_length)
+        {
+            plain(c, "431 Request Header Fields Too Large",
+                  "Request too large.\n");
+        }
+        else
+        {
             pbuf_copy_partial(p, c->request + c->request_length, (u16_t)n, 0u);
             c->request_length += n;
             c->request[c->request_length] = '\0';
-            if (memchr(c->request, '\0', c->request_length) != NULL) {
+            if (memchr(c->request, '\0', c->request_length) != NULL)
+            {
                 plain(c, "400 Bad Request", "Invalid request.\n");
-            } else if (strstr(c->request, "\r\n\r\n") != NULL) { handle_request(c); }
+            }
+            else if (strstr(c->request, "\r\n\r\n") != NULL)
+            {
+                handle_request(c);
+            }
         }
     }
     pbuf_free(p);
@@ -384,9 +631,14 @@ static err_t client_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t e
 static err_t accept_client(void *arg, struct tcp_pcb *pcb, err_t err)
 {
     (void)arg;
-    if (err != ERR_OK || pcb == NULL) { return ERR_VAL; }
-    for (size_t i = 0; i < CLIENT_COUNT; ++i) {
-        if (clients[i].pcb == NULL) {
+    if (err != ERR_OK || pcb == NULL)
+    {
+        return ERR_VAL;
+    }
+    for (size_t i = 0; i < CLIENT_COUNT; ++i)
+    {
+        if (clients[i].pcb == NULL)
+        {
             client_t *c = &clients[i];
             memset(c, 0, sizeof(*c));
             c->pcb = pcb;
@@ -407,21 +659,28 @@ static err_t accept_client(void *arg, struct tcp_pcb *pcb, err_t err)
 static bool station_listen(void)
 {
     struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
-    if (pcb != NULL && tcp_bind(pcb, IP_ANY_TYPE, 80u) == ERR_OK) {
+    if (pcb != NULL && tcp_bind(pcb, IP_ANY_TYPE, 80u) == ERR_OK)
+    {
         struct tcp_pcb *listener = tcp_listen_with_backlog(pcb, CLIENT_COUNT);
-        if (listener != NULL) {
+        if (listener != NULL)
+        {
             tcp_accept(listener, accept_client);
             return true;
         }
     }
-    if (pcb != NULL) { tcp_abort(pcb); }
+    if (pcb != NULL)
+    {
+        tcp_abort(pcb);
+    }
     return false;
 }
 /* Text form of the DHCP-assigned address; empty if there is none. */
 static void station_address_text(char *out, size_t size)
 {
-    const ip4_addr_t *address = netif_ip4_addr(&cyw43_state.netif[CYW43_ITF_STA]);
-    snprintf(out, size, "%s", ip4_addr_isany_val(*address) ? "" : ip4addr_ntoa(address));
+    const ip4_addr_t *address =
+        netif_ip4_addr(&cyw43_state.netif[CYW43_ITF_STA]);
+    snprintf(out, size, "%s",
+             ip4_addr_isany_val(*address) ? "" : ip4addr_ntoa(address));
 }
 /* Called from the network core. Re-joins after a drop (the radio does not do
  * this on its own) and tells core 0 when the address changes. It never
@@ -430,35 +689,51 @@ static void station_maintain(void)
 {
     static uint64_t next_us;
     uint64_t now = time_us_64();
-    if (now < next_us) { return; }
+    if (now < next_us)
+    {
+        return;
+    }
     next_us = now + STATION_RETRY_US;
     int link = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
-    if (link == CYW43_LINK_UP) {
+    if (link == CYW43_LINK_UP)
+    {
         char text[16];
         station_address_text(text, sizeof text);
         shared_enter();
-        if (strcmp(text, station_ip) != 0) {
+        if (strcmp(text, station_ip) != 0)
+        {
             memcpy(station_ip, text, sizeof station_ip);
             station_announce = true;
         }
         shared_exit();
         return;
     }
-    shared_enter(); station_ip[0] = '\0'; shared_exit();
-    if (link == CYW43_LINK_JOIN || link == CYW43_LINK_NOIP) { return; } /* in progress */
-    (void)cyw43_arch_wifi_connect_async(STATION_WIFI_SSID, STATION_WIFI_PASSWORD, STATION_WIFI_AUTH);
+    shared_enter();
+    station_ip[0] = '\0';
+    shared_exit();
+    if (link == CYW43_LINK_JOIN || link == CYW43_LINK_NOIP)
+    {
+        return;
+    } /* in progress */
+    (void)cyw43_arch_wifi_connect_async(
+        STATION_WIFI_SSID, STATION_WIFI_PASSWORD, STATION_WIFI_AUTH);
 }
 #endif
 static bool network_init(void)
 {
     boot_id = get_rand_32();
-    if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0) { return false; }
+    if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0)
+    {
+        return false;
+    }
 #ifdef ROBOCAR_WIFI_STATION
     cyw43_arch_enable_sta_mode();
     (void)cyw43_wifi_pm(&cyw43_state, CYW43_NONE_PM);
-    int join = cyw43_arch_wifi_connect_timeout_ms(STATION_WIFI_SSID, STATION_WIFI_PASSWORD,
-                                                  STATION_WIFI_AUTH, STATION_JOIN_TIMEOUT_MS);
-    if (join == 0 && station_listen()) {
+    int join = cyw43_arch_wifi_connect_timeout_ms(
+        STATION_WIFI_SSID, STATION_WIFI_PASSWORD, STATION_WIFI_AUTH,
+        STATION_JOIN_TIMEOUT_MS);
+    if (join == 0 && station_listen())
+    {
         char text[16];
         station_address_text(text, sizeof text);
         shared_enter();
@@ -471,11 +746,17 @@ static bool network_init(void)
         return true;
     }
     int join_link = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
-    shared_enter(); station_join_result = join != 0 ? join : -1; station_join_link = join_link; shared_exit();
+    shared_enter();
+    station_join_result = join != 0 ? join : -1;
+    station_join_link = join_link;
+    shared_exit();
     /* Could not join (wrong password, out of range, 5 GHz only...): start
      * from a clean radio and fall back to hosting the access point below. */
     cyw43_arch_deinit();
-    if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0) { return false; }
+    if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE) != 0)
+    {
+        return false;
+    }
 #endif
     /* SDK default channel 3 overlaps busy channels 1 and 6; 11 does not.
      * Init resets it, so set it here, before the AP starts. */
@@ -484,20 +765,30 @@ static bool network_init(void)
     /* SDK default is PM2 power-save; keep the radio awake so distant clients
      * don't see dropped or late packets. Must follow enable_ap_mode. */
     (void)cyw43_wifi_pm(&cyw43_state, CYW43_NONE_PM);
-    ip_addr_t gateway, mask;
+    ip_addr_t gateway;
+    ip_addr_t mask;
     IP4_ADDR(&gateway, 192, 168, 4, 1);
     IP4_ADDR(&mask, 255, 255, 255, 0);
     dhcp_server_init(&dhcp, &gateway, &mask);
     struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
-    if (pcb != NULL && dhcp.udp != NULL && tcp_bind(pcb, IP_ANY_TYPE, 80u) == ERR_OK) {
+    if (pcb != NULL && dhcp.udp != NULL &&
+        tcp_bind(pcb, IP_ANY_TYPE, 80u) == ERR_OK)
+    {
         struct tcp_pcb *listener = tcp_listen_with_backlog(pcb, CLIENT_COUNT);
-        if (listener != NULL) {
+        if (listener != NULL)
+        {
             tcp_accept(listener, accept_client);
-            shared_enter();core.selection_allowed = true;ready = true;shared_exit();
+            shared_enter();
+            core.selection_allowed = true;
+            ready = true;
+            shared_exit();
             return true;
         }
     }
-    if (pcb != NULL) { tcp_abort(pcb); }
+    if (pcb != NULL)
+    {
+        tcp_abort(pcb);
+    }
     dhcp_server_deinit(&dhcp);
     cyw43_arch_disable_ap_mode();
     cyw43_arch_deinit();
@@ -505,22 +796,39 @@ static bool network_init(void)
 }
 static void network_poll(void)
 {
-    if (!ready) { return; }
+    if (!ready)
+    {
+        return;
+    }
     uint64_t start = time_us_64();
     cyw43_arch_poll();
 #ifdef ROBOCAR_WIFI_STATION
-    if (station_mode) { station_maintain(); }
+    if (station_mode)
+    {
+        station_maintain();
+    }
 #endif
     /* One bounded chunk per connection per application iteration. */
-    for (size_t i = 0; i < CLIENT_COUNT; ++i) {
-        if (clients[i].pcb != NULL) {
-            if (time_us_64() - clients[i].opened_us > CLIENT_TIMEOUT_US) { (void)close_client(&clients[i]); }
-            else { (void)send_chunk(&clients[i]); }
+    for (size_t i = 0; i < CLIENT_COUNT; ++i)
+    {
+        if (clients[i].pcb != NULL)
+        {
+            if (time_us_64() - clients[i].opened_us > CLIENT_TIMEOUT_US)
+            {
+                (void)close_client(&clients[i]);
+            }
+            else
+            {
+                (void)send_chunk(&clients[i]);
+            }
         }
     }
     uint32_t elapsed = (uint32_t)(time_us_64() - start);
     shared_enter();
-    if (elapsed > max_poll_us) { max_poll_us = elapsed; }
+    if (elapsed > max_poll_us)
+    {
+        max_poll_us = elapsed;
+    }
     shared_exit();
 }
 #if ROBOCAR_WIFI_CORE1
@@ -528,17 +836,28 @@ static void network_main(void)
 {
     (void)network_init();
     sem_release(&network_started);
-    for(;;){network_poll();sleep_ms(1);}
+    for (;;)
+    {
+        network_poll();
+        sleep_ms(1);
+    }
 }
 #endif
 bool calibration_wifi_init(void)
 {
     shared_init();
 #if ROBOCAR_WIFI_CORE1
-    sem_init(&network_started,0,1);
-    multicore_launch_core1_with_stack(network_main,network_stack,sizeof(network_stack));
-    if(!sem_acquire_timeout_ms(&network_started,NETWORK_START_TIMEOUT_MS))return false;
-    shared_enter();bool available=ready;shared_exit();return available;
+    sem_init(&network_started, 0, 1);
+    multicore_launch_core1_with_stack(network_main, network_stack,
+                                      sizeof(network_stack));
+    if (!sem_acquire_timeout_ms(&network_started, NETWORK_START_TIMEOUT_MS))
+    {
+        return false;
+    }
+    shared_enter();
+    bool available = ready;
+    shared_exit();
+    return available;
 #else
     return network_init();
 #endif
@@ -546,23 +865,58 @@ bool calibration_wifi_init(void)
 void calibration_wifi_poll(bool selection_allowed)
 {
 #ifdef ROBOCAR_WIFI_STATION
-    shared_enter();bool announce=station_announce;station_announce=false;shared_exit();
-    if(announce)calibration_wifi_help();
+    shared_enter();
+    bool announce = station_announce;
+    station_announce = false;
+    shared_exit();
+    if (announce)
+    {
+        calibration_wifi_help();
+    }
 #endif
-    shared_enter();core.selection_allowed=selection_allowed;shared_exit();
+    shared_enter();
+    core.selection_allowed = selection_allowed;
+    shared_exit();
 #if !ROBOCAR_WIFI_CORE1
     network_poll();
 #endif
 }
 int calibration_wifi_getchar(void)
-{shared_enter();int ch=calibration_take_command(&core);if(ch=='q')selected_course=core.course;shared_exit();return ch;}
+{
+    shared_enter();
+    int ch = calibration_take_command(&core);
+    if (ch == 'q')
+    {
+        selected_course = core.course;
+    }
+    shared_exit();
+    return ch;
+}
 uint32_t calibration_wifi_max_poll_us(void)
-{shared_enter();uint32_t n=max_poll_us;shared_exit();return n;}
+{
+    shared_enter();
+    uint32_t n = max_poll_us;
+    shared_exit();
+    return n;
+}
 void calibration_wifi_reset_timing(void)
-{shared_enter();max_poll_us=0;shared_exit();}
+{
+    shared_enter();
+    max_poll_us = 0;
+    shared_exit();
+}
 #ifdef ROBOCAR_MEASUREMENTS
 void calibration_wifi_set_measure_live(const char *text)
-{shared_enter();snprintf(core.live,sizeof core.live,"%s",text);shared_exit();}
+{
+    shared_enter();
+    snprintf(core.live, sizeof core.live, "%s", text);
+    shared_exit();
+}
 #endif
 course_config_t calibration_wifi_course_config(void)
-{shared_enter();course_config_t c=selected_course;shared_exit();return c;}
+{
+    shared_enter();
+    course_config_t c = selected_course;
+    shared_exit();
+    return c;
+}

@@ -7,9 +7,18 @@
  * Only the debounced physical-button path may call note_release/arm.
  * 16-bit tokens never wrap: the 65,536th arm requires a cold restart. */
 #define SAFETY_SERVICE_US 40000u
-enum { STOP_BOOT, STOP_BUTTON, STOP_SERVICE, STOP_MOTION, STOP_INIT,
-       STOP_RANGE, STOP_COMPLETE };
-typedef struct {
+enum
+{
+    STOP_BOOT,
+    STOP_BUTTON,
+    STOP_SERVICE,
+    STOP_MOTION,
+    STOP_INIT,
+    STOP_RANGE,
+    STOP_COMPLETE
+};
+typedef struct
+{
     uint32_t serviced_us; /* modulo microseconds, compared within 40 ms */
     uint16_t epoch;
     uint8_t state; /* armed:0, release:1, stop reason:2..4; 5..7 zero */

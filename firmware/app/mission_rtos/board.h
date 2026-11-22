@@ -4,7 +4,8 @@
 #include "safety_gate.h"
 
 /* SDK hardware access stays on physical core0. All output paths are serialized
- * inside this module, including the IRQ's stop override. No network motor API. */
+ * inside this module, including the IRQ's stop override. No network motor API.
+ */
 bool board_init(void);
 bool board_button_down(void);
 void board_note_release(void);
@@ -16,20 +17,40 @@ void board_gate_snapshot(bool *armed, uint8_t *reason);
 bool board_select(uint8_t kind);
 #ifdef RTOS_OBSTACLE
 /* Local selector only. Obstacle mode still publishes track-format motion. */
-enum { BOARD_OBSTACLE_SELECT = 6 };
+enum
+{
+    BOARD_OBSTACLE_SELECT = 6
+};
 #endif
 uint8_t board_selected(void);
 void board_publish(const motion_record_t *record);
 void board_read(uint8_t output[MOTION_RECORD_BYTES]);
-typedef struct {
-    uint32_t sequence, requested_us, disabled_us, alarm_gap_us;
+typedef struct
+{
+    uint32_t sequence;
+    uint32_t requested_us;
+    uint32_t disabled_us;
+    uint32_t alarm_gap_us;
     uint8_t reason;
 } board_stop_trace_t;
 void board_stop_trace(board_stop_trace_t *trace);
-enum { STOP_SOURCE_BOOT,STOP_SOURCE_API,STOP_SOURCE_GUARD,STOP_SOURCE_APPLY };
-typedef struct {
-    uint32_t sequence,requested_us,disabled_us,guard_gap_us,service_gap_us;
-    uint8_t reason,source;bool armed;
+enum
+{
+    STOP_SOURCE_BOOT,
+    STOP_SOURCE_API,
+    STOP_SOURCE_GUARD,
+    STOP_SOURCE_APPLY
+};
+typedef struct
+{
+    uint32_t sequence;
+    uint32_t requested_us;
+    uint32_t disabled_us;
+    uint32_t guard_gap_us;
+    uint32_t service_gap_us;
+    uint8_t reason;
+    uint8_t source;
+    bool armed;
 } board_runtime_trace_t;
 void board_runtime_trace(board_runtime_trace_t *out);
 #endif

@@ -115,17 +115,18 @@ def check_obstacle_decoder():
     # Same hand-packed fixture as network_test.c obstacle_protocol().
     assert decode(topic,bytes.fromhex("4433221153bf34090400"))==dict(
         type="obstacle",captured_ms=0x11223344,active=True,phase=9,phase_name="AVOID_SCAN_SIDE",servo_deg=125,
-        range_valid=True,range_mm=1234,detected=2,completed=1)
+        range_valid=True,range_mm=1234,detected=2,completed=1,width_cm=0)
+    assert decode(topic,bytes.fromhex("4433221153bf3409049c"))["width_cm"]==39  # width6 in bits 42..47
     assert decode(topic,bytes.fromhex("44332211000000000000"))["active"] is False
-    for bad in ["4433221153bf340904","4433221153bf3409040000","4433221153bf34090440",
+    for bad in ["4433221153bf340904","4433221153bf3409040000","44332211000000000400",
                 "44332211020000000000","4433221153df00080400"]:
         try: decode(topic,bytes.fromhex(bad))
         except ValueError: pass
         else: raise AssertionError(f"Malformed obstacle packet accepted: {bad}")
     header=(ROOT/"firmware/app/robot_firmware/obstacle_bypass.h").read_text()
-    enum=header[header.index("typedef enum {"):header.index("} avoid_phase_t;")]
+    enum=header[re.search(r"typedef enum\s*\{",header).start():header.index("} avoid_phase_t;")]
     assert tuple(re.findall(r"AVOID_[A-Z_]+",enum))==OBSTACLE_PHASES,"observer phase names drifted from obstacle_bypass.h"
-    print("PASS obstacle decoder: hand-packed fixture, phase names, length/padding/inactive/range rejection")
+    print("PASS obstacle decoder: hand-packed fixture, phase names, length/width/inactive/range rejection")
 
 
 def main():

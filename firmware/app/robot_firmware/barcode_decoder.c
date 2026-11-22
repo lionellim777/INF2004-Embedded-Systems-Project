@@ -3,7 +3,8 @@
 #include <stddef.h>
 #include <math.h>
 
-enum {
+enum
+{
     CODE39_ELEMENTS = 9,
     CODE39_WIDE_ELEMENTS = 3,
     CODE39_CHARACTER_STRIDE = 10,
@@ -12,10 +13,9 @@ enum {
 };
 
 static const uint16_t letter_patterns[26] = {
-    0x109, 0x049, 0x148, 0x019, 0x118, 0x058, 0x00D,
-    0x10C, 0x04C, 0x01C, 0x103, 0x043, 0x142, 0x013,
-    0x112, 0x052, 0x007, 0x106, 0x046, 0x016, 0x181,
-    0x0C1, 0x1C0, 0x091, 0x190, 0x0D0,
+    0x109, 0x049, 0x148, 0x019, 0x118, 0x058, 0x00D, 0x10C, 0x04C,
+    0x01C, 0x103, 0x043, 0x142, 0x013, 0x112, 0x052, 0x007, 0x106,
+    0x046, 0x016, 0x181, 0x0C1, 0x1C0, 0x091, 0x190, 0x0D0,
 };
 
 typedef uint32_t (*run_getter_t)(const void *runs, unsigned int index);
@@ -38,127 +38,206 @@ static uint32_t packed_run_get(const void *runs, unsigned int index)
  * must still satisfy the original1.8 separation, plus within-class coherence.
  */
 static bool classify_pattern(const uint32_t widths[CODE39_ELEMENTS],
-                             uint16_t *pattern,
-                             uint32_t *white_threshold, int outer_narrow,
-                             uint8_t *reason,bool coherent)
+                             uint16_t *pattern, uint32_t *white_threshold,
+                             int outer_narrow, uint8_t *reason, bool coherent)
 {
-    if(reason)*reason=BARCODE_WIDTH_OK;
-    *pattern=0;
-#define WIDTH_REJECT(code) do {if(reason)*reason=(code);return false;} while(0)
+    if (reason)
+    {
+        *reason = BARCODE_WIDTH_OK;
+    }
+    *pattern = 0;
+#define WIDTH_REJECT(code)                                                     \
+    do                                                                         \
+    {                                                                          \
+        if (reason)                                                            \
+        {                                                                      \
+            *reason = (code);                                                  \
+        }                                                                      \
+        return false;                                                          \
+    } while (0)
     uint32_t sorted[2][5] = {{0}};
     unsigned count[2] = {0};
-    for (unsigned i=0;i<CODE39_ELEMENTS;i++) {
-        if (!widths[i] || widths[i]>BARCODE_RUN_MAX_US) WIDTH_REJECT(BARCODE_WIDTH_RANGE);
-        unsigned colour=i%2, insert=count[colour]++;
-        while (insert && sorted[colour][insert-1]>widths[i]) {
-            sorted[colour][insert]=sorted[colour][insert-1];--insert;
+    for (unsigned i = 0; i < CODE39_ELEMENTS; i++)
+    {
+        if (!widths[i] || widths[i] > BARCODE_RUN_MAX_US)
+        {
+            WIDTH_REJECT(BARCODE_WIDTH_RANGE);
         }
-        sorted[colour][insert]=widths[i];
+        unsigned colour = i % 2, insert = count[colour]++;
+        while (insert && sorted[colour][insert - 1] > widths[i])
+        {
+            sorted[colour][insert] = sorted[colour][insert - 1];
+            --insert;
+        }
+        sorted[colour][insert] = widths[i];
     }
     /* Three narrow elements of each colour. Ties at the split are ambiguous. */
-    if (sorted[0][3]<=sorted[0][2] || sorted[1][3]<=sorted[1][2]) WIDTH_REJECT(BARCODE_WIDTH_TIE);
-    int64_t offset=(int64_t)sorted[1][1]-sorted[0][1];
-    int64_t min_narrow=INT64_MAX,max_narrow=0,min_wide=INT64_MAX,max_wide=0;
-    int64_t outer_width=0, narrow[6],nsum=0,wsum=0;
-    unsigned narrow_count=0;
-    *pattern=0;
-    for (unsigned i=0;i<CODE39_ELEMENTS;i++) {
-        unsigned colour=i%2;
-        bool wide=widths[i]>=sorted[colour][3];
-        int64_t corrected=2*(int64_t)widths[i]+(colour ? -offset : offset);
-        if (corrected<=0) WIDTH_REJECT(BARCODE_WIDTH_OFFSET);
-        *pattern=(uint16_t)((*pattern<<1) | (wide?1u:0u));
+    if (sorted[0][3] <= sorted[0][2] || sorted[1][3] <= sorted[1][2])
+    {
+        WIDTH_REJECT(BARCODE_WIDTH_TIE);
+    }
+    int64_t offset = (int64_t)sorted[1][1] - sorted[0][1];
+    int64_t min_narrow = INT64_MAX, max_narrow = 0, min_wide = INT64_MAX,
+            max_wide = 0;
+    int64_t outer_width = 0, narrow[6], nsum = 0, wsum = 0;
+    unsigned narrow_count = 0;
+    *pattern = 0;
+    for (unsigned i = 0; i < CODE39_ELEMENTS; i++)
+    {
+        unsigned colour = i % 2;
+        bool wide = widths[i] >= sorted[colour][3];
+        int64_t corrected =
+            2 * (int64_t)widths[i] + (colour ? -offset : offset);
+        if (corrected <= 0)
+        {
+            WIDTH_REJECT(BARCODE_WIDTH_OFFSET);
+        }
+        *pattern = (uint16_t)((*pattern << 1) | (wide ? 1u : 0u));
         /* Only the physical first/last narrow BLACK guard element may use
          * bounded expansion. Never reinterpret a ranked wide bar as narrow. */
-        if ((int)i == outer_narrow) {
-            if (wide || colour) WIDTH_REJECT(BARCODE_WIDTH_OUTER);
-            outer_width=corrected;
+        if ((int)i == outer_narrow)
+        {
+            if (wide || colour)
+            {
+                WIDTH_REJECT(BARCODE_WIDTH_OUTER);
+            }
+            outer_width = corrected;
             continue;
         }
-        if(wide){
-            wsum+=corrected;
-            if(corrected<min_wide)min_wide=corrected;
-            if(corrected>max_wide)max_wide=corrected;
-        }else{
-            nsum+=corrected;
-            unsigned insert=narrow_count++;
-            while(insert && narrow[insert-1]>corrected){
-                narrow[insert]=narrow[insert-1];--insert;
+        if (wide)
+        {
+            wsum += corrected;
+            if (corrected < min_wide)
+            {
+                min_wide = corrected;
             }
-            narrow[insert]=corrected;
-            if(corrected<min_narrow)min_narrow=corrected;
-            if(corrected>max_narrow)max_narrow=corrected;
+            if (corrected > max_wide)
+            {
+                max_wide = corrected;
+            }
+        }
+        else
+        {
+            nsum += corrected;
+            unsigned insert = narrow_count++;
+            while (insert && narrow[insert - 1] > corrected)
+            {
+                narrow[insert] = narrow[insert - 1];
+                --insert;
+            }
+            narrow[insert] = corrected;
+            if (corrected < min_narrow)
+            {
+                min_narrow = corrected;
+            }
+            if (corrected > max_narrow)
+            {
+                max_narrow = corrected;
+            }
         }
     }
-    if(coherent){
+    if (coherent)
+    {
         /* Mean class ratio2..3.5; every narrow within35%, wide within25%.
          * Unlike worst-wide/biggest-narrow1.8, permits measured jitter around
          * a legitimate2:1 print. Class ranges must remain separated by30%.
          * Used only by exact31-extrema, two-profile waveform consensus. */
-        if(outer_narrow>=0 || wsum*2<nsum*2 || wsum*20>nsum*35 || min_wide*10<max_narrow*13)
+        if (outer_narrow >= 0 || wsum * 2 < nsum * 2 || wsum * 20 > nsum * 35 ||
+            min_wide * 10 < max_narrow * 13)
+        {
             WIDTH_REJECT(BARCODE_WIDTH_SEPARATION);
-        if(min_narrow*600<nsum*65 || max_narrow*600>nsum*135)WIDTH_REJECT(BARCODE_WIDTH_NARROW_SPREAD);
-        if(min_wide*300<wsum*75 || max_wide*300>wsum*125)WIDTH_REJECT(BARCODE_WIDTH_WIDE_SPREAD);
-    }else if(min_wide*10<max_narrow*18)WIDTH_REJECT(BARCODE_WIDTH_SEPARATION);
-    if(max_narrow>2*min_narrow)WIDTH_REJECT(BARCODE_WIDTH_NARROW_SPREAD);
-    if(max_wide>2*min_wide)WIDTH_REJECT(BARCODE_WIDTH_WIDE_SPREAD);
-    if (outer_narrow >= 0) {
+        }
+        if (min_narrow * 600 < nsum * 65 || max_narrow * 600 > nsum * 135)
+        {
+            WIDTH_REJECT(BARCODE_WIDTH_NARROW_SPREAD);
+        }
+        if (min_wide * 300 < wsum * 75 || max_wide * 300 > wsum * 125)
+        {
+            WIDTH_REJECT(BARCODE_WIDTH_WIDE_SPREAD);
+        }
+    }
+    else if (min_wide * 10 < max_narrow * 18)
+    {
+        WIDTH_REJECT(BARCODE_WIDTH_SEPARATION);
+    }
+    if (max_narrow > 2 * min_narrow)
+    {
+        WIDTH_REJECT(BARCODE_WIDTH_NARROW_SPREAD);
+    }
+    if (max_wide > 2 * min_wide)
+    {
+        WIDTH_REJECT(BARCODE_WIDTH_WIDE_SPREAD);
+    }
+    if (outer_narrow >= 0)
+    {
         /* End-of-frame optics/speed can expand a terminal narrow bar. Permit
          * ONE such bar per frame, with all other elements strict. It must be
          * an expansion, <=3x the other narrow median and at least 20% shorter
          * than every corrected wide element. Missing/extra runs are not fixed.
          * These are provisional acceptance bounds, not proof of the cause. */
-        if(narrow_count!=5 || outer_width<=max_narrow ||
-           outer_width>3*narrow[2] || outer_width*5>min_wide*4) WIDTH_REJECT(BARCODE_WIDTH_OUTER);
+        if (narrow_count != 5 || outer_width <= max_narrow ||
+            outer_width > 3 * narrow[2] || outer_width * 5 > min_wide * 4)
+        {
+            WIDTH_REJECT(BARCODE_WIDTH_OUTER);
+        }
     }
     /* Separator is white: compare in its original measurement domain. */
-    *white_threshold=sorted[1][2]+(sorted[1][3]-sorted[1][2])/2u;
+    *white_threshold = sorted[1][2] + (sorted[1][3] - sorted[1][2]) / 2u;
     return true;
 #undef WIDTH_REJECT
 }
 
 static char pattern_to_letter(uint16_t pattern)
 {
-    for (unsigned int index = 0u; index < 26u; ++index) {
-        if (letter_patterns[index] == pattern) {
+    for (unsigned int index = 0u; index < 26u; ++index)
+    {
+        if (letter_patterns[index] == pattern)
+        {
             return (char)('A' + index);
         }
     }
     return '\0';
 }
 
-static bool decode_direction(
-    const void *runs, run_getter_t get_run, bool reverse,
-    char *letter, int physical_outer,bool coherent)
+static bool decode_direction(const void *runs, run_getter_t get_run,
+                             bool reverse, char *letter, int physical_outer,
+                             bool coherent)
 {
     uint16_t patterns[CODE39_CHARACTER_COUNT];
     uint32_t thresholds[CODE39_CHARACTER_COUNT];
 
     for (unsigned int character = 0u; character < CODE39_CHARACTER_COUNT;
-         ++character) {
+         ++character)
+    {
         uint32_t widths[CODE39_ELEMENTS];
         unsigned int offset = character * CODE39_CHARACTER_STRIDE;
 
-        for (unsigned int element = 0u; element < CODE39_ELEMENTS;
-             ++element) {
+        for (unsigned int element = 0u; element < CODE39_ELEMENTS; ++element)
+        {
             unsigned int index = offset + element;
-            widths[element] = get_run(runs, reverse
-                ? BARCODE_CODE39_RUN_COUNT - 1u - index : index);
+            widths[element] = get_run(
+                runs, reverse ? BARCODE_CODE39_RUN_COUNT - 1u - index : index);
         }
 
-        int outer=-1;
-        int logical_outer=physical_outer;
-        if(reverse && physical_outer>=0) logical_outer=28-physical_outer;
-        if(logical_outer>=0 && (unsigned)logical_outer/10u==character)
-            outer=logical_outer%10;
+        int outer = -1;
+        int logical_outer = physical_outer;
+        if (reverse && physical_outer >= 0)
+        {
+            logical_outer = 28 - physical_outer;
+        }
+        if (logical_outer >= 0 && (unsigned)logical_outer / 10u == character)
+        {
+            outer = logical_outer % 10;
+        }
         if (!classify_pattern(widths, &patterns[character],
-                              &thresholds[character], outer, NULL,coherent)) {
+                              &thresholds[character], outer, NULL, coherent))
+        {
             return false;
         }
     }
 
-    if (patterns[0] != CODE39_ASTERISK ||
-        patterns[2] != CODE39_ASTERISK) {
+    if (patterns[0] != CODE39_ASTERISK || patterns[2] != CODE39_ASTERISK)
+    {
         return false;
     }
 
@@ -167,7 +246,8 @@ static bool decode_direction(
     uint32_t second_gap = get_run(runs, reverse ? 9u : 19u);
     if (!first_gap || !second_gap || first_gap >= thresholds[0] ||
         first_gap >= thresholds[1] || second_gap >= thresholds[1] ||
-        second_gap >= thresholds[2]) {
+        second_gap >= thresholds[2])
+    {
         return false;
     }
 
@@ -177,128 +257,292 @@ static bool decode_direction(
 
 /* Try strict first. A bounded fallback can affect only one physical outer
  * guard bar, never a payload or interior marker element. Conflicting candidates
- * are rejected, even if a future pattern set makes reverse decoding ambiguous. */
+ * are rejected, even if a future pattern set makes reverse decoding ambiguous.
+ */
 static bool decode(const void *runs, run_getter_t get_run, char *letter)
 {
-    static const int outer_modes[]={-1,0,28};
-    for(unsigned mode=0;mode<3;mode++) {
-        char accepted=0;
+    static const int outer_modes[] = {-1, 0, 28};
+    for (unsigned mode = 0; mode < 3; mode++)
+    {
+        char accepted = 0;
         /* Evaluate both boundary alternatives together before accepting. */
-        unsigned last=mode?3:1;
-        for(unsigned m=mode;m<last;m++)for(unsigned reverse=0;reverse<2;reverse++) {
-            char candidate=0;
-            if(decode_direction(runs,get_run,reverse,&candidate,outer_modes[m],false)) {
-                if(accepted && accepted!=candidate)return false;
-                accepted=candidate;
+        unsigned last = mode ? 3 : 1;
+        for (unsigned m = mode; m < last; m++)
+        {
+            for (unsigned reverse = 0; reverse < 2; reverse++)
+            {
+                char candidate = 0;
+                if (decode_direction(runs, get_run, reverse, &candidate,
+                                     outer_modes[m], false))
+                {
+                    if (accepted && accepted != candidate)
+                    {
+                        return false;
+                    }
+                    accepted = candidate;
+                }
             }
         }
-        if(accepted){*letter=accepted;return true;}
-        if(mode)break;
+        if (accepted)
+        {
+            *letter = accepted;
+            return true;
+        }
+        if (mode)
+        {
+            break;
+        }
     }
     return false;
 }
 
-bool barcode_decode_code39_letter(
-    const uint32_t runs[BARCODE_CODE39_RUN_COUNT], char *letter)
+bool barcode_decode_code39_letter(const uint32_t runs[BARCODE_CODE39_RUN_COUNT],
+                                  char *letter)
 {
-    if (runs == NULL || letter == NULL) return false;
-    return decode(runs,array_run_get,letter);
+    if (runs == NULL || letter == NULL)
+    {
+        return false;
+    }
+    return decode(runs, array_run_get, letter);
 }
 
 bool barcode_decode_code39_packed(const barcode_runs_t *runs, char *letter)
 {
-    if (runs == NULL || letter == NULL) return false;
-    return decode(runs,packed_run_get,letter);
+    if (runs == NULL || letter == NULL)
+    {
+        return false;
+    }
+    return decode(runs, packed_run_get, letter);
 }
 
-void barcode_inspect_code39(const uint32_t runs[29],barcode_decode_diagnostic_t *out)
+void barcode_inspect_code39(const uint32_t runs[29],
+                            barcode_decode_diagnostic_t *out)
 {
-    *out=(barcode_decode_diagnostic_t){0};
-    for(unsigned reverse=0;reverse<2;reverse++){
-        barcode_decode_diagnostic_t d={0};uint32_t thresholds[3]={0};
-        d.reversed=(uint8_t)reverse;
-        for(unsigned ch=0;ch<3;ch++){
+    *out = (barcode_decode_diagnostic_t){0};
+    for (unsigned reverse = 0; reverse < 2; reverse++)
+    {
+        barcode_decode_diagnostic_t d = {0};
+        uint32_t thresholds[3] = {0};
+        d.reversed = (uint8_t)reverse;
+        for (unsigned ch = 0; ch < 3; ch++)
+        {
             uint32_t widths[9];
-            for(unsigned e=0;e<9;e++)widths[e]=runs[reverse?28-ch*10-e:ch*10+e];
-            if(classify_pattern(widths,&d.patterns[ch],&thresholds[ch],-1,&d.width_reason[ch],false))d.score++;
+            for (unsigned e = 0; e < 9; e++)
+            {
+                widths[e] = runs[reverse ? 28 - ch * 10 - e : ch * 10 + e];
+            }
+            if (classify_pattern(widths, &d.patterns[ch], &thresholds[ch], -1,
+                                 &d.width_reason[ch], false))
+            {
+                d.score++;
+            }
         }
-        if(d.patterns[0]==CODE39_ASTERISK){d.guards|=1;d.score+=4;}
-        if(d.patterns[2]==CODE39_ASTERISK){d.guards|=2;d.score+=4;}
-        uint32_t a=runs[reverse?19:9],b=runs[reverse?9:19];
-        if(a && a<thresholds[0] && a<thresholds[1])d.separators|=1;
-        if(b && b<thresholds[1] && b<thresholds[2])d.separators|=2;
-        if(!reverse || d.score>out->score)*out=d;
+        if (d.patterns[0] == CODE39_ASTERISK)
+        {
+            d.guards |= 1;
+            d.score += 4;
+        }
+        if (d.patterns[2] == CODE39_ASTERISK)
+        {
+            d.guards |= 2;
+            d.score += 4;
+        }
+        uint32_t a = runs[reverse ? 19 : 9], b = runs[reverse ? 9 : 19];
+        if (a && a < thresholds[0] && a < thresholds[1])
+        {
+            d.separators |= 1;
+        }
+        if (b && b < thresholds[1] && b < thresholds[2])
+        {
+            d.separators |= 2;
+        }
+        if (!reverse || d.score > out->score)
+        {
+            *out = d;
+        }
     }
 }
 
-bool barcode_decode_code39_coherent(const uint32_t runs[29],char *letter)
+bool barcode_decode_code39_coherent(const uint32_t runs[29], char *letter)
 {
-    if(!runs || !letter)return false;
-    char accepted=0;
-    for(unsigned reverse=0;reverse<2;reverse++){
-        char candidate=0;
-        if(decode_direction(runs,array_run_get,reverse,&candidate,-1,true)){
-            if(accepted && accepted!=candidate)return false;
-            accepted=candidate;
+    if (!runs || !letter)
+    {
+        return false;
+    }
+    char accepted = 0;
+    for (unsigned reverse = 0; reverse < 2; reverse++)
+    {
+        char candidate = 0;
+        if (decode_direction(runs, array_run_get, reverse, &candidate, -1,
+                             true))
+        {
+            if (accepted && accepted != candidate)
+            {
+                return false;
+            }
+            accepted = candidate;
         }
     }
-    if(!accepted)return false;
-    *letter=accepted;return true;
+    if (!accepted)
+    {
+        return false;
+    }
+    *letter = accepted;
+    return true;
 }
 
 /* Flat printed3:1 Code39: black-bar CENTRES cancel an additive black/white
- * edge bias. Fit all letters and both directions; never pass an expected letter.
- * User measurements: narrow3mm (half),6mm (full), same3:1 white/black ratio. */
-bool barcode_decode_code39_geometry(const uint32_t runs[29],char *letter)
+ * edge bias. Fit all letters and both directions; never pass an expected
+ * letter. User measurements: narrow3mm (half),6mm (full), same3:1 white/black
+ * ratio. */
+bool barcode_decode_code39_geometry(const uint32_t runs[29], char *letter)
 {
-    if(!runs || !letter)return false;
-    for(unsigned i=0;i<29;i++)if(!runs[i] || runs[i]>BARCODE_RUN_MAX_US)return false;
-    char accepted=0;
-    for(unsigned reverse=0;reverse<2;reverse++){
-        float observed[15],at=0;uint32_t ordered[29];
-        for(unsigned i=0;i<29;i++){
-            ordered[i]=runs[reverse?28-i:i];
-            if(!(i%2))observed[i/2]=at+ordered[i]*0.5f;
-            at+=ordered[i];
-        }
-        unsigned black_mask[3]={0};bool ranks=true;
-        for(unsigned c=0;c<3;c++){
-            uint32_t black[5];
-            for(unsigned k=0;k<5;k++)black[k]=ordered[c*10+2*k];
-            for(unsigned i=1;i<5;i++){uint32_t v=black[i];unsigned j=i;while(j&&black[j-1]>v){black[j]=black[j-1];j--;}black[j]=v;}
-            if(black[3]<=black[2]){ranks=false;break;}
-            for(unsigned e=0;e<9;e+=2)if(ordered[c*10+e]>=black[3])black_mask[c]|=1u<<(8-e);
-        }
-        /* Guard/black-rank prefilter avoids expensive model fits on noise. */
-        if(!ranks || black_mask[0]!=(CODE39_ASTERISK&0x155u) || black_mask[2]!=(CODE39_ASTERISK&0x155u))continue;
-        for(unsigned ch=0;ch<26;ch++){
-            if((letter_patterns[ch]&0x155u)!=black_mask[1])continue;
-            unsigned pattern[3]={CODE39_ASTERISK,letter_patterns[ch],CODE39_ASTERISK};
-            unsigned modules[29];
-            for(unsigned i=0;i<29;i++)modules[i]=(i%10<9 && (pattern[i/10]&(1u<<(8-i%10))))?3u:1u;
-            float expected[15];at=0;
-            for(unsigned i=0;i<29;i++){if(!(i%2))expected[i/2]=at+modules[i]*0.5f;at+=modules[i];}
-            float mx=0,my=0;for(unsigned i=0;i<15;i++){mx+=expected[i];my+=observed[i];}mx/=15;my/=15;
-            float covariance=0,variance=0;
-            for(unsigned i=0;i<15;i++){float dx=expected[i]-mx;covariance+=dx*(observed[i]-my);variance+=dx*dx;}
-            float narrow=covariance/variance,offset=my-narrow*mx;
-            /*1000 units/mean encoder count; nominal wheel60mm/2543CPR.
-             * +/-25% accommodates uncalibrated geometry/scan-axis skew. */
-            const float half=3000.0f*2543.0f/188.4955592f;
-            bool scale=(narrow>=half*0.75f && narrow<=half*1.25f)||
-                       (narrow>=half*1.5f && narrow<=half*2.5f);
-            if(!scale)continue;
-            bool good=true;
-            for(unsigned i=0;i<15;i++){
-                if(fabsf(observed[i]-offset-narrow*expected[i])>0.65f*narrow)good=false;
-                if(i && fabsf((observed[i]-observed[i-1])-narrow*(expected[i]-expected[i-1]))>0.65f*narrow)good=false;
-            }
-            if(!good)continue;
-            char candidate=(char)('A'+ch);
-            if(accepted && accepted!=candidate)return false;
-            accepted=candidate;
+    if (!runs || !letter)
+    {
+        return false;
+    }
+    for (unsigned i = 0; i < 29; i++)
+    {
+        if (!runs[i] || runs[i] > BARCODE_RUN_MAX_US)
+        {
+            return false;
         }
     }
-    if(!accepted)return false;
-    *letter=accepted;return true;
+    char accepted = 0;
+    for (unsigned reverse = 0; reverse < 2; reverse++)
+    {
+        float observed[15], at = 0;
+        uint32_t ordered[29];
+        for (unsigned i = 0; i < 29; i++)
+        {
+            ordered[i] = runs[reverse ? 28 - i : i];
+            if (!(i % 2))
+            {
+                observed[i / 2] = at + ordered[i] * 0.5f;
+            }
+            at += ordered[i];
+        }
+        unsigned black_mask[3] = {0};
+        bool ranks = true;
+        for (unsigned c = 0; c < 3; c++)
+        {
+            uint32_t black[5];
+            for (unsigned k = 0; k < 5; k++)
+            {
+                black[k] = ordered[c * 10 + 2 * k];
+            }
+            for (unsigned i = 1; i < 5; i++)
+            {
+                uint32_t v = black[i];
+                unsigned j = i;
+                while (j && black[j - 1] > v)
+                {
+                    black[j] = black[j - 1];
+                    j--;
+                }
+                black[j] = v;
+            }
+            if (black[3] <= black[2])
+            {
+                ranks = false;
+                break;
+            }
+            for (unsigned e = 0; e < 9; e += 2)
+            {
+                if (ordered[c * 10 + e] >= black[3])
+                {
+                    black_mask[c] |= 1u << (8 - e);
+                }
+            }
+        }
+        /* Guard/black-rank prefilter avoids expensive model fits on noise. */
+        if (!ranks || black_mask[0] != (CODE39_ASTERISK & 0x155u) ||
+            black_mask[2] != (CODE39_ASTERISK & 0x155u))
+        {
+            continue;
+        }
+        for (unsigned ch = 0; ch < 26; ch++)
+        {
+            if ((letter_patterns[ch] & 0x155u) != black_mask[1])
+            {
+                continue;
+            }
+            unsigned pattern[3] = {CODE39_ASTERISK, letter_patterns[ch],
+                                   CODE39_ASTERISK};
+            unsigned modules[29];
+            for (unsigned i = 0; i < 29; i++)
+            {
+                modules[i] =
+                    (i % 10 < 9 && (pattern[i / 10] & (1u << (8 - i % 10))))
+                        ? 3u
+                        : 1u;
+            }
+            float expected[15];
+            at = 0;
+            for (unsigned i = 0; i < 29; i++)
+            {
+                if (!(i % 2))
+                {
+                    expected[i / 2] = at + modules[i] * 0.5f;
+                }
+                at += modules[i];
+            }
+            float mx = 0, my = 0;
+            for (unsigned i = 0; i < 15; i++)
+            {
+                mx += expected[i];
+                my += observed[i];
+            }
+            mx /= 15;
+            my /= 15;
+            float covariance = 0, variance = 0;
+            for (unsigned i = 0; i < 15; i++)
+            {
+                float dx = expected[i] - mx;
+                covariance += dx * (observed[i] - my);
+                variance += dx * dx;
+            }
+            float narrow = covariance / variance, offset = my - narrow * mx;
+            /*1000 units/mean encoder count; nominal wheel60mm/2543CPR.
+             * +/-25% accommodates uncalibrated geometry/scan-axis skew. */
+            const float half = 3000.0f * 2543.0f / 188.4955592f;
+            bool scale = (narrow >= half * 0.75f && narrow <= half * 1.25f) ||
+                         (narrow >= half * 1.5f && narrow <= half * 2.5f);
+            if (!scale)
+            {
+                continue;
+            }
+            bool good = true;
+            for (unsigned i = 0; i < 15; i++)
+            {
+                if (fabsf(observed[i] - offset - narrow * expected[i]) >
+                    0.65f * narrow)
+                {
+                    good = false;
+                }
+                if (i && fabsf((observed[i] - observed[i - 1]) -
+                               narrow * (expected[i] - expected[i - 1])) >
+                             0.65f * narrow)
+                {
+                    good = false;
+                }
+            }
+            if (!good)
+            {
+                continue;
+            }
+            char candidate = (char)('A' + ch);
+            if (accepted && accepted != candidate)
+            {
+                return false;
+            }
+            accepted = candidate;
+        }
+    }
+    if (!accepted)
+    {
+        return false;
+    }
+    *letter = accepted;
+    return true;
 }

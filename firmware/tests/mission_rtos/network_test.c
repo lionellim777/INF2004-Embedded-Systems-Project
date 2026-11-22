@@ -194,7 +194,10 @@ static void obstacle_protocol(void)
  bad=r;bad.range_mm=4096;assert(!obstacle_record_encode(&bad,b));
  obstacle_reading_t edge=r;edge.phase=31;edge.servo_deg=127;edge.range_mm=4095;assert(obstacle_record_encode(&edge,b));
  r.range_valid=false;assert(obstacle_record_encode(&r,b) && b[5]==0x1f && b[6]==0x00 && b[7]==0x08);
- r.active=false;assert(obstacle_record_encode(&r,b));
+ r.range_valid=true;r.width_cm=37;assert(obstacle_record_encode(&r,b) && ((b[9]>>2)&63u)==37u); /* width6 sits in bits 42..47 */
+ bad=r;bad.width_cm=64;assert(!obstacle_record_encode(&bad,b));
+ r.width_cm=0;
+ r.active=false;r.width_cm=37;assert(obstacle_record_encode(&r,b));
  for(unsigned i=4;i<OBSTACLE_RECORD_BYTES;i++)assert(b[i]==0);
  puts("PASS obstacle record: hand-packed phase, servo, range and episode counts");
 }

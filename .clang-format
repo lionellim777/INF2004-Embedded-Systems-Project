@@ -1,0 +1,27 @@
+# BARR-C:2018 layout for project-owned C: 80 columns, four-space indent,
+# no tabs, braces on their own lines, braces around every control body.
+Language: Cpp
+BasedOnStyle: LLVM
+ColumnLimit: 80
+IndentWidth: 4
+ContinuationIndentWidth: 4
+UseTab: Never
+BreakBeforeBraces: Allman
+InsertBraces: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+PointerAlignment: Right
+SpaceBeforeParens: ControlStatements
+IndentCaseLabels: false
+AlignAfterOpenBracket: Align
+BinPackArguments: true
+BinPackParameters: true
+SortIncludes: Never
+ReflowComments: true
+MaxEmptyLinesToKeep: 1
+LineEnding: LF
+InsertNewlineAtEOF: true

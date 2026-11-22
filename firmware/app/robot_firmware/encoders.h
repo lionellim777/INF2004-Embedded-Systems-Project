@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-typedef struct {
+typedef struct
+{
     uint32_t left_raw;
     uint32_t right_raw;
     uint32_t left_invalid;

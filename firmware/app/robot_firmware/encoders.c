@@ -6,7 +6,8 @@
 #include "hardware/irq.h"
 #include "hardware/sync.h"
 
-enum {
+enum
+{
     LEFT_A_PIN = 2,
     LEFT_B_PIN = 3,
     RIGHT_A_PIN = 16,
@@ -17,54 +18,61 @@ static volatile uint32_t counts[2];
 static volatile uint32_t invalid[2];
 static uint8_t previous_state[2];
 
-/* The handler and its table run from RAM, and the GPIO interrupt has top priority, so flash
- * (XIP) stalls and other handlers (USB etc.) cannot delay it past the gap between A and B edges.
- * A late read sees both pins changed and counts an invalid transition (a missed edge). */
+/* The handler and its table run from RAM, and the GPIO interrupt has top
+ * priority, so flash (XIP) stalls and other handlers (USB etc.) cannot delay it
+ * past the gap between A and B edges. A late read sees both pins changed and
+ * counts an invalid transition (a missed edge). */
 static uint8_t __not_in_flash_func(read_state)(uint pin_a, uint pin_b)
 {
     /* Read A/B from the same instant, rather than two separate GPIO reads. */
-    uint32_t pins=gpio_get_all();
-    return (uint8_t)(((pins>>pin_a)&1u)*2u | ((pins>>pin_b)&1u));
+    uint32_t pins = gpio_get_all();
+    return (uint8_t)(((pins >> pin_a) & 1u) * 2u | ((pins >> pin_b) & 1u));
 }
 
 /* Non-const so it lives in RAM (.data), not flash. */
 static int8_t transition_table[16] = {
-     0,  1, -1,  0,
-    -1,  0,  0,  1,
-     1,  0,  0, -1,
-     0, -1,  1,  0,
+    0, 1, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, -1, 1, 0,
 };
 
-static void __not_in_flash_func(encoder_gpio_callback)(uint gpio, uint32_t events)
+static void __not_in_flash_func(encoder_gpio_callback)(uint gpio,
+                                                       uint32_t events)
 {
     (void)events;
     uint index;
     uint pin_a;
     uint pin_b;
-    if (gpio == LEFT_A_PIN || gpio == LEFT_B_PIN) {
+    if (gpio == LEFT_A_PIN || gpio == LEFT_B_PIN)
+    {
         index = 0u;
         pin_a = LEFT_A_PIN;
         pin_b = LEFT_B_PIN;
-    } else if (gpio == RIGHT_A_PIN || gpio == RIGHT_B_PIN) {
+    }
+    else if (gpio == RIGHT_A_PIN || gpio == RIGHT_B_PIN)
+    {
         index = 1u;
         pin_a = RIGHT_A_PIN;
         pin_b = RIGHT_B_PIN;
-    } else {
+    }
+    else
+    {
         return;
     }
 
     uint8_t current = read_state(pin_a, pin_b);
-    if ((previous_state[index] ^ current) == 3u) {
+    if ((previous_state[index] ^ current) == 3u)
+    {
         ++invalid[index];
     }
-    counts[index] += (uint32_t)(int32_t)transition_table[(previous_state[index] << 2u) | current];
+    counts[index] += (uint32_t)(int32_t)
+        transition_table[(previous_state[index] << 2u) | current];
     previous_state[index] = current;
 }
 
 void encoders_init(void)
 {
     const uint pins[4] = {LEFT_A_PIN, LEFT_B_PIN, RIGHT_A_PIN, RIGHT_B_PIN};
-    for (uint i = 0u; i < 4u; ++i) {
+    for (uint i = 0u; i < 4u; ++i)
+    {
         gpio_init(pins[i]);
         gpio_set_dir(pins[i], GPIO_IN);
         gpio_pull_up(pins[i]);
@@ -85,15 +93,15 @@ void encoders_init(void)
 int32_t encoder_left_count(void)
 {
     uint32_t value = counts[0];
-    return value <= INT32_MAX ? (int32_t)value :
-        (int32_t)((int64_t)value - INT64_C(4294967296));
+    return value <= INT32_MAX ? (int32_t)value
+                              : (int32_t)((int64_t)value - INT64_C(4294967296));
 }
 
 int32_t encoder_right_count(void)
 {
     uint32_t value = counts[1];
-    return value <= INT32_MAX ? (int32_t)value :
-        (int32_t)((int64_t)value - INT64_C(4294967296));
+    return value <= INT32_MAX ? (int32_t)value
+                              : (int32_t)((int64_t)value - INT64_C(4294967296));
 }
 
 encoder_sample_t encoders_snapshot(void)

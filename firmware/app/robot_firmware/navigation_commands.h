@@ -3,7 +3,8 @@
 
 #include <stdbool.h>
 
-typedef enum {
+typedef enum
+{
     NAV_COMMAND_NONE,
     NAV_COMMAND_LEFT,
     NAV_COMMAND_RIGHT,
@@ -12,15 +13,16 @@ typedef enum {
     NAV_COMMAND_INVALID
 } navigation_command_t;
 
-typedef struct {
+typedef struct
+{
     navigation_command_t command;
     float requested_turn_degrees;
     bool requires_turn;
 } navigation_manoeuvre_t;
 
 navigation_command_t navigation_decode_symbol(char symbol);
-navigation_manoeuvre_t navigation_create_manoeuvre(
-    navigation_command_t command);
+navigation_manoeuvre_t
+navigation_create_manoeuvre(navigation_command_t command);
 const char *navigation_command_name(navigation_command_t command);
 
 #endif

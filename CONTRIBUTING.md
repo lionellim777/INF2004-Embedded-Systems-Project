@@ -39,5 +39,11 @@ A hardware change is complete only when:
 - Validate pointers and sensor results before use.
 - Keep interrupt handlers short and non-blocking.
 - Use bounded waits and safe failure states.
-- Follow the supplied BARR-C guidance where practical for the module.
+- Follow the BARR-C coding standard in project-owned C under `firmware/app/`:
+  run `clang-format -i` on changed files (the repository `.clang-format` gives
+  80 columns, four-space indent and braces on their own lines) and
+  `py -3 tools/check_barr.py`, which must report no findings. Generated pages
+  and upstream copies are excluded; see `docs/minimum-bit-representation.md`.
+- Use `ROBOCAR_BIT1` for groups of one-bit flags that a single task owns, and
+  never share a byte between flags written from different contexts.
 
