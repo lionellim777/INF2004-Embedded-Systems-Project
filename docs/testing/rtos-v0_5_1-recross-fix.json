@@ -1,0 +1,80 @@
+{
+  "version": "0.5.1",
+  "branch": "yixuan/rtos-barcode-recross",
+  "base_commit": "a7cdba2",
+  "recorded_utc": "2026-11-09T02:34:04.985683+00:00",
+  "status": "Installed; one physical AAZ pass accepted; live wireless power-handoff acceptance remains open",
+  "image": {
+    "private_path": "build/rtos-network-v0_5_1/robocar_rtos_network_v0_5_1.uf2",
+    "sha256": "b7836015b55e8636b6f154a3139b693851651b810b654da642c85b5a62e2624d",
+    "uf2_matches_linked_binary": true,
+    "text_bytes": 451248,
+    "bss_bytes": 207332,
+    "data_bytes": 0,
+    "bss_increase_over_v0_5": 1024,
+    "task_stack_allocations_unchanged": true
+  },
+  "diagnosis": {
+    "source_session": "serial-output/rtos-network-20261109-101959",
+    "capture_start_us": 54420463,
+    "fnv1a": "43be51a9",
+    "retained_readings": 3873,
+    "largest_backward_projected_excursion_counts": 186,
+    "largest_backward_projected_excursion_mm": 13.79,
+    "old_high_prominence_extrema": [
+      33,
+      33,
+      33
+    ],
+    "new_high_prominence_extrema": [
+      31,
+      31,
+      31
+    ],
+    "original_replay_letter": null,
+    "candidate_replay_letter": "A"
+  },
+  "change": "An opt-in per-instance1024-byte bitmap selects strict suffix minima of measured GP26 projected positions. Decoding then uses the latest monotonic crossing of rescanned coordinates, retaining raw samples and all existing Code39 validators. No edges are guessed/deleted, no expected letter is supplied, and no framing/geometry tolerance is relaxed.",
+  "legacy_behavior": "BARCODE_WAVE_LAST_PASS defaults to0. Only RTOS enables1; v5.63 image and default scanner behavior remain preserved.",
+  "tests": {
+    "waveform_modes": [
+      "legacy0/first",
+      "recovery1/first",
+      "recovery1/latest"
+    ],
+    "saved_full_A_batch_and_streaming": "PASS A only in latest mode; original path continues rejecting",
+    "saved_bend_Z_inputs": "PASS",
+    "previous_physical_AAZ_Z_capture": "PASS Z",
+    "transient_recross_A_Z_both_directions_full_half": "104/104 in latest mode,0/104 in first mode",
+    "extra_mark_without_recross_and_missing_guard": "208/208 rejected in each mode",
+    "existing_waveform_matrices_noise_guards_partials_quiet_wrap": "PASS in all three modes",
+    "actual_ADC_queue_course_decoder_PWM_host_integration": "PASS",
+    "motor_guard_start_stop_fault_host_regression": "PASS",
+    "console_and_bench": "PASS v0.5.1 identity, no START, existing telemetry",
+    "local_setup_and_broker": "PASS (compatible MacOSX26.5 SDK)"
+  },
+  "validation_logs": [
+    "build/rtos-v0_5_1-waveform-tests.log",
+    "build/rtos-v0_5_1-track-tests.log",
+    "build/rtos-v0_5_1-motion-tests.log",
+    "build/rtos-v0_5_1-console-tests.log",
+    "build/rtos-v0_5_1-bench-tests.log",
+    "build/rtos-v0_5_1-recorded-full-A-replay.log",
+    "build/rtos-v0_5_1-recorded-previous-pass-replay.log",
+    "build/rtos-v0_5_1-setup-tests.log"
+  ],
+  "limits": [
+    "One physical AAZ pass now has all three retained attempts accepted; repeatability remains unverified.",
+    "Live telemetry was absent during the course and recovered on USB reconnection. A stationary standalone-power boot check remains pending.",
+    "Steering, sensor calibration, motor guard and task stacks are unchanged. Teammate modules remain outside this target."
+  ],
+  "source_sha256": {
+    "firmware/app/robot_firmware/barcode_waveform.c": "89c9e46aec1c26a33bfed17bf43c13e43e8bc55b803956c26a5aad47ee75bd25",
+    "firmware/app/robot_firmware/barcode_waveform.h": "8cecdf768bf7c8edbaecc8833d873f22233e7cebff0ec956c8437c915a9fa128",
+    "firmware/app/mission_rtos/version.h": "267bf75c84491abf90597679a176cf285de1a034ee00e85fdac3ed71df63c8ff",
+    "firmware/app/mission_rtos/CMakeLists.txt": "a9ec1c8d802af6b669bcd120d26f3ab9d8adc7f85ae76147bb3df2a1aee117f3"
+  },
+  "implementation_commit": "924eefe",
+  "stationary_acceptance": "rtos-v0_5_1-stationary-acceptance.json",
+  "physical_track_acceptance": "rtos-v0_5_1-track-acceptance.json"
+}

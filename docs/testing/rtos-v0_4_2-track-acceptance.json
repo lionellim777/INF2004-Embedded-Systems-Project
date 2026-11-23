@@ -1,0 +1,129 @@
+{
+  "firmware_version": "0.4.2",
+  "source_commit": "916c0dc",
+  "recorded_utc": "2026-11-08T16:12:35.643097+00:00",
+  "source_session": "serial-output/rtos-network-20261109-000152",
+  "firmware_sha256": "e46e1dc253ba054d2a6c179052b7b282961e440104eaed21e4d7312cb13cffff",
+  "physical_run": true,
+  "user_report": "Done, successfully detected all 3.",
+  "target_sequence": [
+    "full A",
+    "half A",
+    "half Z at right bend"
+  ],
+  "accepted_reads": [
+    {
+      "type": "barcode",
+      "captured_ms": 42872,
+      "barcode": "A",
+      "unreadable": false,
+      "valid": true,
+      "simulated": false
+    },
+    {
+      "type": "barcode",
+      "captured_ms": 52858,
+      "barcode": "A",
+      "unreadable": false,
+      "valid": true,
+      "simulated": false
+    },
+    {
+      "type": "barcode",
+      "captured_ms": 65448,
+      "barcode": "Z",
+      "unreadable": false,
+      "valid": true,
+      "simulated": false
+    }
+  ],
+  "attempt_details": [
+    {
+      "letter": "A",
+      "start_us": 36664472,
+      "duration_us": 6208000,
+      "yaw_deg": 0,
+      "lateral_mm": 0,
+      "geometry_mask": 48,
+      "consensus_mask": 0,
+      "recovery_counter_min": 0,
+      "recovery_counter_max": 0
+    },
+    {
+      "letter": "A",
+      "start_us": 49558472,
+      "duration_us": 3300000,
+      "yaw_deg": 0,
+      "lateral_mm": 0,
+      "geometry_mask": 62,
+      "consensus_mask": 0,
+      "recovery_counter_min": 0,
+      "recovery_counter_max": 0
+    },
+    {
+      "letter": "Z",
+      "start_us": 59324472,
+      "duration_us": 6124000,
+      "yaw_deg": 25,
+      "lateral_mm": 89,
+      "geometry_mask": 60,
+      "consensus_mask": 0,
+      "recovery_counter_min": 11,
+      "recovery_counter_max": 16
+    }
+  ],
+  "summary": {
+    "type": "scan_diag",
+    "run": 1,
+    "record": "state",
+    "captured_ms": 88721,
+    "samples": 19340,
+    "frames": 7,
+    "rejected": 1,
+    "decode_max_us": 77617,
+    "adc_max_us": 114,
+    "reads": 3,
+    "queue_peak": 40,
+    "faults": 0,
+    "enabled": false,
+    "recording": false,
+    "sealed": true,
+    "attempts": 4,
+    "ready": true,
+    "attempt_overflow": 0,
+    "recoveries": 31,
+    "stop_us": 73880583,
+    "stop_discarded_samples": 5
+  },
+  "controller_stop": {
+    "type": "motion",
+    "captured_ms": 89040,
+    "left_counts": 19093,
+    "right_counts": 15415,
+    "left_mm_s": 0,
+    "right_mm_s": 0,
+    "kind": 7,
+    "phase": 3,
+    "fault": 0,
+    "stop_reason": 1,
+    "valid": true,
+    "stop_latched": true
+  },
+  "waveform_complete": true,
+  "waveform_checksum_verified": true,
+  "mqtt_stop_acks": 1,
+  "mqtt_decode_errors": 0,
+  "concurrent_Z_recoveries_lower_bound": 5,
+  "network_observations": {
+    "motion_delay_events": 8,
+    "max_motion_delay_seconds": 2.222565374999249
+  },
+  "acceptance_scope": "One successful real line/barcode/encoder/MQTT run under micro T-Kernel; Z decoded during ongoing line recovery.",
+  "limits": [
+    "One v0.4.2 moving pass, not repeated-course reliability.",
+    "Both A captures had no observed line recovery; full-A decoding during recovery still requires validation.",
+    "Successful Z used the existing geometry path; the opt-in short-black exception is verified by archived failed-input replay, not attributed as the path used in this pass.",
+    "Wireless delivery gaps are not local controller deadlines; maximum observed arrival gap was about 2.22 seconds.",
+    "Loaded stop latency, task stack watermarks, whole-application minimum-bit coverage and teammate modules remain open."
+  ]
+}

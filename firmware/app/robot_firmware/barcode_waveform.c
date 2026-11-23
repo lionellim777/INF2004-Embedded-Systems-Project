@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <math.h>
 #include "barcode_motion.h"
+#ifndef BARCODE_WAVE_RECOVERY_OPTICS
+#define BARCODE_WAVE_RECOVERY_OPTICS 0
+#endif
 
 /* Adapted from the record-then-decide method in the user-supplied
  * autonomous-robotic-car-main/app_program/subsystem3/barcode_decoder.c:
@@ -36,10 +39,16 @@ static uint32_t fraction(unsigned d,unsigned lo,unsigned hi)
  * a stop or behind the furthest observed position do not add stripe width or
  * duplicate stripes. With flat long bars, another lateral row can contain
  * the same stripe sequence; optical framing and geometry must validate it.
- * Raw samples are retained. */
+ * RTOS latest-pass mode selects the final crossing of rescanned coordinates:
+ * an early filtered optical response during recovery must not be joined to a
+ * later response from the repeated crossing. No edge is inserted/deleted or
+ * chosen using a candidate letter. Raw samples are retained. */
 static bool series_next(const barcode_waveform_t *w,unsigned *index,int32_t *coordinate)
 {
     for(unsigned i=*index+1u;i<w->count;i++){
+#if BARCODE_WAVE_LAST_PASS
+        if(w->motion && !(w->latest_mask[i/8u]&(1u<<(i%8u))))continue;
+#endif
         int32_t next=w->motion?w->position[i]:*coordinate+(int32_t)STEP(w,i);
         if(w->motion && next<=*coordinate)continue;
         *index=i;*coordinate=next;return true;
@@ -96,6 +105,21 @@ bool barcode_waveform_decode(barcode_waveform_t *w,char *letter)
     static const unsigned prominence[]={12,24,48,96,192,384};
     if(!w || !letter || w->count<3u || w->count>BARCODE_WAVE_SAMPLES)return false;
     if(w->motion && w->motion_fault)return false;
+#if BARCODE_WAVE_LAST_PASS
+    if(w->motion){
+        /* A reverse scan marks strict suffix minima in O(sample count).
+         * Reading those marked samples forward gives the latest monotonic
+         * traversal. Include only one observation at a repeated coordinate;
+         * filtering/settling while stopped cannot create extra stripe width.
+         * No allocation, recursion, IRQ mask or destructive compaction. */
+        memset(w->latest_mask,0,sizeof(w->latest_mask));
+        int32_t minimum=INT32_MAX;
+        for(unsigned i=w->count;i-- >0u;){
+            if(w->position[i]>=minimum)continue;
+            minimum=w->position[i];w->latest_mask[i/8u]|=(uint8_t)(1u<<(i%8u));
+        }
+    }
+#endif
     char geometry=0;unsigned geometry_profiles=0;uint32_t *geometry_runs=w->geometry_work;
     char accepted=0,fit=0;uint32_t *fit_runs=w->fit_work;unsigned fit_profiles=0;unsigned best_score=0;bool conflict=false;
     w->complete_profiles=0;
@@ -107,16 +131,33 @@ bool barcode_waveform_decode(barcode_waveform_t *w,char *letter)
         /* Skip whole black/white pairs. A complete frame's own 29 intervals
          * remain intact; prefix/tail activity is never used to fill gaps. */
         for(unsigned start=0;start+29u<count;start+=2u){
-            uint32_t runs[29];bool bounded=true;d->windows++;
+            uint32_t runs[29];bool bounded=true,subfloor_ok=true;unsigned subfloor=0;d->windows++;
             for(unsigned i=0;i<29;i++){
                 runs[i]=edges[start+i+1u]-edges[start+i];
                 if(runs[i]<(w->motion?4000u:MIN_RUN_US) || runs[i]>BARCODE_RUN_MAX_US){
                     if(!d->code39.score){d->reason=runs[i]<(w->motion?4000u:MIN_RUN_US)?WAVE_RUN_SHORT:WAVE_RUN_LONG;
                         d->bad_run=(uint8_t)i;d->bad_width=runs[i];}
                     bounded=false;
+                    /* Crossing bias can shorten a positive black interval.
+                     * Never admit a missing edge,
+                     * a tiny white gap, multiple tiny bars or an overlong run. */
+                    if(!w->motion || runs[i]<1000u || runs[i]>=4000u || i%2u)subfloor_ok=false;
+                    subfloor++;
                 }
             }
             if(!bounded){
+                /* Retain the floor for ordinary decoding. On a COMPLETE
+                 * 31-extrema motion frame, one positive black interval may
+                 * be shortened by the sensor's crossing bias. The existing
+                 * strict width/bias/guard/separator validator must accept
+                 * all29 runs, with agreement from >=2 contrast profiles.
+                 * No edge is inserted, deleted or labelled from expectation. */
+                char candidate=0;
+                if(BARCODE_WAVE_RECOVERY_OPTICS && w->motion && d->extrema==31u &&
+                   subfloor_ok && subfloor==1u && barcode_decode_code39_letter(runs,&candidate)){
+                    if(fit && fit!=candidate)conflict=true;
+                    fit=candidate;fit_profiles|=1u<<p;memcpy(fit_runs,runs,sizeof(runs));
+                }
                 /* Retain all29 apparent widths even when the absolute floor
                  * fails, so later diagnostics do not replace them with zeros. */
                 if(!d->code39.score)memcpy(d->runs,runs,sizeof(runs));

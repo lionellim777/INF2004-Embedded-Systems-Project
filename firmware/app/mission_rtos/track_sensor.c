@@ -1,0 +1,344 @@
+#include "track_sensor.h"
+#include "barcode_signal.h"
+#ifdef RTOS_COMPACT_ADC_STATE
+#include "adc12_filter.h"
+#include "board.h"
+#endif
+#include "barcode_waveform.h"
+#include "encoders.h"
+#include "network_service.h"
+#include "hardware/adc.h"
+#include "hardware/sync.h"
+#include "pico/stdlib.h"
+#include <string.h>
+
+#define QUEUE_SIZE 512u
+#define EVENT_SIZE 8u
+/* us32 + raw encoder32x2 + ADC12: 108 bits in 14 bytes. Four zero pad bits.
+ * Preserve raw encoder wrap and the validated 2ms waveform/filter precision. */
+static uint8_t queue[QUEUE_SIZE][14],events[EVENT_SIZE][5];
+#ifdef RTOS_COMPACT_CORE_STATE
+#include "track_control.h"
+static track_control_t capture;
+#define CAP_HEAD capture.head
+#define CAP_TAIL capture.tail
+#define CAP_EVENT_HEAD capture.event_head
+#define CAP_EVENT_TAIL capture.event_tail
+#define CAP_ENABLED capture.enabled
+#define CAP_DIVIDER capture.divider
+#else
+static uint16_t head,tail,event_head,event_tail;
+#define CAP_HEAD head
+#define CAP_TAIL tail
+#define CAP_EVENT_HEAD event_head
+#define CAP_EVENT_TAIL event_tail
+#define CAP_ENABLED enabled
+#define CAP_DIVIDER divider
+#endif
+static uint16_t requested,active;
+#ifndef RTOS_COMPACT_CORE_STATE
+static bool enabled;
+#endif
+static track_ir_t latest;
+static track_diagnostics_t diagnostics;
+static repeating_timer_t timer;
+#ifdef RTOS_COMPACT_ADC_STATE
+static adc12_filter_t filter;
+#else
+static barcode_signal_t filter;
+#endif
+static barcode_waveform_t waveform; /* v5.63 base; RTOS opts into recovery optics */
+#ifndef RTOS_COMPACT_CORE_STATE
+static unsigned divider;
+#endif
+static uint16_t sealed,stop_discarded;
+static uint32_t recoveries,stop_us;
+/* Retain the FIRST substantial failed optical capture as well as the running
+ * decoder's usual latest snapshot. Full 8192-reading bound = 32 KiB of words.
+ * This lets the next run expose the interrupted full A instead of replacing
+ * its raw evidence with the later bend. No truncation or ISR copy. */
+#define FIRST_FAILURE_WORDS (2u*BARCODE_WAVE_SAMPLES)
+#ifndef RTOS_NO_FIRST_FAILURE_CACHE
+static scan_snapshot_t first_failure;
+static barcode_wave_profile_t first_profiles[6];
+static uint16_t first_words[FIRST_FAILURE_WORDS];
+static void retain_first_failure(void)
+{
+    const barcode_wave_snapshot_t *s=&waveform.saved;
+    if(first_failure.count || !s->count || s->count>FIRST_FAILURE_WORDS ||
+       s->reason==WAVE_ACCEPTED || s->duration_us<1000000u || s->signal_range<100u)return;
+    memcpy(first_words,s->sample,s->count*sizeof(uint16_t));
+    memcpy(first_profiles,s->profile,sizeof first_profiles);
+    first_failure=(scan_snapshot_t){.start_us=s->start_us,.leading_us=s->leading_us,.white_us=s->white_us,
+        .duration_us=s->duration_us,.checksum=s->checksum,.count=s->count,.paper=s->paper,
+        .signal_range=s->signal_range,.reason=s->reason,.coherent_mask=s->coherent_mask,
+        .geometry_mask=s->geometry_mask,.letter=s->letter,.motion=s->motion};
+}
+static void select_first_failure(void)
+{
+    if(!first_failure.count)return;
+    barcode_wave_snapshot_t *s=&waveform.saved;const scan_snapshot_t *f=&first_failure;
+    s->start_us=f->start_us;s->leading_us=f->leading_us;s->white_us=f->white_us;
+    s->duration_us=f->duration_us;s->checksum=f->checksum;s->count=f->count;s->paper=f->paper;
+    s->signal_range=f->signal_range;s->reason=f->reason;s->coherent_mask=f->coherent_mask;
+    s->geometry_mask=f->geometry_mask;s->letter=f->letter;s->motion=f->motion;
+    memcpy(s->sample,first_words,s->count*sizeof(uint16_t));memcpy(s->profile,first_profiles,sizeof first_profiles);
+}
+static inline void reset_first_failure(void){first_failure=(scan_snapshot_t){0};}
+#else
+/* Lean profile keeps the same decoder, attempt ledger and latest frozen
+ * waveform; only the duplicate first-failure raw cache is omitted. */
+static inline void retain_first_failure(void){}
+static inline void select_first_failure(void){}
+static inline void reset_first_failure(void){}
+#endif
+
+static void put32(uint8_t *p,uint32_t n)
+{ for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(n>>(8u*i)); }
+static uint32_t get32(const uint8_t *p)
+{ return (uint32_t)p[0]|((uint32_t)p[1]<<8u)|((uint32_t)p[2]<<16u)|((uint32_t)p[3]<<24u); }
+#ifdef RTOS_COMPACT_ADC_STATE
+static bool adc_mean(unsigned input,uint16_t *out)
+{
+    adc_select_input(input);busy_wait_us_32(5);
+    uint16_t total=0; /* Eight ADC12 values sum to0..32760. */
+    for(unsigned i=0;i<8;i++){
+        uint16_t raw=adc_read();
+        if(raw>4095u)return false;
+        total=(uint16_t)(total+raw);
+    }
+    *out=(uint16_t)(total/8u);return true;
+}
+#else
+static uint16_t adc_mean(unsigned input)
+{
+    adc_select_input(input);busy_wait_us_32(5);
+    uint32_t total=0;
+    for(unsigned i=0;i<8;i++)total+=adc_read();
+    return (uint16_t)(total/8u);
+}
+#endif
+static bool sample(repeating_timer_t *unused)
+{
+    (void)unused;
+    uint32_t now=time_us_32();
+    /* GP26 barcode, GP28 centre, GP27 right: same order as v5.63. */
+#ifdef RTOS_COMPACT_ADC_STATE
+    /* Invalid ADC values never truncate into plausible black/white samples.
+     * The existing board stop gate is IRQ-safe and owns all PWM writes. */
+    if(!adc_mean(0,&latest.raw[0]) || !adc_mean(2,&latest.raw[1]) || !adc_mean(1,&latest.raw[2])){
+        board_stop(STOP_RANGE);return true;
+    }
+#else
+    latest.raw[0]=adc_mean(0);latest.raw[1]=adc_mean(2);latest.raw[2]=adc_mean(1);
+#endif
+    latest.us=now;
+#ifdef RTOS_COMPACT_ADC_STATE
+    uint16_t grey;
+    if(!adc12_filter_update(&filter,latest.raw[0],&grey)){board_stop(STOP_RANGE);return true;}
+#else
+    uint16_t grey=barcode_signal_update(&filter,latest.raw[0]);
+#endif
+#ifdef RTOS_COMPACT_CORE_STATE
+    /* The two-bit divider stores only0..3; four is a transient arithmetic
+     * result, not a representable state. Disabled time does not advance it. */
+    if(CAP_ENABLED)CAP_DIVIDER=(CAP_DIVIDER+1u)&3u;
+    if(CAP_ENABLED && CAP_DIVIDER==0u){
+#else
+    if(CAP_ENABLED && ++CAP_DIVIDER==4u){
+#endif
+        CAP_DIVIDER=0;
+        uint16_t next=(uint16_t)((CAP_HEAD+1u)%QUEUE_SIZE);
+        if(next==CAP_TAIL)diagnostics.faults|=TRACK_QUEUE_FAULT;
+        else {
+            encoder_sample_t e=encoders_snapshot();uint8_t *p=queue[CAP_HEAD];
+            put32(p,now);put32(p+4,e.left_raw);put32(p+8,e.right_raw);
+            p[12]=(uint8_t)grey;p[13]=(uint8_t)(grey>>8u);
+            CAP_HEAD=next;
+            unsigned depth=(CAP_HEAD+QUEUE_SIZE-CAP_TAIL)%QUEUE_SIZE;
+            if(depth>diagnostics.queue_peak)diagnostics.queue_peak=(uint16_t)depth;
+            diagnostics.samples++;
+        }
+    }
+    uint32_t duration=time_us_32()-now;
+    if(duration>diagnostics.adc_max_us)diagnostics.adc_max_us=duration;
+    return true;
+}
+bool track_sensor_init(void)
+{
+#ifdef RTOS_COMPACT_CORE_STATE
+    memset(&capture,0,sizeof capture);
+#endif
+    CAP_ENABLED=false;requested=active=0;CAP_HEAD=CAP_TAIL=CAP_EVENT_HEAD=CAP_EVENT_TAIL=0;CAP_DIVIDER=0;
+    latest=(track_ir_t){0};diagnostics=(track_diagnostics_t){0};
+    memset(&filter,0,sizeof filter);
+    sealed=stop_discarded=0;recoveries=stop_us=0;
+    reset_first_failure();
+    adc_init();adc_gpio_init(26);adc_gpio_init(28);adc_gpio_init(27);
+    latest.ready=add_repeating_timer_us(-(int64_t)TRACK_SAMPLE_US,sample,NULL,&timer);
+    return latest.ready;
+}
+void track_sensor_read(track_ir_t *out)
+{
+    uint32_t irq=save_and_disable_interrupts();*out=latest;out->age_us=time_us_32()-latest.us;restore_interrupts(irq);
+}
+void track_request(uint16_t token)
+{
+    uint32_t irq=save_and_disable_interrupts();
+    requested=token;CAP_ENABLED=true;CAP_HEAD=CAP_TAIL=CAP_EVENT_HEAD=CAP_EVENT_TAIL=0;CAP_DIVIDER=0;
+    diagnostics=(track_diagnostics_t){0};
+    sealed=stop_discarded=0;recoveries=stop_us=0;
+    restore_interrupts(irq);
+    (void)network_barcode((uint32_t)(time_us_64()/1000u),0,false,false);
+}
+void track_stop(void)
+{
+    uint32_t irq=save_and_disable_interrupts();
+    if(CAP_ENABLED){stop_us=time_us_32();stop_discarded=(uint16_t)((CAP_HEAD+QUEUE_SIZE-CAP_TAIL)%QUEUE_SIZE);}
+    CAP_ENABLED=false;CAP_HEAD=CAP_TAIL=CAP_EVENT_HEAD=CAP_EVENT_TAIL=0;
+    restore_interrupts(irq);
+}
+bool track_ready(uint16_t token)
+{
+    uint32_t irq=save_and_disable_interrupts();
+    bool result=CAP_ENABLED && requested==token && diagnostics.ack==token;
+    restore_interrupts(irq);return result;
+}
+bool track_faulted(void)
+{
+    uint32_t irq=save_and_disable_interrupts();bool result=diagnostics.faults!=0;
+    restore_interrupts(irq);return result;
+}
+bool track_recording(void)
+{
+    uint32_t irq=save_and_disable_interrupts();bool result=CAP_ENABLED && diagnostics.recording;
+    restore_interrupts(irq);return result;
+}
+void track_diagnostics(track_diagnostics_t *out)
+{
+    uint32_t irq=save_and_disable_interrupts();*out=diagnostics;restore_interrupts(irq);
+}
+bool track_event_take(uint16_t token,track_event_t *out)
+{
+    uint32_t irq=save_and_disable_interrupts();
+    bool found=CAP_ENABLED && requested==token && CAP_EVENT_TAIL!=CAP_EVENT_HEAD;
+    if(found){
+        uint8_t *p=events[CAP_EVENT_TAIL];
+        *out=(track_event_t){get32(p),(char)('A'-1+(p[4]&31u)),(p[4]&32u)!=0};
+        CAP_EVENT_TAIL=(uint16_t)((CAP_EVENT_TAIL+1u)%EVENT_SIZE);
+    }
+    restore_interrupts(irq);return found;
+}
+static bool current(uint16_t token)
+{ return CAP_ENABLED && requested==token; }
+void track_service(void)
+{
+    uint32_t irq=save_and_disable_interrupts();
+    uint16_t token=requested;bool running=CAP_ENABLED;
+    restore_interrupts(irq);
+    if(!running){
+        /* Decoder-owned work only. Motors are already stopped. Preserve an
+         * interrupted frame as diagnostics, never promote it to a read.
+         * A new Motion request may preempt this work; do not seal that run. */
+        if(active && active==token && sealed!=token){
+            barcode_waveform_save_partial(&waveform);
+            retain_first_failure();select_first_failure();
+            irq=save_and_disable_interrupts();
+            if(requested==token && !CAP_ENABLED)sealed=token;
+            restore_interrupts(irq);
+        }
+        return;
+    }
+    if(active!=token){
+        barcode_waveform_begin(&waveform);reset_first_failure();active=token;
+        irq=save_and_disable_interrupts();
+        if(current(token))diagnostics.ack=token;
+        restore_interrupts(irq);
+    }
+    for(unsigned work=0;work<24;work++){
+        uint8_t p[14];
+        irq=save_and_disable_interrupts();
+        bool found=current(token) && CAP_TAIL!=CAP_HEAD;
+        if(found){memcpy(p,queue[CAP_TAIL],sizeof p);CAP_TAIL=(uint16_t)((CAP_TAIL+1u)%QUEUE_SIZE);}
+        restore_interrupts(irq);
+        if(!found)break;
+        char letter=0;uint32_t start=time_us_32();
+        bool read=barcode_waveform_update_motion(&waveform,(uint16_t)(p[12]|((uint16_t)p[13]<<8u)),get32(p),get32(p+4),get32(p+8),&letter);
+        retain_first_failure();
+        uint32_t duration=time_us_32()-start;
+        irq=save_and_disable_interrupts();
+        if(current(token)){
+            if(duration>diagnostics.decode_max_us)diagnostics.decode_max_us=duration;
+            diagnostics.frames=waveform.frames;diagnostics.rejected=waveform.rejected;
+            diagnostics.recording=waveform.recording;
+            if(waveform.timing_faults)diagnostics.faults|=TRACK_TIMING_FAULT;
+            if(read){
+                uint16_t next=(uint16_t)((CAP_EVENT_HEAD+1u)%EVENT_SIZE);
+                if(next==CAP_EVENT_TAIL)diagnostics.faults|=TRACK_EVENT_FAULT;
+                else if(letter>='A' && letter<='Z'){
+                    bool crossing=latest.raw[1]>=861u && latest.raw[2]>=317u;
+                    put32(events[CAP_EVENT_HEAD],get32(p));
+                    events[CAP_EVENT_HEAD][4]=(uint8_t)(letter-'A'+1u)|(crossing?32u:0u);
+                    CAP_EVENT_HEAD=next;diagnostics.events++;
+                    uint64_t now=time_us_64();uint32_t age=(uint32_t)now-get32(p);
+                    (void)network_barcode((uint32_t)((now-age)/1000u),letter,true,false);
+                }
+            }
+        }
+        restore_interrupts(irq);
+    }
+}
+void track_recoveries(uint32_t count)
+{
+    uint32_t irq=save_and_disable_interrupts();recoveries=count;restore_interrupts(irq);
+}
+uint16_t track_scan_run(void)
+{
+    uint32_t irq=save_and_disable_interrupts();uint16_t run=requested;restore_interrupts(irq);return run;
+}
+size_t track_scan_state(uint8_t out[SCAN_PACKET_BYTES])
+{
+    uint32_t irq=save_and_disable_interrupts();bool ready=active==requested && requested!=0;
+    scan_state_t s={.run=requested,.ms=(uint32_t)(time_us_64()/1000u),
+        .samples=diagnostics.samples,.frames=diagnostics.frames,.rejected=diagnostics.rejected,
+        .decode_us=diagnostics.decode_max_us,.adc_us=diagnostics.adc_max_us,
+        .events=diagnostics.events,.queue_peak=diagnostics.queue_peak,.faults=diagnostics.faults,
+        .enabled=CAP_ENABLED,.recording=diagnostics.recording,.sealed=ready && sealed==requested,
+        .ready=ready,.attempts=ready?(uint8_t)waveform.attempt_count:0,
+        .attempt_overflow=ready?waveform.attempt_overflow:0,.recoveries=recoveries,
+        .stop_us=stop_us,.stop_discarded=stop_discarded};
+    restore_interrupts(irq);return scan_state_encode(&s,out);
+}
+size_t track_scan_export(uint16_t run,unsigned index,uint8_t out[SCAN_PACKET_BYTES])
+{
+    union { barcode_wave_attempt_t attempt;barcode_wave_profile_t profile;uint16_t words[SCAN_CHUNK_WORDS]; } copy;
+    scan_snapshot_t meta={0};unsigned kind=SCAN_DONE,item=0,count=0,attempts=0;bool snapshot=false;
+    uint32_t irq=save_and_disable_interrupts();
+    if(!run || requested!=run || CAP_ENABLED || sealed!=run){restore_interrupts(irq);return 0;}
+    attempts=waveform.attempt_count;snapshot=waveform.saved.count!=0;
+    if(index<attempts){kind=SCAN_ATTEMPT;item=index;copy.attempt=waveform.attempts[item];}
+    else {
+        index-=attempts;const barcode_wave_snapshot_t *s=&waveform.saved;
+        if(snapshot && index==0){
+            kind=SCAN_SNAPSHOT;
+            meta=(scan_snapshot_t){.start_us=s->start_us,.leading_us=s->leading_us,.white_us=s->white_us,
+                .duration_us=s->duration_us,.checksum=s->checksum,.count=s->count,.paper=s->paper,
+                .signal_range=s->signal_range,.reason=s->reason,.coherent_mask=s->coherent_mask,
+                .geometry_mask=s->geometry_mask,.letter=s->letter,.motion=s->motion};
+        }else if(snapshot && index<=6u){kind=SCAN_PROFILE;item=index-1u;copy.profile=s->profile[item];}
+        else {
+            unsigned chunks=(s->count+SCAN_CHUNK_WORDS-1u)/SCAN_CHUNK_WORDS;
+            if(snapshot && index-7u<chunks){
+                kind=SCAN_WORDS;item=index-7u;count=s->count-item*SCAN_CHUNK_WORDS;
+                if(count>SCAN_CHUNK_WORDS)count=SCAN_CHUNK_WORDS;
+                memcpy(copy.words,s->sample+item*SCAN_CHUNK_WORDS,count*sizeof(uint16_t));
+            }else if(index!=(snapshot?chunks+7u:0u)){restore_interrupts(irq);return 0;}
+        }
+    }
+    restore_interrupts(irq);
+    if(kind==SCAN_ATTEMPT)return scan_attempt_encode(run,item,&copy.attempt,out);
+    if(kind==SCAN_SNAPSHOT)return scan_snapshot_encode(run,&meta,out);
+    if(kind==SCAN_PROFILE)return scan_profile_encode(run,item,&copy.profile,out);
+    if(kind==SCAN_WORDS)return scan_words_encode(run,item,copy.words,count,out);
+    return scan_done_encode(run,attempts,snapshot,out);
+}

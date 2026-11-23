@@ -1,0 +1,123 @@
+{
+  "version": "rtos-motion-v0.2",
+  "date_local": "2026-11-07",
+  "branch": "yixuan/rtos-motion-foundation",
+  "source_parent_commit": "80c3960",
+  "file": "build/rtos-motion/robocar_rtos_motion_v0_2.uf2",
+  "sha256": "020344e2437ff87b2faf5140819e0e4d0c14e82cc0c9a4000c2d19daa4cfadb8",
+  "uf2_bytes": 773632,
+  "uf2_blocks": 1511,
+  "uf2_image_matches_linked_binary": true,
+  "kernel_commit": "15ed232c08f2d89e54e514db79de150e224307e3",
+  "bridge_source_commit": "0a7604d807a7457a79c481a3a4758ac41fab45d7",
+  "pico_sdk_commit": "bddd20f928ce76142793bef434d4f75f4af6e433",
+  "compiler": "arm-none-eabi-gcc (Arm GNU Toolchain 14.2.Rel1 (Build arm-14.52)) 14.2.1 20241119",
+  "linked_text_bytes": 386576,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 89976,
+  "kernel_pool_bytes": 32768,
+  "application_task_requested_stacks_bytes": [
+    4096,
+    4096,
+    4096
+  ],
+  "main_stack_reservation_bytes": 4096,
+  "physical_tests_performed": true,
+  "flashed": true,
+  "hardware_network_tested": false,
+  "runtime_stack_margins_measured": false,
+  "network_path_compiled": true,
+  "network_configured": false,
+  "default_waits_for_usb_logger": true,
+  "baseline_v5_63_unchanged": true,
+  "baseline_v5_63_sha256": "a4e2eccb6fb4e74cd49a6d25214bc1be1807c7e8c23de6664ecd32dac1f6a2a3",
+  "test_results": {
+    "motion": {
+      "native_equivalent_record_bytes": 28,
+      "binary_record_bytes": 13,
+      "safety_gate_bytes": 8,
+      "runtime_bytes": 200,
+      "codec_cases": 5005,
+      "test_type": "Host SDK simulation and target compile; no hardware/RTOS scheduling execution"
+    },
+    "network": {
+      "production_service_sdk_mock": "PASS",
+      "independent_binary_decode": "PASS",
+      "local_broker_binary_roundtrip_packets": 15,
+      "hardware_network_tested": false,
+      "local_broker_restart_cycles": 1,
+      "packet_sizes": {
+        "motion": [
+          13
+        ],
+        "barcode": [
+          5
+        ],
+        "status": [
+          10
+        ],
+        "link": [
+          1
+        ],
+        "command_result": [
+          1
+        ]
+      }
+    },
+    "usb_helper": "PASS identity/no-start/active-selection/log/trace/no-overwrite checks"
+  },
+  "stop_design": {
+    "service_deadline_us": 40000,
+    "alarm_period_us": 5000,
+    "trace": "detected request to register write; excludes physical detection/coast latency",
+    "physical_latency_measured": false
+  },
+  "physical_test_guide": "docs/testing/rtos-motion-first-physical-check.md",
+  "limitations": [
+    "Default radio unconfigured; no Pico MQTT test yet",
+    "Barcode/line/terrain/obstacle producers not integrated",
+    "Static RAM differences reflect feature-set changes; not whole-firmware least-bits savings",
+    "Codec and broker fixtures are host data, not hardware observations",
+    "Stack margins and stop latency still need hardware measurement"
+  ],
+  "source_sha256": {
+    "firmware/app/mission_rtos/CMakeLists.txt": "0dd15a1b88dd71686b87b9834ffd77355daf8afab17bee7c9eb0c7e82f43dcb4",
+    "firmware/app/mission_rtos/binary_protocol.c": "20872f43574010ee57f91131b9391c19fe06a687f36c139ad42495f79284a174",
+    "firmware/app/mission_rtos/binary_protocol.h": "fdf05342920955e063d0792877e71f5723f69dfb5bd9505a6f1614d61009540a",
+    "firmware/app/mission_rtos/board.c": "063c73fc7981ed33c7e6d20e6fd2828f815d9c974e3658d1b035615c4b42a995",
+    "firmware/app/mission_rtos/board.h": "62c3e625aaf432882435d5c9c89f50023c920c6efa79978be0bf1f35669b6313",
+    "firmware/app/mission_rtos/lwipopts.h": "6ed9d27bdb374ef55d43db032b75f5ae4864e7b8ca3caf251f3f9ed2e34a6707",
+    "firmware/app/mission_rtos/main.c": "ded48c4df8f1efe8924559ade5ec5bfd382ded35d5b0a2a91333477992a8b8fb",
+    "firmware/app/mission_rtos/motion_record.c": "18a90475bf3ed52b35d312e3c387fd1cbeb7c0d2386798f790266f619211900a",
+    "firmware/app/mission_rtos/motion_record.h": "02cc001f6920388de27b217dd71c110fadc9c810416ac37d7c8bc983b740ddd7",
+    "firmware/app/mission_rtos/motion_runtime.c": "591592e553bb48aeb9e3db1a1eb9c0c83fe71b19fb0db7544cb672bddb35854a",
+    "firmware/app/mission_rtos/motion_runtime.h": "08a8cfe28a609ea0128379fe97091b1eaf006c4ef3495b4acd4985d9a02b5496",
+    "firmware/app/mission_rtos/network_service.c": "45c01ad98c6f11ca5830c61781e9b2af909cfb15236a004ca94ceeb2411cef07",
+    "firmware/app/mission_rtos/network_service.h": "ab9f59db38dae4482f73de5d37d81c5094aaa6c3a611d6fc1bf70e7b59451803",
+    "firmware/app/mission_rtos/network_settings.example.h": "ba0653c9eda114e45f3dfe2f2c496efdb31bdd32f31f640bb5b8303f9ed57fc7",
+    "firmware/app/mission_rtos/port/mtk_bridge.c": "b32230c50d95846f75fa18ad2471facce26269f41a31217c4856f30395c8fea9",
+    "firmware/app/mission_rtos/port/mtk_bridge.h": "6d1858c616ca5cffa7b4c14680ffd7280caf8376c7f97e157fe073fbfcffab45",
+    "firmware/app/mission_rtos/safety_gate.c": "83732fb4f00487162e412318be9dce3acd85700c0d3aaafa0a526248c0fd4926",
+    "firmware/app/mission_rtos/safety_gate.h": "46e38a72a8cbd12ecbdb9a7171938f5d9ed9b0acdab8165f01b64b7ca54091b0",
+    "firmware/app/robot_firmware/encoders.c": "1b684c010e0db68f029b620a7fd04fa412762c04770fb921d8bd2bf7cd1b6f66",
+    "firmware/app/robot_firmware/encoders.h": "618231847534e8d709a71a6c1f1afd27de6d262f41235151dd05ff32a4c0c450",
+    "firmware/app/robot_firmware/motion_control.c": "d6d17594a193624b3f15a038152cbb493a4394afee79790db5d25cb00c60fe53",
+    "firmware/app/robot_firmware/motion_control.h": "fb7303f7f1be44e1cb9812cc7bd6ccbc648ff501a1c418377f2bb72757372980",
+    "firmware/tests/mission_rtos/foundation_test.c": "de1faa682bff2b51094f9849ab18ac1fc01c3daf5791c5e957e4b387b5226fef",
+    "firmware/tests/mission_rtos/network_test.c": "ec6a0fd3fb3bc97a23c4d979857ef075b31da1c76f0a40feda7fa73204ade89f",
+    "firmware/tests/mission_rtos/network_test_sdk.h": "21a99218a2c6950515de532188529d6da53ae7b11496f3c313408aed2f27e1ec",
+    "firmware/tests/mission_rtos/test_sdk.h": "556672e24b0586faeb9f35dcda4a36a873ac97673e5f59a6c55fe18763a57fef",
+    "tools/build_rtos_motion.sh": "8e0827242758583c4c4d30a4d3f0be39c33fc791be4cc0e891c2c67c7f9c113e",
+    "tools/decode_motion_record.py": "51f4e5150474f3e1b2241a35364dcc8aef2ce52066d413e6a875b943c74df9c6",
+    "tools/requirements-rtos-tools.txt": "cd813d7525314a37e9884905597d508a0f637af131668e02895664b21d8e4bb8",
+    "tools/rtos_bench.py": "3e961d2ce472ab166c4978613bd21bde3f74ebd54f784a4f56a8abc05caa4f7b",
+    "tools/rtos_mqtt_observer.py": "5a4cf6e94576ca82e30bf26b1bd4428e6c882e318c1a26012ea5feab4a99bbb2",
+    "tools/run_rtos_bench.sh": "d573f5d39bcf607b0ce6d5dbc4bdf2fba831060cc0e6486994249a409e466425",
+    "tools/test_rtos_bench.py": "39c9ab50e6c8ab96bf6d6032effb647de16ff5cc110b386c991aee0180953f28",
+    "tools/test_rtos_motion.py": "5e1c2c3ca7d4151d998fad3b5d832f8f70de5fbd8e26f1e8d8b341e3ca909242",
+    "tools/test_rtos_network.py": "5a4155d489c38c8eb32eaec6097d42f0db5845d12edf3cc57ae0489bd8626290"
+  },
+  "source_commit": "d58f686",
+  "flashed_by": "user",
+  "hardware_validation": "docs/testing/rtos-v0_2-usb-acceptance.json"
+}

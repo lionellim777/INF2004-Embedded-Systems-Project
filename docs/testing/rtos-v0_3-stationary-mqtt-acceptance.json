@@ -1,0 +1,87 @@
+{
+  "date_local": "2026-11-08",
+  "reviewed_utc": "2026-11-07T17:31:01.179698+00:00",
+  "source_commit": "aa2b44e",
+  "firmware": "rtos-network-v0.3",
+  "configured_image_sha256": "529d7eb32f9a6da205d95d35bfa367c01a7ea95ac481778a1bf25d9f1cc69434",
+  "configured_image_embeds_local_credentials": true,
+  "flashed_and_verified_over_usb": true,
+  "stationary_radio_and_mqtt_acceptance": true,
+  "correction": "Selected the home router 2.4 GHz SSID instead of its separate 5 GHz SSID; retained the saved password",
+  "broker": "Authenticated broker on Mac; Mac remained on its existing home Wi-Fi connection",
+  "available_real_producers": [
+    "motion/encoders"
+  ],
+  "unavailable_producers": [
+    "barcode",
+    "line",
+    "terrain",
+    "obstacle"
+  ],
+  "simulated_mask": 0,
+  "packet_counts_at_snapshot": {
+    "motion": 467,
+    "status": 102,
+    "barcode": 96,
+    "link": 100,
+    "command_result": 1
+  },
+  "first_motion_received_utc": "2026-11-07T17:29:18.429915+00:00",
+  "last_motion_received_utc": "2026-11-07T17:31:01.093907+00:00",
+  "last_motion": {
+    "received_utc": "2026-11-07T17:31:01.093907+00:00",
+    "event": "packet",
+    "topic": "inf2004/aai10/robot1/v1/motion",
+    "payload_hex": "daca0100000000000000002003",
+    "retained": false,
+    "type": "motion",
+    "captured_ms": 117466,
+    "left_counts": 0,
+    "right_counts": 0,
+    "left_mm_s": 0,
+    "right_mm_s": 0,
+    "kind": 0,
+    "phase": 0,
+    "fault": 0,
+    "stop_reason": 1,
+    "valid": true,
+    "stop_latched": true
+  },
+  "last_status": {
+    "received_utc": "2026-11-07T17:31:00.300305+00:00",
+    "event": "packet",
+    "topic": "inf2004/aai10/robot1/v1/status",
+    "payload_hex": "bac70100f01b99640110",
+    "retained": false,
+    "type": "status",
+    "captured_ms": 116666,
+    "boot_id": 1687755760,
+    "available_mask": 1,
+    "simulated_mask": 0,
+    "network_state": 4
+  },
+  "mqtt_stop_command_payload_bytes": 0,
+  "mqtt_stop_ack": {
+    "received_utc": "2026-11-07T17:29:51.003828+00:00",
+    "event": "packet",
+    "topic": "inf2004/aai10/robot1/v1/command_result",
+    "payload_hex": "07",
+    "retained": false,
+    "type": "command_result",
+    "accepted": true,
+    "command": 3
+  },
+  "mqtt_log_snapshot_sha256": "587f94a51270ac06456e62b9ae0a25b6788dee9f4cd4e65a8c4fa7709be09709",
+  "raw_mqtt_log_local": "serial-output/rtos-network-20261108-005922/mqtt.jsonl",
+  "raw_usb_log_local": "serial-output/rtos-network-20261108-005922/usb.log",
+  "stationary_stop_test_local": "serial-output/rtos-network-20261108-005922/stationary-mqtt-stop-check.json",
+  "physical_motor_battery_disconnected": true,
+  "physical_stopping_under_network_load_tested": false,
+  "live_pico_broker_reconnect_tested": false,
+  "limits": [
+    "Stationary tests establish Pico association, DHCP, live real binary telemetry and command acknowledgement",
+    "Mechanical stopping and GP20/USB stop behavior with radio traffic still require supported-wheel tests",
+    "Live Pico recovery after broker restart still requires physical-session check",
+    "Full mission, loaded tracking, runtime stack margins and worst-case deadlines remain unverified"
+  ]
+}

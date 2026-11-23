@@ -1,0 +1,190 @@
+{
+  "recorded_utc": "2026-11-10T02:16:30.145528+00:00",
+  "branch": "yixuan/rtos-minimum-bit-state",
+  "base_stage2_commit": "47a0a43",
+  "status": "Stage3 opt-in candidates built/software verified; not installed",
+  "installed_version": "0.5.1",
+  "candidates": {
+    "full": {
+      "text": 450912,
+      "data": 0,
+      "bss": 207156,
+      "sha256": "0e438aceaa44ed60682e7a7989c40fc4c79425d82de20d688e30a8b4356d04bd",
+      "private_path": "build/rtos-minbits-stage3-candidate/robocar_rtos_minbits_stage3_candidate.uf2",
+      "symbols": {
+        "runtime": 1312,
+        "queue": 7168,
+        "kernel_pool": 32768,
+        "waveform": 74620,
+        "capture": 4,
+        "first_words": 32768,
+        "first_profiles": 864,
+        "first_failure": 32,
+        "ADC_filter": 21
+      },
+      "UF2_matches_linked_binary": true
+    },
+    "lean": {
+      "text": 450424,
+      "data": 0,
+      "bss": 173492,
+      "sha256": "23ef64512cb7d9cc0021ea9f2df2b298a70b6e2086f1875e01d15b68a4b17178",
+      "private_path": "build/rtos-minbits-stage3-lean/robocar_rtos_minbits_stage3_lean.uf2",
+      "symbols": {
+        "runtime": 1312,
+        "queue": 7168,
+        "kernel_pool": 32768,
+        "waveform": 74620,
+        "capture": 4,
+        "ADC_filter": 21
+      },
+      "UF2_matches_linked_binary": true
+    }
+  },
+  "default_control": {
+    "text": 451248,
+    "data": 0,
+    "bss": 207332,
+    "sha256": "b7836015b55e8636b6f154a3139b693851651b810b654da642c85b5a62e2624d",
+    "private_path": "build/rtos-minbits-stage3-default-control/robocar_rtos_default_control.uf2",
+    "symbols": {
+      "runtime": 1464,
+      "queue": 7168,
+      "kernel_pool": 32768,
+      "waveform": 74620,
+      "first_words": 32768,
+      "first_profiles": 864,
+      "first_failure": 32,
+      "ADC_filter": 36
+    },
+    "UF2_matches_linked_binary": true
+  },
+  "ARM_layout_bytes": {
+    "accepted": {
+      "motion_wheel_t": 64,
+      "motion_control_t": 176,
+      "barcode_progress_t": 256,
+      "center_search_t": 144,
+      "center_trim_t": 72,
+      "course_control_t": 1160,
+      "track_runtime_t": 1264,
+      "motion_runtime_t": 1464
+    },
+    "stage2": {
+      "motion_wheel_t": 64,
+      "motion_control_t": 176,
+      "barcode_progress_t": 256,
+      "center_search_t": 144,
+      "center_trim_t": 72,
+      "course_control_t": 1160,
+      "track_runtime_t": 1232,
+      "motion_runtime_t": 1432
+    },
+    "stage3": {
+      "motion_wheel_t": 56,
+      "motion_control_t": 152,
+      "barcode_progress_t": 248,
+      "center_search_t": 136,
+      "center_trim_t": 72,
+      "course_control_t": 1064,
+      "track_runtime_t": 1136,
+      "motion_runtime_t": 1312
+    }
+  },
+  "savings_bytes": {
+    "stage3_incremental_representation": 120,
+    "total_representation": 176,
+    "optional_lean_feature": 33664
+  },
+  "default_binary_identical_to_accepted_with_reference_build_date": true,
+  "reference_build_date_control": {
+    "SOURCE_DATE_EPOCH": 1794225600,
+    "date": "Nov  9 2026",
+    "reason": "SDK embeds compiler __DATE__; no functional source or binary patch"
+  },
+  "compiler_frame_bytes": {
+    "accepted": {
+      "motion_runtime_step": 128,
+      "track_runtime_begin": 136,
+      "sample": 48,
+      "track_service": 96,
+      "motion_poll": 152,
+      "course_step": 184
+    },
+    "candidate": {
+      "motion_runtime_step": 128,
+      "track_runtime_begin": 136,
+      "sample": 56,
+      "track_service": 96,
+      "motion_poll": 152,
+      "course_step": 192
+    },
+    "interpretation": "Individual compiler frames, not runtime stack watermarks or whole call-chain bounds"
+  },
+  "verification": {
+    "motion_scenarios": 320,
+    "course_scenarios": 240,
+    "independent_behaviour_test_programs": 8,
+    "ADC_updates_equal": 1102600,
+    "baseline_queries_equal": 120601,
+    "independent_option_combinations": 8,
+    "full_exports_byte_identical": true,
+    "lean_retention_tradeoff_verified": true,
+    "sanitizers": "ASan/UBSan",
+    "warning_as_error_ARM_build": true,
+    "normal_provisioning_forces_accepted_flags": true,
+    "candidate_console_no_START": true,
+    "logical_trace_bytes_equal": 90942938,
+    "logical_trace_sha256": "c978d2e06378baf97403fd99abeaea7f7d7f0b52f33536461e1cf5ade499e12b"
+  },
+  "header_inventory": {
+    "CANDIDATE_SOFTWARE_VERIFIED": 62,
+    "CONTAINER_REVIEW_ALLOCATION": 28,
+    "REVIEW_REQUIRED": 411,
+    "DOMAIN_KNOWN_REVIEW_STORAGE": 49,
+    "PRESERVED_COUNTER_CONTRACT": 4
+  },
+  "logs": [
+    "build/rtos-minbits-stage3-tests.log",
+    "build/rtos-minbits-stage3-control-tests.log",
+    "build/rtos-minbits-stage3-build.log",
+    "build/rtos-minbits-stage3-lean-build.log",
+    "build/rtos-minbits-stage3-default-build.log",
+    "build/rtos-minbits-stage3-bench-tests.log",
+    "build/rtos-minbits-stage3-console-tests.log",
+    "build/rtos-minbits-stage3-setup-tests.log"
+  ],
+  "source_sha256": {
+    "firmware/app/mission_rtos/network_service.c": "df4f8babfa4161e0d794244fdb4ee0a82f079a01fb8d2cb77a8e0dcc61e41980",
+    "firmware/app/mission_rtos/motion_record.c": "e8f3120855e750603a61066022be4c79d9cf4120add8f34d06ba8d7c82f4b729",
+    "firmware/app/mission_rtos/motion_runtime.c": "7e2c3ba907032eb392ec3b07650a311879b9b7ccc9d0fc6a799d1121b6439435",
+    "firmware/app/mission_rtos/board.c": "7f7848fa9423f6cd919b44a0a9b4a1c27a8e314d3ac704c97f45aa15c70db229",
+    "firmware/app/mission_rtos/scan_diagnostic.c": "1c00ecc9faced5b53d41a1670b8b9193106354aaecfbfceef49f19ca45e1db59",
+    "firmware/app/mission_rtos/main.c": "20d563e1e654ecd9c26e299b21b79ce519fdab66db22adeb748947a7056f9415",
+    "firmware/app/mission_rtos/binary_protocol.c": "cadc8797c690f578ab9824c18977e05a121b199e41531bd973f1fc6980ec3a7a",
+    "firmware/app/mission_rtos/track_sensor.c": "61c08bcb57f5c00649fdc5269e17478cf28c164f2e7ae1bf56cb590529fc7658",
+    "firmware/app/mission_rtos/safety_gate.c": "83732fb4f00487162e412318be9dce3acd85700c0d3aaafa0a526248c0fd4926",
+    "firmware/app/mission_rtos/runtime_report.c": "ea24d46529d494d4bdac371708a442929af0269bc1090b7430072ccd23b19462",
+    "firmware/app/mission_rtos/track_runtime.c": "0ed78140b030cc2587a6a51b3e38d4bcc7f5ffe5c97b9825ec994470c79c0d36",
+    "firmware/app/mission_rtos/runtime_measure.c": "02d251cc7e3d069c3d54624bba251a3798f2c5a014a332367a5c64fe8c6ec8fa",
+    "firmware/app/robot_firmware/control_representation.h": "29ee752d5e007a87ff7c021e97e05fe756da462dfd8ce2755b617a6ae886e376",
+    "firmware/app/robot_firmware/motion_control.h": "b2c2438c4d6ced4633497bbce4bd2fd667df3091267817d9ab6fe0600e62a7e2",
+    "firmware/app/robot_firmware/course_control.h": "78cc87e9ddb0b17e9bdd4fb7b1a2a5a8531b7cbf85a709a37b0bf42fa7636e4a",
+    "firmware/app/robot_firmware/center_search.h": "eb8f1d61ad5c029a7f092320b2886e4cc0e20ebcbe417f69a2ffe3bead4de593",
+    "firmware/app/robot_firmware/center_trim.h": "66d670846113ed0ec3e733200e443cc8c54544891d06fc32c60faf66faa81b6b",
+    "firmware/app/robot_firmware/barcode_drive.h": "d199f9e025316a6b71b683fef5de22989e4482f2080b74d9a8c172ef522d00ee",
+    "firmware/app/mission_rtos/CMakeLists.txt": "2897a77ee862108c37fbcee79b30f0939cb4ed2a475143a98ef536af84cb5370",
+    "tools/test_rtos_control_bits.py": "fbc9863e4a0ce37468422e23f51b9536b68ac88bc4ab4f01f5c94679cecdae0b",
+    "tools/test_rtos_minimum_bits.py": "56b5a9508906f26981ad09f3d8d3219d375eb049243f779cd7b0674e3ec14fff",
+    "firmware/tests/mission_rtos/control_state_trace.c": "797093dc82d68196c87935187dcd0751f98b3f075d626ac083e4e11f80fed412"
+  },
+  "limits": [
+    "No candidate hardware timing, stack or course acceptance yet; installed v0.5.1 unchanged.",
+    "Header declarations are not independent live allocations or a completion percentage.",
+    "Packing is internal and target compiler verified; no raw bitfield structs are transported.",
+    "Motion owns changed controller flags; this single-core owner proof is not an SMP locking contract.",
+    "Raw encoder/time domains, controller arithmetic, barcode validators, MQTT schemas and task stacks are unchanged.",
+    "Optional lean-cache saving is a feature-budget tradeoff, not minimum-bit credit.",
+    "Teammate algorithms and submitted Tribunal1 are unchanged."
+  ]
+}

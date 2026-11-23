@@ -1,0 +1,659 @@
+scope,source,type,field,owner_review,declared_type,current_storage_bits,byte_offset,range_or_domain,required_or_proposed_bits,status,next_action
+main,barcode_acquisition.h,barcode_batch_t,edges,Jing Hai / Yixuan baseline,barcode_edge_t[64],4096,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_acquisition.h,barcode_batch_t,positions,Jing Hai / Yixuan baseline,uint32_t[64],2048,512,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_acquisition.h,barcode_batch_t,stats,Jing Hai / Yixuan baseline,barcode_sample_stats_t,448,768,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_acquisition.h,barcode_batch_t,count,Jing Hai / Yixuan baseline,uint16_t,16,824,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_batch_t,pending_edge,Jing Hai / Yixuan baseline,bool,8,826,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,reader,Jing Hai / Yixuan baseline,barcode_reader_t,704,0,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_acquisition.h,barcode_capture_t,last_runs,Jing Hai / Yixuan baseline,barcode_runs_t,584,88,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_acquisition.h,barcode_capture_t,stats,Jing Hai / Yixuan baseline,barcode_sample_stats_t,448,164,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_acquisition.h,barcode_capture_t,frames,Jing Hai / Yixuan baseline,uint32_t,32,220,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,rejected,Jing Hai / Yixuan baseline,uint32_t,32,224,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,timeouts,Jing Hai / Yixuan baseline,uint32_t,32,228,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,saved_runs,Jing Hai / Yixuan baseline,uint8_t,8,232,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,decoded,Jing Hai / Yixuan baseline,char,8,233,proposed none + A..Z + unreadable (28 codes),5,RECODING_PROPOSAL,Current bytes are ASCII; decide reserved/invalid codes with navigation and MQTT owners
+main,barcode_acquisition.h,barcode_capture_t,integrity_fault,Jing Hai / Yixuan baseline,bool,8,234,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,halt_on_failure,Jing Hai / Yixuan baseline,bool,8,235,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,continuous,Jing Hai / Yixuan baseline,bool,8,236,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,waiting_gap,Jing Hai / Yixuan baseline,bool,8,237,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,white_tracking,Jing Hai / Yixuan baseline,bool,8,238,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,event_overflow,Jing Hai / Yixuan baseline,bool,8,239,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,white_since_us,Jing Hai / Yixuan baseline,uint32_t,32,240,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,events,Jing Hai / Yixuan baseline,struct (unnamed struct at barcode_acquisition.h:53:5)[16],1024,244,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_acquisition.h,barcode_capture_t,event_count,Jing Hai / Yixuan baseline,unsigned int,32,372,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,clock_origin,Jing Hai / Yixuan baseline,uint32_t,32,376,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,clock_divisor,Jing Hai / Yixuan baseline,uint8_t,8,380,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,distance_mode,Jing Hai / Yixuan baseline,bool,8,381,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,independent_optical,Jing Hai / Yixuan baseline,bool,8,382,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_capture_t,seen_motion_breaks,Jing Hai / Yixuan baseline,uint32_t,32,384,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,motion_aborts,Jing Hai / Yixuan baseline,uint32_t,32,388,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,pause_timeouts,Jing Hai / Yixuan baseline,uint32_t,32,392,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,zero_distance_aborts,Jing Hai / Yixuan baseline,uint32_t,32,396,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,progress_position,Jing Hai / Yixuan baseline,uint32_t,32,400,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_capture_t,progress_us,Jing Hai / Yixuan baseline,uint32_t,32,404,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_decoder.h,barcode_decode_diagnostic_t,patterns,Jing Hai / Yixuan baseline,uint16_t[3],48,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_decoder.h,barcode_decode_diagnostic_t,width_reason,Jing Hai / Yixuan baseline,uint8_t[3],24,6,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_decoder.h,barcode_decode_diagnostic_t,guards,Jing Hai / Yixuan baseline,uint8_t,8,9,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_decoder.h,barcode_decode_diagnostic_t,separators,Jing Hai / Yixuan baseline,uint8_t,8,10,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_decoder.h,barcode_decode_diagnostic_t,reversed,Jing Hai / Yixuan baseline,uint8_t,8,11,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_decoder.h,barcode_decode_diagnostic_t,score,Jing Hai / Yixuan baseline,uint8_t,8,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_edge_t,us,Jing Hai / Yixuan baseline,uint32_t,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_edge_t,black,Jing Hai / Yixuan baseline,bool,8,4,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_motion.h,barcode_motion_t,left_raw,Jing Hai / Yixuan baseline,uint32_t,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_motion.h,barcode_motion_t,right_raw,Jing Hai / Yixuan baseline,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_motion.h,barcode_motion_t,position,Jing Hai / Yixuan baseline,uint32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_motion.h,barcode_motion_t,breaks,Jing Hai / Yixuan baseline,uint32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_motion.h,barcode_motion_t,left,Jing Hai / Yixuan baseline,int64_t,64,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_motion.h,barcode_motion_t,right,Jing Hai / Yixuan baseline,int64_t,64,24,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_motion.h,barcode_motion_t,peak_left,Jing Hai / Yixuan baseline,int64_t,64,32,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_motion.h,barcode_motion_t,peak_right,Jing Hai / Yixuan baseline,int64_t,64,40,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_motion.h,barcode_motion_t,enabled,Jing Hai / Yixuan baseline,bool,8,48,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_optical.h,barcode_optical_t,low,Jing Hai / Yixuan baseline,uint16_t[500],8000,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_optical.h,barcode_optical_t,high,Jing Hai / Yixuan baseline,uint16_t[500],8000,1000,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_optical.h,barcode_optical_t,start_us,Jing Hai / Yixuan baseline,uint32_t,32,2000,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_optical.h,barcode_optical_t,last_us,Jing Hai / Yixuan baseline,uint32_t,32,2004,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_optical.h,barcode_optical_t,samples,Jing Hai / Yixuan baseline,uint32_t,32,2008,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_optical.h,barcode_optical_t,max_gap_us,Jing Hai / Yixuan baseline,uint32_t,32,2012,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_optical.h,barcode_optical_t,active,Jing Hai / Yixuan baseline,bool,8,2016,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_optical.h,barcode_optical_t,armed,Jing Hai / Yixuan baseline,bool,8,2017,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,left,Jing Hai / Yixuan baseline,int32_t,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,right,Jing Hai / Yixuan baseline,int32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,previous_left,Jing Hai / Yixuan baseline,int32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,previous_right,Jing Hai / Yixuan baseline,int32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,balance_offset,Jing Hai / Yixuan baseline,int32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,left_progress,Jing Hai / Yixuan baseline,uint64_t,64,24,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,right_progress,Jing Hai / Yixuan baseline,uint64_t,64,32,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,control_us,Jing Hai / Yixuan baseline,uint64_t,64,40,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,step_us,Jing Hai / Yixuan baseline,uint64_t,64,48,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,left_target,Jing Hai / Yixuan baseline,float,32,56,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,right_target,Jing Hai / Yixuan baseline,float,32,60,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,left_cps,Jing Hai / Yixuan baseline,float,32,64,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,right_cps,Jing Hai / Yixuan baseline,float,32,68,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,left_integral,Jing Hai / Yixuan baseline,float,32,72,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,right_integral,Jing Hai / Yixuan baseline,float,32,76,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,left_pwm,Jing Hai / Yixuan baseline,float,32,80,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,right_pwm,Jing Hai / Yixuan baseline,float,32,84,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,left_speed_sum,Jing Hai / Yixuan baseline,float,32,88,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,right_speed_sum,Jing Hai / Yixuan baseline,float,32,92,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,left_speed_min,Jing Hai / Yixuan baseline,float,32,96,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,right_speed_min,Jing Hai / Yixuan baseline,float,32,100,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,left_speed_max,Jing Hai / Yixuan baseline,float,32,104,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,right_speed_max,Jing Hai / Yixuan baseline,float,32,108,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,speed_samples,Jing Hai / Yixuan baseline,unsigned int,32,112,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,steering_intervals,Jing Hai / Yixuan baseline,unsigned int,32,116,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,started,Jing Hai / Yixuan baseline,bool,8,120,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,steering_since_update,Jing Hai / Yixuan baseline,bool,8,121,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,speed_valid,Jing Hai / Yixuan baseline,bool,8,122,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,both_active,Jing Hai / Yixuan baseline,bool,8,123,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,clear_tracking,Jing Hai / Yixuan baseline,bool,8,124,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,both_since,Jing Hai / Yixuan baseline,uint64_t,64,128,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,clear_since,Jing Hai / Yixuan baseline,uint64_t,64,136,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,both_left,Jing Hai / Yixuan baseline,int32_t,32,144,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,both_right,Jing Hai / Yixuan baseline,int32_t,32,148,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,edge_direction,Jing Hai / Yixuan baseline,int8_t,8,152,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,edge_since,Jing Hai / Yixuan baseline,uint64_t,64,160,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,edge_last,Jing Hai / Yixuan baseline,uint64_t,64,168,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,hard_corner,Jing Hai / Yixuan baseline,bool,8,176,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,corner_hold,Jing Hai / Yixuan baseline,bool,8,177,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,cruise_clear_tracking,Jing Hai / Yixuan baseline,bool,8,178,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,center_profile,Jing Hai / Yixuan baseline,bool,8,179,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,launch_active,Jing Hai / Yixuan baseline,bool,8,180,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,launch_complete,Jing Hai / Yixuan baseline,bool,8,181,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,launch_us,Jing Hai / Yixuan baseline,uint64_t,64,184,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,launch_l,Jing Hai / Yixuan baseline,int32_t,32,192,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,launch_r,Jing Hai / Yixuan baseline,int32_t,32,196,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,launch_left_pwm,Jing Hai / Yixuan baseline,float,32,200,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,launch_right_pwm,Jing Hai / Yixuan baseline,float,32,204,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,center_bend,Jing Hai / Yixuan baseline,bool,8,208,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_drive.h,barcode_progress_t,center_steer,Jing Hai / Yixuan baseline,float,32,212,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,center_cruise_cps,Jing Hai / Yixuan baseline,float,32,216,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,yaw_error,Jing Hai / Yixuan baseline,float,32,220,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,yaw_pwm,Jing Hai / Yixuan baseline,float,32,224,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_drive.h,barcode_progress_t,yaw_direction,Jing Hai / Yixuan baseline,int,32,228,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,cruise_clear_since,Jing Hai / Yixuan baseline,uint64_t,64,232,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,stall_mask,Jing Hai / Yixuan baseline,unsigned int,32,240,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,stall_left_ms,Jing Hai / Yixuan baseline,uint32_t,32,244,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_drive.h,barcode_progress_t,stall_right_ms,Jing Hai / Yixuan baseline,uint32_t,32,248,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_reader.h,barcode_reader_t,edge_us,Jing Hai / Yixuan baseline,uint32_t,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_reader.h,barcode_reader_t,last_emit_us,Jing Hai / Yixuan baseline,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_reader.h,barcode_reader_t,runs,Jing Hai / Yixuan baseline,barcode_runs_t,584,8,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_reader.h,barcode_reader_t,run_count,Jing Hai / Yixuan baseline,uint8_t,8,81,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_reader.h,barcode_reader_t,last_letter,Jing Hai / Yixuan baseline,char,8,82,proposed none + A..Z + unreadable (28 codes),5,RECODING_PROPOSAL,Current bytes are ASCII; decide reserved/invalid codes with navigation and MQTT owners
+main,barcode_reader.h,barcode_reader_t,level_black,Jing Hai / Yixuan baseline,bool,8,83,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_reader.h,barcode_reader_t,active,Jing Hai / Yixuan baseline,bool,8,84,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_reader.h,barcode_reader_t,armed,Jing Hai / Yixuan baseline,bool,8,85,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_reader.h,barcode_reader_t,search_frames,Jing Hai / Yixuan baseline,bool,8,86,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_runs.h,barcode_runs_t,bytes,Jing Hai / Yixuan baseline,uint8_t[73],584,0,"29 widths, each 0..750000 at existing resolution",580,ALREADY_PACKED,"20 bits per width, 73 bytes incl. four tail bits; do not change units"
+main,barcode_acquisition.h,barcode_sample_stats_t,samples,Jing Hai / Yixuan baseline,uint32_t,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,edges,Jing Hai / Yixuan baseline,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,max_gap_us,Jing Hai / Yixuan baseline,uint32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,last_us,Jing Hai / Yixuan baseline,uint32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,raw_white,Jing Hai / Yixuan baseline,uint32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,raw_band,Jing Hai / Yixuan baseline,uint32_t,32,20,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,raw_black,Jing Hai / Yixuan baseline,uint32_t,32,24,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,white_dips,Jing Hai / Yixuan baseline,uint32_t,32,28,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,longest_black_us,Jing Hai / Yixuan baseline,uint32_t,32,32,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,position,Jing Hai / Yixuan baseline,uint32_t,32,36,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,motion_breaks,Jing Hai / Yixuan baseline,uint32_t,32,40,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,raw_min,Jing Hai / Yixuan baseline,uint16_t,16,44,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,raw_max,Jing Hai / Yixuan baseline,uint16_t,16,46,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,high_water,Jing Hai / Yixuan baseline,uint16_t,16,48,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sample_stats_t,black,Jing Hai / Yixuan baseline,bool,8,50,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_sample_stats_t,gap_fault,Jing Hai / Yixuan baseline,bool,8,51,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_sample_stats_t,overflow,Jing Hai / Yixuan baseline,bool,8,52,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_sampler_t,edges,Jing Hai / Yixuan baseline,barcode_edge_t[64],4096,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_acquisition.h,barcode_sampler_t,positions,Jing Hai / Yixuan baseline,uint32_t[64],2048,512,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_acquisition.h,barcode_sampler_t,stats,Jing Hai / Yixuan baseline,barcode_sample_stats_t,448,768,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_acquisition.h,barcode_sampler_t,count,Jing Hai / Yixuan baseline,uint16_t,16,824,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sampler_t,black_on,Jing Hai / Yixuan baseline,uint16_t,16,826,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sampler_t,black_off,Jing Hai / Yixuan baseline,uint16_t,16,828,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sampler_t,enabled,Jing Hai / Yixuan baseline,bool,8,830,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_sampler_t,candidate,Jing Hai / Yixuan baseline,bool,8,831,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_acquisition.h,barcode_sampler_t,candidate_samples,Jing Hai / Yixuan baseline,uint8_t,8,832,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sampler_t,candidate_us,Jing Hai / Yixuan baseline,uint32_t,32,836,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sampler_t,black_since_us,Jing Hai / Yixuan baseline,uint32_t,32,840,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sampler_t,candidate_position,Jing Hai / Yixuan baseline,uint32_t,32,844,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_acquisition.h,barcode_sampler_t,motion,Jing Hai / Yixuan baseline,barcode_motion_t,448,848,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_signal.h,barcode_signal_t,samples,Jing Hai / Yixuan baseline,uint16_t[12],192,0,12 samples of 0..4095,144,ADC12_ASSUMPTION,Requires retaining the 12-bit ADC input contract; no firmware change made
+main,barcode_signal.h,barcode_signal_t,sum,Jing Hai / Yixuan baseline,uint32_t,32,24,0..49140 = 12*4095,16,ADC12_ASSUMPTION,Requires retaining the 12-bit ADC input contract; no firmware change made
+main,barcode_signal.h,barcode_signal_t,next,Jing Hai / Yixuan baseline,unsigned int,32,28,0..11,4,ADC12_ASSUMPTION,Requires retaining the 12-bit ADC input contract; no firmware change made
+main,barcode_signal.h,barcode_signal_t,count,Jing Hai / Yixuan baseline,unsigned int,32,32,0..12,4,ADC12_ASSUMPTION,Requires retaining the 12-bit ADC input contract; no firmware change made
+main,barcode_waveform.h,barcode_wave_attempt_t,start_us,Jing Hai / Yixuan baseline,uint32_t,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,duration_us,Jing Hai / Yixuan baseline,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,samples,Jing Hai / Yixuan baseline,uint16_t,16,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,raw_min,Jing Hai / Yixuan baseline,uint16_t,16,10,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,raw_max,Jing Hai / Yixuan baseline,uint16_t,16,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,lateral_mm,Jing Hai / Yixuan baseline,uint16_t,16,14,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,yaw_deg,Jing Hai / Yixuan baseline,uint16_t,16,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,reason,Jing Hai / Yixuan baseline,uint8_t,8,18,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,coherent_mask,Jing Hai / Yixuan baseline,uint8_t,8,19,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,geometry_mask,Jing Hai / Yixuan baseline,uint8_t,8,20,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_attempt_t,letter,Jing Hai / Yixuan baseline,char,8,21,proposed none + A..Z + unreadable (28 codes),5,RECODING_PROPOSAL,Current bytes are ASCII; decide reserved/invalid codes with navigation and MQTT owners
+main,barcode_waveform.h,barcode_wave_attempt_t,best,Jing Hai / Yixuan baseline,barcode_wave_profile_t,1152,24,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_waveform.h,barcode_wave_profile_t,extrema,Jing Hai / Yixuan baseline,uint16_t,16,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_profile_t,windows,Jing Hai / Yixuan baseline,uint16_t,16,2,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_profile_t,best_window,Jing Hai / Yixuan baseline,uint16_t,16,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_profile_t,reason,Jing Hai / Yixuan baseline,uint8_t,8,6,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_profile_t,bad_run,Jing Hai / Yixuan baseline,uint8_t,8,7,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_profile_t,bad_width,Jing Hai / Yixuan baseline,uint32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_profile_t,code39,Jing Hai / Yixuan baseline,barcode_decode_diagnostic_t,112,12,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_waveform.h,barcode_wave_profile_t,runs,Jing Hai / Yixuan baseline,uint32_t[29],928,28,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_wave_snapshot_t,sample,Jing Hai / Yixuan baseline,uint16_t[16384],262144,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_wave_snapshot_t,count,Jing Hai / Yixuan baseline,uint16_t,16,32768,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,paper,Jing Hai / Yixuan baseline,uint16_t,16,32770,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,motion,Jing Hai / Yixuan baseline,bool,8,32772,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_wave_snapshot_t,coherent_mask,Jing Hai / Yixuan baseline,uint8_t,8,32773,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,geometry_mask,Jing Hai / Yixuan baseline,uint8_t,8,32774,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,signal_range,Jing Hai / Yixuan baseline,uint16_t,16,32776,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,start_us,Jing Hai / Yixuan baseline,uint32_t,32,32780,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,leading_us,Jing Hai / Yixuan baseline,uint32_t,32,32784,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,white_us,Jing Hai / Yixuan baseline,uint32_t,32,32788,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,duration_us,Jing Hai / Yixuan baseline,uint32_t,32,32792,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,checksum,Jing Hai / Yixuan baseline,uint32_t,32,32796,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,reason,Jing Hai / Yixuan baseline,uint8_t,8,32800,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_wave_snapshot_t,letter,Jing Hai / Yixuan baseline,char,8,32801,proposed none + A..Z + unreadable (28 codes),5,RECODING_PROPOSAL,Current bytes are ASCII; decide reserved/invalid codes with navigation and MQTT owners
+main,barcode_waveform.h,barcode_wave_snapshot_t,profile,Jing Hai / Yixuan baseline,barcode_wave_profile_t[6],6912,32804,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,sample,Jing Hai / Yixuan baseline,uint16_t[8192],131072,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,position,Jing Hai / Yixuan baseline,int16_t[8192],131072,16384,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,edge_work,Jing Hai / Yixuan baseline,uint32_t[95],3040,32768,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,fit_work,Jing Hai / Yixuan baseline,uint32_t[29],928,33148,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,geometry_work,Jing Hai / Yixuan baseline,uint32_t[29],928,33264,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,motion,Jing Hai / Yixuan baseline,bool,8,33380,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,motion_seen,Jing Hai / Yixuan baseline,bool,8,33381,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,motion_fault,Jing Hai / Yixuan baseline,bool,8,33382,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,odometry_fault,Jing Hai / Yixuan baseline,bool,8,33383,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,recrossing,Jing Hai / Yixuan baseline,bool,8,33384,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,left_raw,Jing Hai / Yixuan baseline,uint32_t,32,33388,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,right_raw,Jing Hai / Yixuan baseline,uint32_t,32,33392,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,motion_faults,Jing Hai / Yixuan baseline,uint32_t,32,33396,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,recrosses,Jing Hai / Yixuan baseline,uint32_t,32,33400,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,stationary_samples,Jing Hai / Yixuan baseline,uint32_t,32,33404,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,white_counts,Jing Hai / Yixuan baseline,uint32_t,32,33408,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,lateral_recrosses,Jing Hai / Yixuan baseline,uint32_t,32,33412,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,frame_reason,Jing Hai / Yixuan baseline,uint8_t,8,33416,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,partial_saved,Jing Hai / Yixuan baseline,bool,8,33417,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,start_yaw,Jing Hai / Yixuan baseline,float,32,33420,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,pose_x,Jing Hai / Yixuan baseline,float,32,33424,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,pose_y,Jing Hai / Yixuan baseline,float,32,33428,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,yaw,Jing Hai / Yixuan baseline,float,32,33432,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,sensor_x,Jing Hai / Yixuan baseline,float,32,33436,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,sensor_y,Jing Hai / Yixuan baseline,float,32,33440,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,axis_cos,Jing Hai / Yixuan baseline,float,32,33444,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,axis_sin,Jing Hai / Yixuan baseline,float,32,33448,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,origin_x,Jing Hai / Yixuan baseline,float,32,33452,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,origin_y,Jing Hai / Yixuan baseline,float,32,33456,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,frontier_y,Jing Hai / Yixuan baseline,float,32,33460,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,max_lateral,Jing Hai / Yixuan baseline,float,32,33464,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,max_yaw,Jing Hai / Yixuan baseline,float,32,33468,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,barcode_waveform.h,barcode_waveform_t,progress,Jing Hai / Yixuan baseline,int32_t,32,33472,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,frontier,Jing Hai / Yixuan baseline,int32_t,32,33476,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,white_frontier,Jing Hai / Yixuan baseline,int32_t,32,33480,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,attempts,Jing Hai / Yixuan baseline,barcode_wave_attempt_t[32],43008,33484,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,attempt_count,Jing Hai / Yixuan baseline,unsigned int,32,38860,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,attempt_overflow,Jing Hai / Yixuan baseline,unsigned int,32,38864,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,count,Jing Hai / Yixuan baseline,uint16_t,16,38868,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,previous,Jing Hai / Yixuan baseline,uint16_t,16,38870,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,paper,Jing Hai / Yixuan baseline,uint16_t,16,38872,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,last_us,Jing Hai / Yixuan baseline,uint32_t,32,38876,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,residual_us,Jing Hai / Yixuan baseline,uint32_t,32,38880,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,white_us,Jing Hai / Yixuan baseline,uint32_t,32,38884,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,leading_us,Jing Hai / Yixuan baseline,uint32_t,32,38888,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,frame_us,Jing Hai / Yixuan baseline,uint32_t,32,38892,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,frames,Jing Hai / Yixuan baseline,uint32_t,32,38896,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,rejected,Jing Hai / Yixuan baseline,uint32_t,32,38900,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,overflows,Jing Hai / Yixuan baseline,uint32_t,32,38904,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,timing_faults,Jing Hai / Yixuan baseline,uint32_t,32,38908,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,ambiguous,Jing Hai / Yixuan baseline,uint32_t,32,38912,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,last_runs,Jing Hai / Yixuan baseline,uint32_t[29],928,38916,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,last_prominence,Jing Hai / Yixuan baseline,uint16_t,16,39032,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,last_extrema,Jing Hai / Yixuan baseline,uint16_t,16,39034,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,profile_extrema,Jing Hai / Yixuan baseline,uint16_t[6],96,39036,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,complete_profiles,Jing Hai / Yixuan baseline,uint8_t,8,39048,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,coherent_mask,Jing Hai / Yixuan baseline,uint8_t,8,39049,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,geometry_mask,Jing Hai / Yixuan baseline,uint8_t,8,39050,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,capture_start_us,Jing Hai / Yixuan baseline,uint32_t,32,39052,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,barcode_waveform.h,barcode_waveform_t,profile,Jing Hai / Yixuan baseline,barcode_wave_profile_t[6],6912,39056,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,barcode_waveform.h,barcode_waveform_t,saved,Jing Hai / Yixuan baseline,barcode_wave_snapshot_t,269344,39920,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,barcode_waveform.h,barcode_waveform_t,seen,Jing Hai / Yixuan baseline,bool,8,73588,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,armed,Jing Hai / Yixuan baseline,bool,8,73589,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,recording,Jing Hai / Yixuan baseline,bool,8,73590,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,attempted,Jing Hai / Yixuan baseline,bool,8,73591,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,barcode_waveform.h,barcode_waveform_t,last_conflict,Jing Hai / Yixuan baseline,bool,8,73592,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,robot_firmware.c,button_t,stable,Yixuan / integration owner,bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,robot_firmware.c,button_t,candidate,Yixuan / integration owner,bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,robot_firmware.c,button_t,changed_us,Yixuan / integration owner,uint64_t,64,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,wireless/calibration_core.h,calibration_core_t,log,Justin / integration owner,char[16384],131072,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,written,Justin / integration owner,uint32_t,32,16384,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,wireless/calibration_core.h,calibration_core_t,line,Justin / integration owner,char[768],6144,16388,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,line_length,Justin / integration owner,size_t,32,17156,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,wireless/calibration_core.h,calibration_core_t,line_overflow,Justin / integration owner,bool,8,17160,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,wireless/calibration_core.h,calibration_core_t,stop,Justin / integration owner,char[768],6144,17161,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,motion_detail,Justin / integration owner,char[768],6144,17929,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,previous_stop,Justin / integration owner,char[768],6144,18697,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,previous_detail,Justin / integration owner,char[768],6144,19465,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,settled,Justin / integration owner,char[768],6144,20233,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,summary,Justin / integration owner,char[768],6144,21001,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,timing,Justin / integration owner,char[768],6144,21769,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,barcode,Justin / integration owner,char[768],6144,22537,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,waveform,Justin / integration owner,char[768],6144,23305,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,trace,Justin / integration owner,char[2][768],12288,24073,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,optical_result,Justin / integration owner,char[256],2048,25609,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,pending,Justin / integration owner,char,8,25865,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,wireless/calibration_core.h,calibration_core_t,course,Justin / integration owner,course_config_t,32,25866,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,wireless/calibration_core.h,calibration_core_t,course_result,Justin / integration owner,char[768],6144,25870,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,wireless/calibration_core.h,calibration_core_t,selection_allowed,Justin / integration owner,bool,8,26638,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_baseline.h,center_baseline_t,samples,Jing Hai / Yixuan,uint16_t[31],496,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,center_baseline.h,center_baseline_t,count,Jing Hai / Yixuan,unsigned int,32,64,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_baseline.h,center_baseline_t,next,Jing Hai / Yixuan,unsigned int,32,68,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_baseline.h,center_baseline_t,last_us,Jing Hai / Yixuan,uint64_t,64,72,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,start_us,Jing Hai / Yixuan,uint64_t,64,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,stage_us,Jing Hai / Yixuan,uint64_t,64,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,last_us,Jing Hai / Yixuan,uint64_t,64,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,left_us,Jing Hai / Yixuan,uint64_t,64,24,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,right_us,Jing Hai / Yixuan,uint64_t,64,32,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,confirm_us,Jing Hai / Yixuan,uint64_t,64,40,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,origin_l,Jing Hai / Yixuan,int32_t,32,48,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,origin_r,Jing Hai / Yixuan,int32_t,32,52,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,peak_l,Jing Hai / Yixuan,int32_t,32,56,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,peak_r,Jing Hai / Yixuan,int32_t,32,60,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,confirm_l,Jing Hai / Yixuan,int32_t,32,64,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,confirm_r,Jing Hai / Yixuan,int32_t,32,68,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,settle_l,Jing Hai / Yixuan,int32_t,32,72,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,settle_r,Jing Hai / Yixuan,int32_t,32,76,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,coast_l,Jing Hai / Yixuan,int32_t,32,80,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,coast_r,Jing Hai / Yixuan,int32_t,32,84,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,still_us,Jing Hai / Yixuan,uint64_t,64,88,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,black_us,Jing Hai / Yixuan,uint64_t,64,96,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,white_us,Jing Hai / Yixuan,uint64_t,64,104,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,black_tracking,Jing Hai / Yixuan,bool,8,112,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_search.h,center_search_t,direction,Jing Hai / Yixuan,int,32,116,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,limit,Jing Hai / Yixuan,int32_t,32,120,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,reversed,Jing Hai / Yixuan,bool,8,124,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_search.h,center_search_t,confirming,Jing Hai / Yixuan,bool,8,125,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_search.h,center_search_t,found,Jing Hai / Yixuan,bool,8,126,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_search.h,center_search_t,retry_confirmation,Jing Hai / Yixuan,bool,8,127,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_search.h,center_search_t,extended_recovery,Jing Hai / Yixuan,bool,8,128,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_search.h,center_search_t,confirmation_retries,Jing Hai / Yixuan,unsigned int,32,132,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_search.h,center_search_t,sweep,Jing Hai / Yixuan,unsigned int,32,136,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,active,Jing Hai / Yixuan,bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_trim.h,center_trim_t,reversed,Jing Hai / Yixuan,bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_trim.h,center_trim_t,exhausted,Jing Hai / Yixuan,bool,8,2,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_trim.h,center_trim_t,no_response,Jing Hai / Yixuan,bool,8,3,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,center_trim.h,center_trim_t,direction,Jing Hai / Yixuan,int,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,last_good,Jing Hai / Yixuan,int,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,entry_level,Jing Hai / Yixuan,int32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,best_level,Jing Hai / Yixuan,int32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,progress_level,Jing Hai / Yixuan,int32_t,32,20,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,entry_delta,Jing Hai / Yixuan,int64_t,64,24,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,previous_delta,Jing Hai / Yixuan,int64_t,64,32,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,since,Jing Hai / Yixuan,uint64_t,64,40,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,started,Jing Hai / Yixuan,uint64_t,64,48,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,progress_since,Jing Hai / Yixuan,uint64_t,64,56,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,center_trim.h,center_trim_t,total_travel,Jing Hai / Yixuan,uint64_t,64,64,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_config.h,course_config_t,y_action,Jing Hai / Yixuan,char,8,0,11 action choices,4,RECODING_PROPOSAL,Explicit code mapping required; current ASCII is unchanged
+main,course_config.h,course_config_t,z_action,Jing Hai / Yixuan,char,8,1,11 action choices,4,RECODING_PROPOSAL,Explicit code mapping required; current ASCII is unchanged
+main,course_config.h,course_config_t,advance_mm,Jing Hai / Yixuan,uint16_t,16,2,60..250 mm,8,CODE_RANGE,Direct unsigned representation; no change to controller thresholds
+main,course_control.h,course_control_t,config,Jing Hai / Yixuan,course_config_t,32,0,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,course_control.h,course_control_t,phase,Jing Hai / Yixuan,course_phase_t,8,4,declared enum values 0..7,3,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+main,course_control.h,course_control_t,reference,Jing Hai / Yixuan,motion_control_t,1408,8,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,course_control.h,course_control_t,turn,Jing Hai / Yixuan,motion_control_t,1408,184,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,course_control.h,course_control_t,drive,Jing Hai / Yixuan,barcode_progress_t,2048,360,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,course_control.h,course_control_t,center_search,Jing Hai / Yixuan,center_search_t,1152,616,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,course_control.h,course_control_t,center_trim,Jing Hai / Yixuan,center_trim_t,576,760,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,course_control.h,course_control_t,center_reference,Jing Hai / Yixuan,int32_t,32,832,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,cruise_limit_cps,Jing Hai / Yixuan,unsigned int,32,836,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,recovery_limit_counts,Jing Hai / Yixuan,unsigned int,32,840,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,steady_line_us,Jing Hai / Yixuan,uint64_t,64,848,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,trim_attempts,Jing Hai / Yixuan,unsigned int,32,856,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,trim_reversals,Jing Hai / Yixuan,unsigned int,32,860,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,trim_no_responses,Jing Hai / Yixuan,unsigned int,32,864,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,center_search_started,Jing Hai / Yixuan,bool,8,868,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,center_level_valid,Jing Hai / Yixuan,bool,8,869,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,center_visible,Jing Hai / Yixuan,bool,8,870,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,barcode_seen,Jing Hai / Yixuan,bool,8,871,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,center_level,Jing Hai / Yixuan,int32_t,32,872,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,barcode_activity_us,Jing Hai / Yixuan,uint64_t,64,880,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,recoveries,Jing Hai / Yixuan,unsigned int,32,888,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,confirmation_retries,Jing Hai / Yixuan,unsigned int,32,892,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,wide_searches,Jing Hai / Yixuan,unsigned int,32,896,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_disabled,Jing Hai / Yixuan,bool,8,900,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,bend_ready,Jing Hai / Yixuan,bool,8,901,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,bend_active,Jing Hai / Yixuan,bool,8,902,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,bend_direction,Jing Hai / Yixuan,int,32,904,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_hint_us,Jing Hai / Yixuan,uint64_t,64,912,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_ready_us,Jing Hai / Yixuan,uint64_t,64,920,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_start_us,Jing Hai / Yixuan,uint64_t,64,928,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_strong_us,Jing Hai / Yixuan,uint64_t,64,936,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_ready_l,Jing Hai / Yixuan,int32_t,32,944,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_ready_r,Jing Hai / Yixuan,int32_t,32,948,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_l,Jing Hai / Yixuan,int32_t,32,952,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_r,Jing Hai / Yixuan,int32_t,32,956,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_attempts,Jing Hai / Yixuan,unsigned int,32,960,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_completed,Jing Hai / Yixuan,unsigned int,32,964,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_fallbacks,Jing Hai / Yixuan,unsigned int,32,968,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,flow_follow,Jing Hai / Yixuan,bool,8,972,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,right_level_valid,Jing Hai / Yixuan,bool,8,973,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,right_preview,Jing Hai / Yixuan,bool,8,974,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,right_preview_tracking,Jing Hai / Yixuan,bool,8,975,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,loss_coast,Jing Hai / Yixuan,bool,8,976,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,right_level,Jing Hai / Yixuan,int32_t,32,980,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,coast_l,Jing Hai / Yixuan,int32_t,32,984,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,coast_r,Jing Hai / Yixuan,int32_t,32,988,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,right_preview_since,Jing Hai / Yixuan,uint64_t,64,992,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,coast_us,Jing Hai / Yixuan,uint64_t,64,1000,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,right_previews,Jing Hai / Yixuan,unsigned int,32,1008,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,loss_coasts,Jing Hai / Yixuan,unsigned int,32,1012,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,bend_source,Jing Hai / Yixuan,const char *,32,1016,address/reference; not a portable wire value,,STRUCTURAL,Consider replacing application state strings with enum codes; do not transmit pointers
+main,course_control.h,course_control_t,bend_exit,Jing Hai / Yixuan,const char *,32,1020,address/reference; not a portable wire value,,STRUCTURAL,Consider replacing application state strings with enum codes; do not transmit pointers
+main,course_control.h,course_control_t,start_us,Jing Hai / Yixuan,uint64_t,64,1024,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,last_us,Jing Hai / Yixuan,uint64_t,64,1032,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,segment_us,Jing Hai / Yixuan,uint64_t,64,1040,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,phase_us,Jing Hai / Yixuan,uint64_t,64,1048,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,both_us,Jing Hai / Yixuan,uint64_t,64,1056,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,clear_us,Jing Hai / Yixuan,uint64_t,64,1064,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,seek_us,Jing Hai / Yixuan,uint64_t,64,1072,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,segment_l,Jing Hai / Yixuan,int32_t,32,1080,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,segment_r,Jing Hai / Yixuan,int32_t,32,1084,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,entry_l,Jing Hai / Yixuan,int32_t,32,1088,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,entry_r,Jing Hai / Yixuan,int32_t,32,1092,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,exit_l,Jing Hai / Yixuan,int32_t,32,1096,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,exit_r,Jing Hai / Yixuan,int32_t,32,1100,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,seek_l,Jing Hai / Yixuan,int32_t,32,1104,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,seek_r,Jing Hai / Yixuan,int32_t,32,1108,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,junctions,Jing Hai / Yixuan,unsigned int,32,1112,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,turns,Jing Hai / Yixuan,unsigned int,32,1116,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,route_updates,Jing Hai / Yixuan,unsigned int,32,1120,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,replacements,Jing Hai / Yixuan,unsigned int,32,1124,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,deferred_replacements,Jing Hai / Yixuan,unsigned int,32,1128,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,pending_action,Jing Hai / Yixuan,char,8,1132,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,pending_source,Jing Hai / Yixuan,char,8,1133,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,turn_action,Jing Hai / Yixuan,char,8,1134,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,turn_source,Jing Hai / Yixuan,char,8,1135,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,deferred_action,Jing Hai / Yixuan,char,8,1136,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,deferred_source,Jing Hai / Yixuan,char,8,1137,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,remaining_junctions,Jing Hai / Yixuan,unsigned int,32,1140,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,course_control.h,course_control_t,ignore_current_crossing,Jing Hai / Yixuan,bool,8,1144,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,deferred,Jing Hai / Yixuan,bool,8,1145,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,candidate,Jing Hai / Yixuan,bool,8,1146,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,latched,Jing Hai / Yixuan,bool,8,1147,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,clear_tracking,Jing Hai / Yixuan,bool,8,1148,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,seek_reverse,Jing Hai / Yixuan,bool,8,1149,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,course_control.h,course_control_t,fault,Jing Hai / Yixuan,const char *,32,1152,address/reference; not a portable wire value,,STRUCTURAL,Consider replacing application state strings with enum codes; do not transmit pointers
+main,encoders.h,encoder_sample_t,left_raw,Yixuan / integration owner,uint32_t,32,0,uint32 modulo counter; full bit pattern retained,32,KEEP_PENDING_LIFETIME_REVIEW,Never reset shared raw counts to satisfy a proposed relative-message width
+main,encoders.h,encoder_sample_t,right_raw,Yixuan / integration owner,uint32_t,32,4,uint32 modulo counter; full bit pattern retained,32,KEEP_PENDING_LIFETIME_REVIEW,Never reset shared raw counts to satisfy a proposed relative-message width
+main,encoders.h,encoder_sample_t,left_invalid,Yixuan / integration owner,uint32_t,32,8,uint32 modulo counter; full bit pattern retained,32,KEEP_PENDING_LIFETIME_REVIEW,Never reset shared raw counts to satisfy a proposed relative-message width
+main,encoders.h,encoder_sample_t,right_invalid,Yixuan / integration owner,uint32_t,32,12,uint32 modulo counter; full bit pattern retained,32,KEEP_PENDING_LIFETIME_REVIEW,Never reset shared raw counts to satisfy a proposed relative-message width
+main,line_check.h,ir_roles_t,barcode,Jing Hai / Yixuan baseline,bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,line_check.h,ir_roles_t,left,Jing Hai / Yixuan baseline,bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,line_check.h,ir_roles_t,right,Jing Hai / Yixuan baseline,bool,8,2,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,line_check.h,line_check_output_t,left,Jing Hai / Yixuan baseline,float,32,0,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,line_check.h,line_check_output_t,right,Jing Hai / Yixuan baseline,float,32,4,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,line_check.h,line_check_output_t,stop,Jing Hai / Yixuan baseline,bool,8,8,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,line_check.h,line_check_output_t,state,Jing Hai / Yixuan baseline,const char *,32,12,address/reference; not a portable wire value,,STRUCTURAL,Consider replacing application state strings with enum codes; do not transmit pointers
+main,motion_control.h,motion_control_t,start,Yixuan / integration owner,encoder_sample_t,128,0,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,motion_control.h,motion_control_t,left,Yixuan / integration owner,motion_wheel_t,512,16,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,motion_control.h,motion_control_t,right,Yixuan / integration owner,motion_wheel_t,512,80,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,motion_control.h,motion_control_t,start_us,Yixuan / integration owner,uint64_t,64,144,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_control_t,control_us,Yixuan / integration owner,uint64_t,64,152,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_control_t,peak_skew,Yixuan / integration owner,int32_t,32,160,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_control_t,kind,Yixuan / integration owner,motion_kind_t,8,164,declared enum values 0..8,4,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+main,motion_control.h,motion_control_t,phase,Yixuan / integration owner,motion_phase_t,8,165,declared enum values 0..4,3,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+main,motion_control.h,motion_control_t,fault,Yixuan / integration owner,motion_fault_t,8,166,declared enum values 0..5,3,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+main,motion_control.h,motion_control_t,stalled_wheels,Yixuan / integration owner,uint8_t,8,167,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_control_t,slow_distance,Yixuan / integration owner,bool,8,168,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,motion_control.h,motion_control_t,transit_drive,Yixuan / integration owner,bool,8,169,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,motion_control.h,motion_control_t,alignment_drive,Yixuan / integration owner,bool,8,170,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,motion_control.h,motion_control_t,slow_turn,Yixuan / integration owner,bool,8,171,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,motion_control.h,motion_wheel_t,integral,Yixuan / integration owner,float,32,0,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,motion_control.h,motion_wheel_t,throttle,Yixuan / integration owner,float,32,4,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,motion_control.h,motion_wheel_t,cps,Yixuan / integration owner,float,32,8,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,motion_control.h,motion_wheel_t,applied_pwm,Yixuan / integration owner,float,32,12,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,motion_control.h,motion_wheel_t,requested_cps,Yixuan / integration owner,float,32,16,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,motion_control.h,motion_wheel_t,no_progress_ms,Yixuan / integration owner,uint32_t,32,20,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_wheel_t,held,Yixuan / integration owner,bool,8,24,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,motion_control.h,motion_wheel_t,target,Yixuan / integration owner,int32_t,32,28,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_wheel_t,position,Yixuan / integration owner,int32_t,32,32,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_wheel_t,previous,Yixuan / integration owner,int32_t,32,36,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_wheel_t,cutoff_position,Yixuan / integration owner,int32_t,32,40,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_wheel_t,cutoff_elapsed_us,Yixuan / integration owner,uint32_t,32,44,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_wheel_t,last_progress_us,Yixuan / integration owner,uint64_t,64,48,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motion_control.h,motion_wheel_t,finished,Yixuan / integration owner,bool,8,56,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,motor_guard.h,motor_guard_t,refreshed_us,Yixuan / integration owner,uint32_t,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,motor_guard.h,motor_guard_t,armed,Yixuan / integration owner,bool,8,4,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,motor_guard.h,motor_guard_t,tripped,Yixuan / integration owner,bool,8,5,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,robot_firmware.c,motor_t,slice,Yixuan / integration owner,uint,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,robot_firmware.c,motor_t,channel_a,Yixuan / integration owner,uint,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,robot_firmware.c,motor_t,channel_b,Yixuan / integration owner,uint,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,robot_firmware.c,motor_t,forward_sign,Yixuan / integration owner,float,32,12,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,navigation_commands.h,navigation_manoeuvre_t,command,Jing Hai / Yixuan baseline,navigation_command_t,8,0,declared enum values 0..5,3,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+main,navigation_commands.h,navigation_manoeuvre_t,requested_turn_degrees,Jing Hai / Yixuan baseline,float,32,4,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,navigation_commands.h,navigation_manoeuvre_t,requires_turn,Jing Hai / Yixuan baseline,bool,8,8,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,line,Lionel,course_control_t,9280,0,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,leg,Lionel,motion_control_t,1408,1160,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,origin,Lionel,motion_control_t,1408,1336,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,tape_origin,Lionel,motion_control_t,1408,1512,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,episode_origin,Lionel,motion_control_t,1408,1688,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,align_origin,Lionel,motion_control_t,1408,1864,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,saved_leg,Lionel,motion_control_t,1408,2040,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,probe_black,Lionel,bool,8,2216,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,probe_gap,Lionel,bool,8,2217,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,probe_first_black_mm,Lionel,unsigned int,32,2220,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,route_heading_deg,Lionel,int,32,2224,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,plan,Lionel,obstacle_plan_t,192,2228,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,plan_cm,Lionel,float[5],160,2252,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,obstacle_bypass.h,obstacle_bypass_t,plan_good,Lionel,unsigned int[5],160,2272,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,obstacle_bypass.h,obstacle_bypass_t,departure_deg,Lionel,unsigned int,32,2292,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,departure_travel_mm,Lionel,unsigned int,32,2296,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,departure_forward_mm,Lionel,unsigned int,32,2300,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,left_samples,Lionel,unsigned int,32,2304,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,left_far,Lionel,unsigned int,32,2308,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,tail_margin_done,Lionel,bool,8,2312,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,left_near,Lionel,bool,8,2313,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,axle_mm,Lionel,unsigned int,32,2316,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,align_direction,Lionel,int,32,2320,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,align_reversed,Lionel,bool,8,2324,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,align_armed,Lionel,bool,8,2325,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,align_hit_us,Lionel,uint64_t,64,2328,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,align_rejected,Lionel,unsigned int,32,2336,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,fast_clear,Lionel,unsigned int,32,2340,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,approach_pending,Lionel,bool,8,2344,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,approach_warning,Lionel,bool,8,2345,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,approach_origin,Lionel,motion_control_t,1408,2352,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+main,obstacle_bypass.h,obstacle_bypass_t,approach_estimate_cm,Lionel,float,32,2528,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,obstacle_bypass.h,obstacle_bypass_t,approach_anchor_cm,Lionel,float,32,2532,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,obstacle_bypass.h,obstacle_bypass_t,approach_yaw_rad,Lionel,float,32,2536,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,obstacle_bypass.h,obstacle_bypass_t,approach_us,Lionel,uint64_t,64,2544,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,approach_min_cm,Lionel,float,32,2552,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,obstacle_bypass.h,obstacle_bypass_t,approach_hits,Lionel,unsigned int,32,2556,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,phase,Lionel,avoid_phase_t,8,2560,declared enum values 0..21,5,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+main,obstacle_bypass.h,obstacle_bypass_t,next,Lionel,avoid_phase_t,8,2561,declared enum values 0..21,5,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+main,obstacle_bypass.h,obstacle_bypass_t,resume_phase,Lionel,avoid_phase_t,8,2562,declared enum values 0..21,5,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+main,obstacle_bypass.h,obstacle_bypass_t,white_us,Lionel,uint64_t,64,2568,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,candidate_us,Lionel,uint64_t,64,2576,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,resume_servo,Lionel,unsigned int,32,2584,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,rejoin_attempts,Lionel,unsigned int,32,2588,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,rejoin_rejected,Lionel,unsigned int,32,2592,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,rejoin_good,Lionel,unsigned int,32,2596,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,rejoin_armed,Lionel,bool,8,2600,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,no_return,Lionel,bool,8,2601,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,tape_decision,Lionel,const char *,32,2604,address/reference; not a portable wire value,,STRUCTURAL,Consider replacing application state strings with enum codes; do not transmit pointers
+main,obstacle_bypass.h,obstacle_bypass_t,phase_us,Lionel,uint64_t,64,2608,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,last_us,Lionel,uint64_t,64,2616,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,episode_us,Lionel,uint64_t,64,2624,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,range_us,Lionel,uint64_t,64,2632,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,hit_us,Lionel,uint64_t,64,2640,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,wall_us,Lionel,uint64_t,64,2648,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,active_us,Lionel,uint64_t,64,2656,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,sonar_wait_us,Lionel,uint64_t,64,2664,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,sonar_wait,Lionel,bool,8,2672,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,sonar_good,Lionel,unsigned int,32,2676,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,sonar_retries,Lionel,unsigned int,32,2680,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,sonar_resumes,Lionel,unsigned int,32,2684,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,encoder_seen,Lionel,uint32_t[2],64,2688,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,obstacle_bypass.h,obstacle_bypass_t,encoder_error_us,Lionel,uint64_t[2],128,2696,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,obstacle_bypass.h,obstacle_bypass_t,encoder_skips,Lionel,unsigned int[2],64,2712,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,obstacle_bypass.h,obstacle_bypass_t,servo_angle,Lionel,unsigned int,32,2720,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_index,Lionel,unsigned int,32,2724,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,samples,Lionel,unsigned int,32,2728,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,close_count,Lionel,unsigned int,32,2732,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,clear_checks,Lionel,unsigned int,32,2736,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_center_clear,Lionel,unsigned int,32,2740,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_ray_far,Lionel,unsigned int,32,2744,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_far_rays,Lionel,unsigned int,32,2748,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_far_samples,Lionel,unsigned int,32,2752,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_nearest_angle,Lionel,unsigned int,32,2756,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_blocked_angle,Lionel,unsigned int,32,2760,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,last_side_seen_mm,Lionel,unsigned int,32,2764,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,offset_mm,Lionel,unsigned int,32,2768,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,along_mm,Lionel,unsigned int,32,2772,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,outward_mm,Lionel,unsigned int,32,2776,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,detected,Lionel,unsigned int,32,2780,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,completed,Lionel,unsigned int,32,2784,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scans,Lionel,unsigned int,32,2788,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,no_echo,Lionel,unsigned int,32,2792,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_no_echo,Lionel,unsigned int,32,2796,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_serial,Lionel,unsigned int,32,2800,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,scan_min_cm,Lionel,float,32,2804,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,obstacle_bypass.h,obstacle_bypass_t,scan_blocked,Lionel,bool,8,2808,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,side_seen,Lionel,bool,8,2809,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,echo_valid,Lionel,bool,8,2810,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_bypass.h,obstacle_bypass_t,reference,Lionel,int32_t,32,2812,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_bypass.h,obstacle_bypass_t,fault,Lionel,const char *,32,2816,address/reference; not a portable wire value,,STRUCTURAL,Consider replacing application state strings with enum codes; do not transmit pointers
+main,obstacle_plan.h,obstacle_plan_t,angle_deg,Lionel,unsigned int,32,0,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_plan.h,obstacle_plan_t,lateral_mm,Lionel,unsigned int,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_plan.h,obstacle_plan_t,travel_mm,Lionel,unsigned int,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_plan.h,obstacle_plan_t,forward_mm,Lionel,unsigned int,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_plan.h,obstacle_plan_t,observed_width_mm,Lionel,unsigned int,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,obstacle_plan.h,obstacle_plan_t,right_edge_known,Lionel,bool,8,20,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,obstacle_plan.h,obstacle_plan_t,width_bounded,Lionel,bool,8,21,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,run_diagnostics.h,run_diagnostics_t,active,Yixuan / integration owner,bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,run_diagnostics.h,run_diagnostics_t,samples,Yixuan / integration owner,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,run_diagnostics.h,run_diagnostics_t,sonar_valid,Yixuan / integration owner,uint32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,run_diagnostics.h,run_diagnostics_t,sonar_no_echo,Yixuan / integration owner,uint32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,run_diagnostics.h,run_diagnostics_t,pitch_samples,Yixuan / integration owner,uint32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,run_diagnostics.h,run_diagnostics_t,last_pitch_sequence,Yixuan / integration owner,uint32_t,32,20,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,run_diagnostics.h,run_diagnostics_t,ir_min,Yixuan / integration owner,uint16_t[3],48,24,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,run_diagnostics.h,run_diagnostics_t,ir_max,Yixuan / integration owner,uint16_t[3],48,30,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,run_diagnostics.h,run_diagnostics_t,ir_edges,Yixuan / integration owner,uint32_t[3],96,36,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,run_diagnostics.h,run_diagnostics_t,ir_previous,Yixuan / integration owner,bool[3],24,48,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+main,run_diagnostics.h,run_diagnostics_t,sonar_min,Yixuan / integration owner,float,32,52,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,run_diagnostics.h,run_diagnostics_t,sonar_max,Yixuan / integration owner,float,32,56,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,run_diagnostics.h,run_diagnostics_t,pitch_min,Yixuan / integration owner,float,32,60,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,run_diagnostics.h,run_diagnostics_t,pitch_max,Yixuan / integration owner,float,32,64,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,run_diagnostics.h,run_diagnostics_t,start_humps,Yixuan / integration owner,uint32_t,32,68,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,run_diagnostics.h,run_diagnostics_t,start_errors,Yixuan / integration owner,uint32_t,32,72,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,terrain.h,terrain_status_t,available,Ezra,bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,terrain.h,terrain_status_t,calibrated,Ezra,bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,terrain.h,terrain_status_t,pitch_valid,Ezra,bool,8,2,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+main,terrain.h,terrain_status_t,current_pitch_deg,Ezra,float,32,4,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,terrain.h,terrain_status_t,pitch_sequence,Ezra,uint32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,terrain.h,terrain_status_t,read_errors,Ezra,uint32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,terrain.h,terrain_status_t,hump_count,Ezra,uint32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,terrain.h,terrain_status_t,highest_hump_number,Ezra,uint32_t,32,20,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+main,terrain.h,terrain_status_t,highest_peak_angle_deg,Ezra,float,32,24,range/resolution/error budget OPEN,,OWNER_DECISION,Retain working precision until quantified error/range tests justify a fixed-point representation
+main,robot_firmware.c,waveform_sample_t,us,Jing Hai / Yixuan baseline,uint32_t,32,0,uint32 timestamp or modulo wheel counter,32,KEEP_PENDING_LIFETIME_REVIEW,Bounded delta rules must survive wrapping
+main,robot_firmware.c,waveform_sample_t,left,Jing Hai / Yixuan baseline,uint32_t,32,4,uint32 timestamp or modulo wheel counter,32,KEEP_PENDING_LIFETIME_REVIEW,Bounded delta rules must survive wrapping
+main,robot_firmware.c,waveform_sample_t,right,Jing Hai / Yixuan baseline,uint32_t,32,8,uint32 timestamp or modulo wheel counter,32,KEEP_PENDING_LIFETIME_REVIEW,Bounded delta rules must survive wrapping
+main,robot_firmware.c,waveform_sample_t,raw,Jing Hai / Yixuan baseline,uint16_t,16,12,0..4095 filtered ADC,12,ADC12_ASSUMPTION,Target struct padding measured separately; preserve position and sample timing
+wifi,telemetry.h,telemetry_event_t,kind,Justin / integration owner,telemetry_event_kind_t,8,0,declared enum values 0..3,2,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+wifi,telemetry.h,telemetry_event_t,captured_ms,Justin / integration owner,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_event_t,scan_id,Justin / integration owner,uint32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_event_t,value,Justin / integration owner,int32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_event_t,angle_mdeg,Justin / integration owner,int32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_line_t,b_is_valid,Justin / integration owner,_Bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_line_t,b_is_simulated,Justin / integration owner,_Bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_line_t,captured_ms,Justin / integration owner,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_line_t,ir_left,Justin / integration owner,uint16_t,16,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_line_t,ir_middle,Justin / integration owner,uint16_t,16,10,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_line_t,ir_right,Justin / integration owner,uint16_t,16,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_line_t,b_is_on_line,Justin / integration owner,_Bool,8,14,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_line_t,barcode,Justin / integration owner,char,8,15,proposed none + A..Z + unreadable (28 codes),5,RECODING_PROPOSAL,Current bytes are ASCII; decide reserved/invalid codes with navigation and MQTT owners
+wifi,telemetry.h,telemetry_mission_t,b_is_valid,Justin / integration owner,_Bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_mission_t,b_is_simulated,Justin / integration owner,_Bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_mission_t,captured_ms,Justin / integration owner,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_mission_t,state,Justin / integration owner,telemetry_mission_state_t,8,8,declared enum values 0..3,2,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+wifi,telemetry.h,telemetry_motion_t,b_is_valid,Justin / integration owner,_Bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_motion_t,b_is_simulated,Justin / integration owner,_Bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_motion_t,captured_ms,Justin / integration owner,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_motion_t,left_mm_s,Justin / integration owner,int32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_motion_t,right_mm_s,Justin / integration owner,int32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_motion_t,left_ticks,Justin / integration owner,int32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_motion_t,right_ticks,Justin / integration owner,int32_t,32,20,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_motion_t,distance_mm,Justin / integration owner,uint32_t,32,24,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_obstacle_t,b_is_valid,Justin / integration owner,_Bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_obstacle_t,b_is_simulated,Justin / integration owner,_Bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_obstacle_t,captured_ms,Justin / integration owner,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_obstacle_t,scan_id,Justin / integration owner,uint32_t,32,8,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_obstacle_t,closest_mm,Justin / integration owner,uint32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_obstacle_t,width_mm,Justin / integration owner,uint32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_obstacle_t,left_clearance_mm,Justin / integration owner,uint32_t,32,20,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_obstacle_t,right_clearance_mm,Justin / integration owner,uint32_t,32,24,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_sample_t,source,Justin / integration owner,telemetry_source_t,8,0,declared enum values 0..4,3,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+wifi,telemetry.h,telemetry_sample_t,data,Justin / integration owner,union (unnamed union at telemetry.h:135:5),224,4,anonymous record container,,CONTAINER_REVIEW,Review member types separately; do not count container twice
+wifi,telemetry.h,telemetry_snapshot_t,mission,Justin / integration owner,telemetry_mission_t,96,0,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+wifi,telemetry.h,telemetry_snapshot_t,motion,Justin / integration owner,telemetry_motion_t,224,12,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+wifi,telemetry.h,telemetry_snapshot_t,line,Justin / integration owner,telemetry_line_t,128,40,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+wifi,telemetry.h,telemetry_snapshot_t,terrain,Justin / integration owner,telemetry_terrain_t,160,56,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+wifi,telemetry.h,telemetry_snapshot_t,obstacle,Justin / integration owner,telemetry_obstacle_t,224,76,nested application type,,CONTAINER_REVIEW,See field rows for referenced type
+wifi,telemetry.h,telemetry_terrain_t,b_is_valid,Justin / integration owner,_Bool,8,0,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_terrain_t,b_is_simulated,Justin / integration owner,_Bool,8,1,false/true,1,CODE_RANGE,One bit; shared-word updates still require synchronization
+wifi,telemetry.h,telemetry_terrain_t,captured_ms,Justin / integration owner,uint32_t,32,4,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_terrain_t,motion,Justin / integration owner,telemetry_motion_state_t,8,8,declared enum values 0..6,3,CODE_RANGE,Pack only after shared layout and invalid-code rules are agreed
+wifi,telemetry.h,telemetry_terrain_t,hump_mm,Justin / integration owner,int32_t,32,12,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_terrain_t,highest_hump_mm,Justin / integration owner,int32_t,32,16,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+wifi,telemetry.h,telemetry_wheel_history_t,records,Justin / integration owner,uint32_t[26],832,0,array/container; inspect elements or referenced type,,CONTAINER_REVIEW,Do not add nested container and child sizes when estimating RAM
+wifi,telemetry.h,telemetry_wheel_history_t,state,Justin / integration owner,uint16_t,16,104,range/lifetime/reset/overflow policy OPEN,,OWNER_DECISION,No minimum width claimed solely from native C type
+terrain,terrain.h,terrain_status_t,available,Ezra,unsigned int,1,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,calibrated,Ezra,unsigned int,1,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,sample_valid,Ezra,unsigned int,1,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,height_valid,Ezra,unsigned int,1,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,highest_height_valid,Ezra,unsigned int,1,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,motion,Ezra,unsigned int,3,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,hump_count,Ezra,unsigned int,12,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,highest_hump_number,Ezra,unsigned int,12,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,highest_height_hump_number,Ezra,unsigned int,12,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,highest_peak_angle_cdeg,Ezra,unsigned int,14,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,current_hump_mm,Ezra,unsigned int,13,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,highest_hump_mm,Ezra,unsigned int,13,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,captured_ms,Ezra,unsigned int,21,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets
+terrain,terrain.h,terrain_status_t,faults,Ezra,unsigned int,5,bitfield; see explicit encoder,range/lifetime/reset/overflow policy OPEN,,PACKED_OWNER_REVIEW,Width already packed; owner must justify range/resolution and explicit wire offsets

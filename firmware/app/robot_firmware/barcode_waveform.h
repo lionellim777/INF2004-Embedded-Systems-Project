@@ -14,6 +14,9 @@
 #define BARCODE_WAVE_SAMPLES 8192u
 #define BARCODE_WAVE_PERIOD_US 2000u
 #define BARCODE_WAVE_GAP_US 3000u
+#ifndef BARCODE_WAVE_LAST_PASS
+#define BARCODE_WAVE_LAST_PASS 0
+#endif
 enum { WAVE_NONE, WAVE_ACCEPTED, WAVE_TOO_FEW, WAVE_TOO_MANY,
     WAVE_RUN_SHORT, WAVE_RUN_LONG, WAVE_CODE39, WAVE_AMBIGUOUS,
     WAVE_FRAME_LIMIT, WAVE_BUFFER_FULL, WAVE_TIMING, WAVE_STOPPED_PARTIAL,
@@ -41,6 +44,11 @@ typedef struct {
 typedef struct {
     uint16_t sample[BARCODE_WAVE_SAMPLES];
     int16_t position[BARCODE_WAVE_SAMPLES];
+#if BARCODE_WAVE_LAST_PASS
+    /* Per-instance decode scratch: latest forward crossing at each coordinate.
+     * Raw ADC/position words remain unchanged for frozen diagnostics. */
+    uint8_t latest_mask[(BARCODE_WAVE_SAMPLES+7u)/8u];
+#endif
     uint32_t edge_work[95],fit_work[29],geometry_work[29];
     bool motion, motion_seen, motion_fault, odometry_fault, recrossing;
     uint32_t left_raw,right_raw,motion_faults,recrosses,stationary_samples,white_counts,lateral_recrosses;

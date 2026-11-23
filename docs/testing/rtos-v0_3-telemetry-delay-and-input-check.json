@@ -1,0 +1,95 @@
+{
+  "date_local": "2026-11-08",
+  "reviewed_utc": "2026-11-08T13:29:31.809112+00:00",
+  "source_parent_commit": "02681c7",
+  "problem": "Console called every >1s packet-arrival gap a reconnection although USB/MQTT state remained online; a b input was rejected without a restart event",
+  "changes": [
+    "Record ordinary delivery gaps with source and host timing; display only one delay notice per session",
+    "Only announce resumed telemetry after a known broker/observer interruption or offline link",
+    "Read complete buffered input lines without TextIO read-ahead loss; repeated identical command letters coalesce into one request",
+    "Request CYW43_NONE_PM after STA setup and expose the SDK return code in USB diagnostics"
+  ],
+  "sdk_reference": "https://www.raspberrypi.com/documentation/pico-sdk/networking.html",
+  "configured_image_sha256": "41a3d2c98f196fe2b05e4ea32d6c498b6e4cd5b7fba019434482c4dcc1259c20",
+  "image_remains_private_and_ignored": true,
+  "configured_arm_build": "PASS -Wall -Wextra -Werror",
+  "linked_text_bytes": 387384,
+  "linked_bss_bytes": 89976,
+  "picotool_flash_verify_passed": true,
+  "wifi_power_mode_request_sdk_result": 0,
+  "baseline_timing": {
+    "window_seconds": 90,
+    "motion_packets": 318,
+    "observed_span_seconds": 89.810372,
+    "median_arrival_interval_seconds": 0.198767,
+    "maximum_arrival_interval_seconds": 4.989572,
+    "arrival_gaps_over_one_second": 23
+  },
+  "updated_timing": {
+    "window_seconds": 90,
+    "motion_packets": 428,
+    "observed_span_seconds": 89.910511,
+    "median_arrival_interval_seconds": 0.201316,
+    "maximum_arrival_interval_seconds": 1.729604,
+    "arrival_gaps_over_one_second": 5
+  },
+  "timing_interpretation": "Fewer and shorter arrival gaps in these observed stationary runs; not a controlled RF experiment or a worst-case guarantee",
+  "software_tests": {
+    "actual_network_service": "PASS including radio initialization failure, STA-before-PM order and visible PM failure",
+    "binary_roundtrip": "PASS 15 real local-broker packets",
+    "console_delay_and_input": "PASS ordinary delays do not create reconnect spam, true outage resumes once, bb and buffered q accepted, START rejected",
+    "broker_lifecycle": "PASS authentication/ACLs, two restarts with idle TCP and traffic, parent EOF, b/q cancellation and logs"
+  },
+  "live_restart_events": [
+    {
+      "received_utc": "2026-11-08T13:27:08.293269+00:00",
+      "event": "console_command",
+      "key": "b"
+    },
+    {
+      "received_utc": "2026-11-08T13:27:08.293413+00:00",
+      "event": "broker_restart_begin"
+    },
+    {
+      "received_utc": "2026-11-08T13:27:10.423988+00:00",
+      "event": "broker_restart_complete"
+    },
+    {
+      "received_utc": "2026-11-08T13:28:12.880843+00:00",
+      "event": "console_command",
+      "key": "q"
+    }
+  ],
+  "live_reconnections_confirmed": 1,
+  "live_mqtt_stop_acknowledgements": 1,
+  "live_fault_codes": [
+    0
+  ],
+  "live_final_stop_latched": true,
+  "live_phases_seen": [
+    0
+  ],
+  "no_start_sent": true,
+  "raw_before_local": "serial-output/rtos-network-20261108-211716",
+  "raw_after_local": "serial-output/rtos-network-20261108-212512",
+  "raw_after_sha256": {
+    "usb.log": "b73f24739b99869ab06ffbe2a58a63f51c03c099e96c2f55f1fd5144a8d55a86",
+    "usb.json": "7219058692372493fe1c0424c95762cb97792536cfed47290c4d82aeba162cba",
+    "mqtt.jsonl": "885fd1f51998a1ce989ef6539c32f797ce9a77636f2b4aa1500cc823414b3148",
+    "mqtt-summary.json": "5bcec56c803385f4627800a299178d56abb7c5407653b7457021f14b2d8647e5"
+  },
+  "source_sha256": {
+    "firmware/app/mission_rtos/main.c": "24d905394d6a59cdbb3abbdd8f53e8a16162cfe33d954cf69d6b080ea87f0af7",
+    "firmware/app/mission_rtos/network_service.c": "e8b77e4ed641e364ebe502f8fd6822fcd7c1585dfd3b526d6df5b0c45d0f9379",
+    "firmware/app/mission_rtos/network_service.h": "319f37c0b55df0e9fbe8e03c915cddb7912de4d130fdc82299833926f469ef0b",
+    "firmware/tests/mission_rtos/network_test.c": "4c258270e66dcae25f349f7a4c10c89842ff8e1ab3a0b72c7e43a61c63720177",
+    "firmware/tests/mission_rtos/network_test_sdk.h": "2d42c60a2a53f7c04a2c7d6cfb011274dc6ab2679ff442fbb1d9880a449b0fa8",
+    "tools/rtos_network_session.py": "de3a05881587cbae3f1be8949b3b74c0f6fd78904f64a3f674dd588cf2a9d806",
+    "tools/test_rtos_network_console.py": "bbd70ad779c7c75049c7ded830f4c32c61ffd9b3bd8924998086ac0618968d73"
+  },
+  "limits": [
+    "Residual delivery gaps remain; binary MQTT does not establish bounded emergency-stop latency",
+    "Only stationary firmware checks in this capture; motor-under-network timing/physical acceptance remains pending",
+    "Whole mission, stack margins and deadline analysis remain pending"
+  ]
+}

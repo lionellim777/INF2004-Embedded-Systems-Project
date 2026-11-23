@@ -1,0 +1,112 @@
+{
+  "date_local": "2026-11-08",
+  "version": "rtos-motion-v0.3",
+  "branch": "yixuan/rtos-motion-foundation",
+  "source_parent_commit": "d58f686",
+  "compile_validation_only": true,
+  "compile_settings_synthetic": true,
+  "physical_network_tested": false,
+  "flashed": false,
+  "user_credentials_collected": false,
+  "user_action_required": "Run tools/run_rtos_network.sh and enter Wi-Fi settings locally; it builds the actual configured image",
+  "compile_test_artifact": "build/rtos-network-compile-test/COMPILE_TEST_ONLY_DO_NOT_FLASH.uf2",
+  "compile_test_sha256": "6cebb2b547f7cc1781e569bfc14f444fac96affe56b93175a20e07a81bc522d6",
+  "uf2_bytes": 774656,
+  "uf2_blocks": 1513,
+  "uf2_binary_match": true,
+  "linked_text_bytes": 387080,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 89976,
+  "kernel_commit": "15ed232c08f2d89e54e514db79de150e224307e3",
+  "kernel_pool_bytes": 32768,
+  "application_task_requested_stacks_bytes": [
+    4096,
+    4096,
+    4096
+  ],
+  "runtime_stack_margins_measured": false,
+  "software_tests": {
+    "configured_arm_build": "PASS -Wall -Wextra -Werror",
+    "motion": {
+      "native_equivalent_record_bytes": 28,
+      "binary_record_bytes": 13,
+      "safety_gate_bytes": 8,
+      "runtime_bytes": 200,
+      "codec_cases": 5005,
+      "test_type": "Host SDK simulation and target compile; no hardware/RTOS scheduling execution"
+    },
+    "network": {
+      "production_service_sdk_mock": "PASS",
+      "independent_binary_decode": "PASS",
+      "local_broker_binary_roundtrip_packets": 15,
+      "hardware_network_tested": false,
+      "local_broker_restart_cycles": 1,
+      "packet_sizes": {
+        "motion": [
+          13
+        ],
+        "barcode": [
+          5
+        ],
+        "status": [
+          10
+        ],
+        "link": [
+          1
+        ],
+        "command_result": [
+          1
+        ]
+      }
+    },
+    "authenticated_broker": "PASS real loopback: anonymous and wrong passwords rejected; binary motion/empty STOP delivered; operator telemetry forgery blocked",
+    "actual_operator_console": "PASS authenticated startup, owned broker restart, observer automatic reconnect",
+    "private_setup": "PASS modes0700/0600, validated settings, UTF-8/quotes/backslashes round trip through C compiler",
+    "console_safety": "PASS v0.3 selection gate, no START command, exact empty STOP, packet/ACK evidence, no password in logs"
+  },
+  "hardware_usb_acceptance_v0_2": "docs/testing/rtos-v0_2-usb-acceptance.json",
+  "physical_checklist": "docs/testing/rtos-network-first-physical-check.md",
+  "limits": [
+    "Pico Wi-Fi/DHCP and live binary MQTT still need physical execution",
+    "Compile-only image contains synthetic settings and must not be flashed",
+    "Whole mission, loaded accuracy, worst-case stop timing, stack margins and whole-application packing remain pending"
+  ],
+  "source_sha256": {
+    "firmware/app/mission_rtos/CMakeLists.txt": "5573e80f44d736a24fde6fdb389a6fe07aed913b990209e2b30363a28c4f0426",
+    "firmware/app/mission_rtos/binary_protocol.c": "20872f43574010ee57f91131b9391c19fe06a687f36c139ad42495f79284a174",
+    "firmware/app/mission_rtos/binary_protocol.h": "fdf05342920955e063d0792877e71f5723f69dfb5bd9505a6f1614d61009540a",
+    "firmware/app/mission_rtos/board.c": "063c73fc7981ed33c7e6d20e6fd2828f815d9c974e3658d1b035615c4b42a995",
+    "firmware/app/mission_rtos/board.h": "62c3e625aaf432882435d5c9c89f50023c920c6efa79978be0bf1f35669b6313",
+    "firmware/app/mission_rtos/lwipopts.h": "6ed9d27bdb374ef55d43db032b75f5ae4864e7b8ca3caf251f3f9ed2e34a6707",
+    "firmware/app/mission_rtos/main.c": "22ceac9f9431d00880239eee6b63ac2134662d4a0ff053d27bc8841b82160439",
+    "firmware/app/mission_rtos/motion_record.c": "18a90475bf3ed52b35d312e3c387fd1cbeb7c0d2386798f790266f619211900a",
+    "firmware/app/mission_rtos/motion_record.h": "02cc001f6920388de27b217dd71c110fadc9c810416ac37d7c8bc983b740ddd7",
+    "firmware/app/mission_rtos/motion_runtime.c": "591592e553bb48aeb9e3db1a1eb9c0c83fe71b19fb0db7544cb672bddb35854a",
+    "firmware/app/mission_rtos/motion_runtime.h": "08a8cfe28a609ea0128379fe97091b1eaf006c4ef3495b4acd4985d9a02b5496",
+    "firmware/app/mission_rtos/network_service.c": "9986c7c5ee3f102e3d77bc5b64490d1d5f82d6b8a565ab94870251958ecd455f",
+    "firmware/app/mission_rtos/network_service.h": "a6b1f858c7d929b95cab0b50057b338bb969e1dce229f0ef813aec77114c70b0",
+    "firmware/app/mission_rtos/network_settings.example.h": "ba0653c9eda114e45f3dfe2f2c496efdb31bdd32f31f640bb5b8303f9ed57fc7",
+    "firmware/app/mission_rtos/port/mtk_bridge.c": "b32230c50d95846f75fa18ad2471facce26269f41a31217c4856f30395c8fea9",
+    "firmware/app/mission_rtos/port/mtk_bridge.h": "6d1858c616ca5cffa7b4c14680ffd7280caf8376c7f97e157fe073fbfcffab45",
+    "firmware/app/mission_rtos/safety_gate.c": "83732fb4f00487162e412318be9dce3acd85700c0d3aaafa0a526248c0fd4926",
+    "firmware/app/mission_rtos/safety_gate.h": "46e38a72a8cbd12ecbdb9a7171938f5d9ed9b0acdab8165f01b64b7ca54091b0",
+    "firmware/app/mission_rtos/version.h": "10477be283f1d93a9e94d81e7b9fffc5df80d1be23e17c36cba41221cab24114",
+    "firmware/tests/mission_rtos/foundation_test.c": "de1faa682bff2b51094f9849ab18ac1fc01c3daf5791c5e957e4b387b5226fef",
+    "firmware/tests/mission_rtos/network_test.c": "f9cd43e89aae1d9c10235eaf1cca14ed10be0045c12cb1eb2c111b819fe7f149",
+    "firmware/tests/mission_rtos/network_test_sdk.h": "f3f16dbc062cd94c030d24da03616099f7d85afd8e1bde8c7ba892f96453891a",
+    "firmware/tests/mission_rtos/test_sdk.h": "556672e24b0586faeb9f35dcda4a36a873ac97673e5f59a6c55fe18763a57fef",
+    "tools/build_rtos_motion.sh": "a06f6c63bdc64b94efb5416c8a10e42637983847ee616d3e6009a4e2afbe50e1",
+    "tools/rtos_bench.py": "29fa1ad94516cab275859f69fd351795a4729ae562fb8f16e5ae21a32cb22456",
+    "tools/rtos_mqtt_observer.py": "5a4cf6e94576ca82e30bf26b1bd4428e6c882e318c1a26012ea5feab4a99bbb2",
+    "tools/rtos_network_session.py": "31a2e998d8d5f442b2dafc32236b474bcde5b1236449f4a02635f7ac0bdd85c7",
+    "tools/rtos_network_setup.py": "f686d81e857985df30f540474cc6bb0ee5a6b3b1ebd3afca7bcdb76beaaf3441",
+    "tools/run_rtos_network.sh": "6d96fbf1e76af35a180e9083d374ee7ebc5d14f91449b7d5e506501a2d4bbe4e",
+    "tools/test_rtos_bench.py": "7ff9d799ae3565f8c56f907032e3a3c8d27449ffe70869ff5c9cae48ba7cc6cf",
+    "tools/test_rtos_motion.py": "5e1c2c3ca7d4151d998fad3b5d832f8f70de5fbd8e26f1e8d8b341e3ca909242",
+    "tools/test_rtos_network.py": "5a4155d489c38c8eb32eaec6097d42f0db5845d12edf3cc57ae0489bd8626290",
+    "tools/test_rtos_network_console.py": "c75b2a32444666018b4c57904b0ef9b8e205516e9a28476231f5c22ab244a247",
+    "tools/test_rtos_network_setup.py": "776c11cc218f224e60a1453f4a127c7d89c2b131ec02bc549910a6b912e42efb"
+  },
+  "pico_sdk_commit": "bddd20f928ce76142793bef434d4f75f4af6e433",
+  "bringup_waits_for_usb_console": true
+}

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "encoders.h"
+#include "control_representation.h"
 
 typedef enum {
     MOTION_NONE, MOTION_STRAIGHT_30CM, MOTION_LEFT_90,
@@ -26,18 +27,24 @@ typedef struct {
     float applied_pwm; /* Last controller output, retained after fault/abort. */
     float requested_cps;
     uint32_t no_progress_ms;
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    bool held:1,finished:1;
+#else
     bool held; /* Deliberately held to let the other wheel catch up. */
+#endif
     int32_t target;
     int32_t position;
     int32_t previous;
     int32_t cutoff_position;
     uint32_t cutoff_elapsed_us;
     uint64_t last_progress_us;
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool finished;
+#endif
 } motion_wheel_t;
 
-/* Intermediate integration format. Native working values retained until the
- * proposed compact motion representation has its own error/range validation. */
+/* Native numerical working values; opt-in packing changes only trusted state
+ * and flags, never the precision of a motor-control calculation. */
 typedef struct {
     encoder_sample_t start;
     motion_wheel_t left;
@@ -45,6 +52,12 @@ typedef struct {
     uint64_t start_us;
     uint64_t control_us;
     int32_t peak_skew;
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    /* kind0..8:4, phase0..4:3, fault0..6 incl RTOS track:3,
+     * two stalled-wheel flags:2, four profile flags:4 =16 bits. */
+    unsigned short kind:4,phase:3,fault:3,stalled_wheels:2;
+    bool slow_distance:1,transit_drive:1,alignment_drive:1,slow_turn:1;
+#else
     motion_kind_t kind;
     motion_phase_t phase;
     motion_fault_t fault;
@@ -53,7 +66,12 @@ typedef struct {
     bool transit_drive; /* Optional clear bypass leg: 800 cps, slowing near endpoint. */
     bool alignment_drive; /* Probe/axle advance: adaptive low-speed effort, max32%. */
     bool slow_turn; /* Bypass only; standalone calibrated turns keep their profile. */
+#endif
 } motion_control_t;
+#if ROBOCAR_COMPACT_CONTROL_STATE
+_Static_assert(MOTION_AVOID==8 && MOTION_FAULT==4 && MOTION_TIMED_OUT==5,
+               "Review compact state widths when motion domains change");
+#endif
 
 void motion_init(motion_control_t *motion);
 bool motion_begin(motion_control_t *motion, motion_kind_t kind,

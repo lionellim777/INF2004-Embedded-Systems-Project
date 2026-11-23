@@ -98,14 +98,14 @@ static void tick(bool fresh,bool valid,float cm,int center,bool stall){
     seen_phases|=1u<<a.phase;
     assert(a.servo_angle>=50&&a.servo_angle<=125);
     assert(a.offset_mm<=600);
-    if(a.phase==AVOID_MOVE_OUT)assert(a.offset_mm+a.outward_mm<=600);
-    if(a.phase==AVOID_WAIT||a.phase==AVOID_SCAN_INITIAL||a.phase==AVOID_CHECK_LEFT||a.phase==AVOID_SCAN_OUT||a.phase==AVOID_SCAN_SIDE||a.phase==AVOID_SCAN_FORWARD||a.phase==AVOID_CHECK_TAPE||a.phase==AVOID_ALIGN_CONFIRM||out.stop)
+    if(a.phase==AVOID_MOVE_OUT)assert(a.offset_mm<=600&&a.departure_step_mm<=100);
+    if(a.phase==AVOID_WAIT||a.phase==AVOID_SCAN_INITIAL||a.phase==AVOID_CHECK_LEFT||a.phase==AVOID_SCAN_OUT||a.phase==AVOID_SCAN_SIDE||a.phase==AVOID_SCAN_FORWARD||a.phase==AVOID_SCAN_RETURN||a.phase==AVOID_CHECK_TAPE||a.phase==AVOID_ALIGN_CONFIRM||out.stop)
         assert(!out.left&&!out.right);
 }
 static void corridor_scan_tests(void){
     for(unsigned mode=0;mode<4;mode++){
         init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_OUT;a.phase_us=now;
-        a.episode_us=now;a.outward_mm=200;
+        a.episode_us=now;a.outward_mm=a.departure_travel_mm=200;
         bool finished=false;
         for(unsigned i=0;i<1000&&!out.stop;i++){
             float cm=100;
@@ -120,6 +120,65 @@ static void corridor_scan_tests(void){
         else {assert(out.stop&&!strcmp(out.state,"AVOID_RIGHT_PATH_BLOCKED"));assert(a.scan_blocked_angle);}
     }
     puts("PASS angled 34.4cm side echo excluded; near/central/corridor obstacles still block");
+}
+static void side_angle_adjustment_test(void){
+    init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_OUT;a.phase_us=now;
+    a.episode_us=now;a.outward_mm=300;a.departure_deg=a.return_deg=60;
+    a.departure_travel_mm=347;a.departure_forward_mm=173;
+    a.plan.angle_deg=60;a.plan.travel_mm=347;a.plan.forward_mm=173;
+    for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++)
+        tick(i%12==0,true,a.servo_angle==125?28.2f:110,0,false);
+    assert(a.scan_serial==1&&!out.stop);
+    assert(a.phase==AVOID_WAIT&&a.next==AVOID_TURN_CLEARANCE);
+    assert(a.departure_deg==70&&a.clearance_adjustments==1);
+    assert(a.departure_done_mm==0&&a.plan.travel_mm==a.departure_travel_mm);
+    bool saw_turn=false;
+    for(unsigned i=0;i<4000&&a.scan_serial<2&&!out.stop;i++){
+        tick(i%12==0,true,110,0,false);
+        if(a.phase==AVOID_TURN_CLEARANCE){
+            saw_turn=true;
+            assert(a.leg.left.target==1100*10/90);
+            assert(a.leg.right.target==-1100*10/90);
+        }
+    }
+    assert(saw_turn&&a.scan_serial==2&&!out.stop);
+    assert(a.phase==AVOID_WAIT&&a.next==AVOID_MOVE_OUT);
+    puts("PASS isolated side echo causes 10-degree turn and clear rescan before outward move");
+}
+static void original_heading_check_test(void){
+    init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_FORWARD;a.phase_us=a.episode_us=now;
+    a.angled_probe=true;a.offset_mm=300;a.return_deg=60;
+    for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++){
+        a.no_return=true;tick(i%12==0,false,0,0,false);
+    }
+    assert(!out.stop&&a.scan_center_no_return==3);
+    assert(a.phase==AVOID_WAIT&&a.next==AVOID_MOVE_ALONG);
+    for(unsigned i=0;i<3000&&a.along_mm<200&&!out.stop;i++){
+        a.no_return=true;tick(i%12==0,false,0,0,false);
+        assert(a.scan_serial==1&&a.servo_angle==90);
+    }
+    assert(!out.stop&&a.along_mm>=200);
+    puts("PASS clear original-heading scan continues straight without a return turn");
+}
+static void no_return_path_tests(void){
+    for(unsigned mode=0;mode<2;mode++){
+        init();a.phase=AVOID_WAIT;a.next=mode?AVOID_SCAN_RETURN:AVOID_SCAN_OUT;
+        a.phase_us=a.episode_us=now;a.departure_deg=a.return_deg=60;
+        a.departure_travel_mm=100;a.offset_mm=250;
+        for(unsigned i=0;i<1000&&!a.scan_serial&&!out.stop;i++){
+            a.no_return=true;tick(i%12==0,false,0,0,false);
+        }
+        assert(!out.stop&&a.scan_serial==1&&a.scan_center_no_return==3);
+        assert(a.phase==AVOID_WAIT&&a.next==(mode?AVOID_RETURN_LINE:AVOID_MOVE_OUT));
+    }
+    init();a.phase=AVOID_MOVE_OUT;a.episode_us=now;a.departure_step_mm=100;
+    a.departure_travel_mm=200;a.departure_deg=60;
+    motion_begin_distance(&a.leg,100,enc,now);
+    for(unsigned i=0;i<3;i++){
+        a.no_return=true;tick(true,false,0,0,false);
+        assert(!out.stop&&a.moving_invalid==0);
+    }
+    puts("PASS three completed centre no-returns permit checked path; completed no-return does not trip moving invalid guard");
 }
 static void approach_clearance_tests(void){
     /* 45cm is only a warning: stationary readings cannot start a bypass. */
@@ -162,56 +221,59 @@ static void run(unsigned scenario){
     for(unsigned i=0;i<25000&&!out.stop&&!a.completed;i++){
         bool fresh=i%12==0,valid=true,stall=false;float cm=180;int center=(a.phase==AVOID_FOLLOW||a.phase==AVOID_VERIFY||a.phase==AVOID_CHECK_TAPE||a.phase==AVOID_TAPE_PROBE)?700:0;
         if(a.phase==AVOID_FOLLOW)cm=25;
+        if(a.phase==AVOID_SCAN_INITIAL)cm=a.servo_angle<=100?20:100;
         if(a.phase==AVOID_SCAN_SIDE||a.phase==AVOID_CHECK_LEFT)cm=a.along_mm<=300?28:180;
-        if(scenario==1&&a.phase==AVOID_SCAN_OUT)cm=25;
-        if(scenario==2&&a.phase==AVOID_SCAN_SIDE)cm=28;
+        if(scenario==1&&a.phase==AVOID_MOVE_OUT)cm=10;
+        if(scenario==2&&a.phase==AVOID_SCAN_FORWARD)cm=20;
         if(scenario==3&&a.phase==AVOID_MOVE_OUT)stall=true;
         if(scenario==4&&a.phase==AVOID_MOVE_OUT)fresh=false;
         if(scenario==5&&a.phase==AVOID_MOVE_ALONG)cm=10;
-        if(scenario==6&&(a.phase==AVOID_SCAN_SIDE||a.phase==AVOID_CHECK_LEFT))cm=180; /* never saw the object alongside */
+        if(scenario==6&&a.phase==AVOID_SCAN_FORWARD)cm=180; /* clear original heading needs no side observation */
         if(scenario==7&&a.phase==AVOID_MOVE_OUT)enc.left_invalid=2;
-        if(scenario==17&&a.phase==AVOID_TURN_OUT&&motion_left_position(&a.leg,enc)>400)enc.right_invalid=1;
+        if(scenario==17&&a.phase==AVOID_TURN_OUT&&motion_left_position(&a.leg,enc)<-400)enc.right_invalid=1;
         if(scenario==8&&a.phase==AVOID_SCAN_FORWARD&&a.offset_mm<450)cm=22;
-        if(scenario==9&&a.phase==AVOID_SCAN_FORWARD)cm=22;
-        if(scenario==10&&a.phase==AVOID_SCAN_SIDE&&a.along_mm>300)valid=false;
-        if(scenario==11&&a.phase==AVOID_SCAN_OUT&&a.samples==0)cm=20; /* one blocked ray vetoes scan */
-        if(scenario==12&&(a.phase==AVOID_SCAN_SIDE||a.phase==AVOID_CHECK_LEFT)){cm=28;if(a.along_mm==400&&a.clear_checks==0)cm=180;} /* only one clear checkpoint */
-        if(scenario>=18&&a.phase==AVOID_SCAN_SIDE&&a.along_mm>300){
-            cm=120;
-            if(scenario==18)valid=a.servo_angle>=110; /* centre has no echo, two far rays */
-            if(scenario==19)valid=a.servo_angle==125; /* one ray cannot establish clearance */
-            if(scenario==20)valid=a.samples==0; /* isolated readings across rays */
+        if(scenario==9&&a.phase==AVOID_SCAN_FORWARD&&a.along_mm>300)cm=22;
+        if(scenario==10&&a.phase==AVOID_SCAN_FORWARD&&a.servo_angle==90)valid=false;
+        if(scenario==11&&a.phase==AVOID_MOVE_OUT)cm=10;
+        if(scenario==12&&a.phase==AVOID_SCAN_FORWARD&&a.offset_mm<340)cm=20;
+        if(scenario>=18&&a.phase==AVOID_SCAN_FORWARD){
+            if(scenario==18){valid=a.servo_angle!=90;a.no_return=!valid;}
+            if(scenario==19)valid=a.servo_angle==125;
+            if(scenario==20)valid=a.samples==0;
         }
-        if(a.phase==AVOID_RETURN_LINE){
+        if(a.phase==AVOID_RETURN_LINE||a.phase==AVOID_MOVE_ALONG){
             float mm=(motion_left_position(&a.leg,enc)+motion_right_position(&a.leg,enc))/(2*13.491f);
-            center=mm>a.offset_mm-120?700:0;
+            center=mm>35?700:0;
             if(scenario==13)center=0;
+            if(scenario==9)center=0;
             if(scenario==14)center=700;
         }
         if(scenario==15&&a.phase==AVOID_CHECK_TAPE)center=0;
         if(scenario==16&&a.phase==AVOID_VERIFY)center=0;
-        if(a.phase==AVOID_TURN_OUT||a.phase==AVOID_TURN_ALONG)
+        if(a.phase==AVOID_TURN_OUT)
+            assert(a.leg.left.target==-1090*(int)a.departure_deg/90&&a.leg.right.target==1090*(int)a.departure_deg/90);
+        if(a.phase==AVOID_TURN_ALONG)
             assert(a.leg.left.target==1100&&a.leg.right.target==-1100);
         tick(fresh,valid,cm,center,stall);
     }
-    const char *reasons[]={NULL,"AVOID_RIGHT_PATH_BLOCKED","AVOID_OBJECT_END_NOT_CONFIRMED",
+    const char *reasons[]={NULL,"AVOID_PATH_OBSTACLE_STOP","AVOID_OBJECT_TOO_WIDE_OR_PATH_BLOCKED",
         "NO_ENCODER_PROGRESS_1S","AVOID_RANGE_STALE","AVOID_PATH_OBSTACLE_STOP",
-        "AVOID_OBJECT_END_NOT_CONFIRMED","AVOID_ENCODER_INVALID",NULL,
-        "AVOID_OBJECT_TOO_WIDE_OR_PATH_BLOCKED","AVOID_OBJECT_END_NOT_CONFIRMED","AVOID_RIGHT_PATH_BLOCKED",
-        "AVOID_OBJECT_END_NOT_CONFIRMED","AVOID_RETURN_LINE_NOT_FOUND",
-        NULL,"AVOID_RETURN_LINE_NOT_FOUND",NULL,NULL,NULL,"AVOID_OBJECT_END_NOT_CONFIRMED","AVOID_OBJECT_END_NOT_CONFIRMED"};
+        NULL,"AVOID_ENCODER_INVALID",NULL,
+        "AVOID_RETURN_LINE_NOT_FOUND","AVOID_FORWARD_RANGE_UNKNOWN","AVOID_PATH_OBSTACLE_STOP",
+        NULL,"AVOID_RETURN_LINE_NOT_FOUND",
+        "AVOID_RETURN_LINE_NOT_FOUND","AVOID_RETURN_LINE_NOT_FOUND",NULL,NULL,NULL,"AVOID_FORWARD_RANGE_UNKNOWN","AVOID_FORWARD_RANGE_UNKNOWN"};
     if(scenario==16){assert(out.stop&&!a.completed);}
     else if(reasons[scenario]){
-        if(!out.stop||strcmp(out.state,reasons[scenario])){printf("scenario%u stopped=%d reason=%s phase=%s\n",scenario,out.stop,out.state,obstacle_bypass_phase(a.phase));assert(0);}
+        if(!out.stop||strcmp(out.state,reasons[scenario])){fprintf(stderr,"scenario%u stopped=%d reason=%s phase=%s\n",scenario,out.stop,out.state,obstacle_bypass_phase(a.phase));assert(0);}
         assert(!a.completed);
     }else{
-        if(out.stop||a.completed!=1){printf("scenario%u completed=%u stopped=%d reason=%s phase=%s\n",scenario,a.completed,out.stop,out.state,obstacle_bypass_phase(a.phase));assert(0);}
-        assert(a.phase==AVOID_FOLLOW&&a.detected==1&&a.side_seen&&a.along_mm>=400);
+        if(out.stop||a.completed!=1){fprintf(stderr,"scenario%u completed=%u stopped=%d reason=%s phase=%s\n",scenario,a.completed,out.stop,out.state,obstacle_bypass_phase(a.phase));assert(0);}
+        assert(a.phase==AVOID_FOLLOW&&a.detected==1&&(a.plan.edge_from_no_return||a.plan.left_edge_known));
         assert(seen_phases&(1u<<AVOID_VERIFY));
-        if(scenario==18)assert(a.along_mm==500&&a.clear_checks==2&&a.no_echo>0);
-        if(scenario==8)assert(a.offset_mm==450);
+        if(scenario==18)assert(a.no_echo>0);
+        if(scenario==8)assert(a.offset_mm>=450&&a.offset_mm<=550);
         if(scenario==10)assert(a.no_echo>0);
-        if(scenario==17)assert(a.encoder_skips[1]==1&&enc.right_invalid==1&&(seen_phases&(1u<<AVOID_SCAN_OUT)));
+        if(scenario==17)assert(a.encoder_skips[1]==1&&enc.right_invalid==1&&(seen_phases&(1u<<AVOID_SCAN_FORWARD)));
         /* A stale course timestamp after the bypass must not immediately fault. */
         tick(true,true,180,700,false);assert(!out.stop);
     }
@@ -282,7 +344,7 @@ static void encoder_error_tests(void){
     puts("PASS isolated encoder transition, burst/rate/run budget, initial counters and counter reset");
 }
 static void early_rejoin_tests(void){
-    const avoid_phase_t phases[]={AVOID_MOVE_OUT,AVOID_MOVE_ALONG,AVOID_RETURN_LINE};
+    const avoid_phase_t phases[]={AVOID_MOVE_ALONG,AVOID_RETURN_LINE};
     for(unsigned k=0;k<sizeof(phases)/sizeof(phases[0]);k++){
         init();a.phase=phases[k];a.episode_us=now;a.offset_mm=200;a.rejoin_armed=true;
         a.next=AVOID_TURN_LOOK;a.servo_angle=50;
@@ -297,6 +359,12 @@ static void early_rejoin_tests(void){
         for(unsigned i=0;i<400&&!a.completed&&!out.stop;i++)tick(true,true,180,700,false);
         assert(a.completed==1&&!out.stop);
     }
+    /* Crossing the original tape during the outward diagonal is not rejoin. */
+    init();a.phase=AVOID_MOVE_OUT;a.episode_us=now;a.rejoin_armed=true;
+    a.departure_step_mm=100;a.departure_travel_mm=200;a.departure_deg=55;
+    motion_begin_distance(&a.leg,100,enc,now);
+    tick(true,true,180,700,false);
+    assert(!out.stop&&a.phase==AVOID_MOVE_OUT&&a.rejoin_attempts==0);
     /* Right sensor can request checking even while centre is white. */
     init();a.phase=AVOID_MOVE_ALONG;a.offset_mm=200;a.episode_us=now;a.rejoin_armed=true;
     now+=10000;out=obstacle_bypass_step(&a,(ir_roles_t){false,false,true},0,enc,now,true,true,180);
@@ -508,7 +576,7 @@ static void spatial_ink_tests(void){
         while(a.phase==AVOID_CHECK_TAPE)tick(true,true,180,700,false);
         assert(a.phase==AVOID_TAPE_PROBE);
         for(unsigned i=0;i<600&&!out.stop&&a.phase==AVOID_TAPE_PROBE;i++){
-            double mm=(motion_left_position(&a.tape_origin,enc)+motion_right_position(&a.tape_origin,enc))/(2*13.491);
+            double mm=(obstacle_encoder_delta(a.tape_origin.left_raw,enc.left_raw)+obstacle_encoder_delta(enc.right_raw,a.tape_origin.right_raw))/(2*13.491);
             int center=700;
             if(mode==0)center=mm<3?700:0; /* half narrow bar */
             if(mode==1)center=mm<18||mm>=30?700:0; /* full wide bar + gap + next ink */
@@ -529,6 +597,25 @@ static void spatial_ink_tests(void){
     tick(true,true,180,700,false);assert(a.phase==AVOID_TURN_LOOK&&!a.rejoin_attempts);
     puts("PASS spatial ink check: narrow/repeated ink rejected with saved leg; single crossing/continuous tape qualified; pivot ink ignored");
 }
+static void straight_seek_alignment_test(void){
+    for(unsigned transient=0;transient<2;transient++){
+        init();a.phase=AVOID_ALIGN_TURN;a.episode_us=now;
+        a.angled_probe=true;a.return_deg=65;a.align_direction=1;a.align_armed=true;
+        a.align_origin=obstacle_encoder_origin(enc);
+        motion_begin(&a.leg,MOTION_RIGHT_90,enc,now);a.leg.slow_turn=true;
+        left=1222;right=-1222; /* approximately 110 degrees, beyond old A window */
+        tick(true,true,180,700,false);
+        assert(a.phase==AVOID_ALIGN_CONFIRM&&!out.left&&!out.right);
+        if(transient){
+            tick(true,true,180,0,false);
+            assert(a.phase==AVOID_ALIGN_TURN&&a.align_rejected==1);
+        }else{
+            for(unsigned i=0;i<40&&a.phase==AVOID_ALIGN_CONFIRM;i++)tick(true,true,180,700,false);
+            assert(a.phase==AVOID_VERIFY&&!out.stop);
+        }
+    }
+    puts("PASS straight-seek tape at 110deg pauses for confirmation; transient ink resumes alignment");
+}
 static void alignment_tests(void){
     /* Geometric plant: sensor 120 mm ahead of axle; tape at x=0 extending
      * along y. A perpendicular approach cannot succeed by a small pivot at
@@ -537,10 +624,10 @@ static void alignment_tests(void){
     for(unsigned mode=0;mode<14;mode++){
         init();a.phase=AVOID_CHECK_TAPE;a.candidate_us=a.phase_us=a.episode_us=now;
         a.offset_mm=200;a.resume_phase=AVOID_MOVE_ALONG;a.rejoin_attempts=1;
-        /* A small odometry bias still prefers the right path toward the approach. */
-        a.episode_origin.start.left_raw=(uint32_t)-600;
-        if(mode==11||mode==13)a.episode_origin.start.left_raw=2000; /* positive approach bias must still choose right */
-        if(mode==12)a.episode_origin.start.left_raw=(uint32_t)-2000; /* negative approach bias must still choose right */
+        /* A small odometry bias still prefers the left path toward the approach. */
+        a.episode_origin.left_raw=(uint32_t)-600;
+        if(mode==11||mode==13)a.episode_origin.left_raw=2000; /* positive approach bias must still choose left */
+        if(mode==12)a.episode_origin.left_raw=(uint32_t)-2000; /* negative approach bias must still choose left */
         double x=-120,y=0,heading=0;
         unsigned visited=0;bool saw_lost=false;
         for(unsigned i=0;i<5000&&!out.stop&&!a.completed;i++){
@@ -560,7 +647,7 @@ static void alignment_tests(void){
             if(mode==1&&(a.phase==AVOID_ALIGN_TURN||a.phase==AVOID_ALIGN_CONFIRM))center=0;
             /* Force preferred sweep to miss, exercise opposite full sweep. */
             if((mode==2||mode==13)&&a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)center=0;
-            double degrees=-heading*180/3.14159265359;
+            double degrees=heading*180/3.14159265359;
             /* Barcode-like ink at 20..40deg must not end the turn. */
             if((mode==7||mode==9)&&a.phase==AVOID_ALIGN_TURN){
                 if(mode==9)center=0;
@@ -580,7 +667,7 @@ static void alignment_tests(void){
             out=obstacle_bypass_step(&a,(ir_roles_t){false,center>=250,false},center,enc,now,fresh,mode!=10,cm);
             if(mode==5&&a.phase==AVOID_AXLE_ADVANCE)a.leg.alignment_drive=false;
             visited|=1u<<a.phase;
-            if(a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)assert(a.align_direction==1);
+            if(a.phase==AVOID_ALIGN_TURN&&!a.align_reversed)assert(a.align_direction==-1);
             if(a.phase==AVOID_ALIGN_CONFIRM){
                 assert(!out.left&&!out.right);
                 assert(fabs(degrees)>=59&&fabs(degrees)<=116);
@@ -599,41 +686,49 @@ static void alignment_tests(void){
             assert(!strcmp(out.state,reason));
         }
     }
-    puts("PASS 14 perpendicular geometry cases: right-first regardless of odometry bias, both sweeps, early false ink, rejected confirmation recovery, absent tape, load and obstacles");
+    puts("PASS 14 perpendicular geometry cases: left-first regardless of odometry bias, both sweeps, early false ink, rejected confirmation recovery, absent tape, load and obstacles");
 }
 static void planned_detour_tests(void){
-    unsigned good[5]={3,3,3,3,3};
-    float narrow[5]={100,100,20,100,100};
-    obstacle_plan_t p=obstacle_plan(narrow,good,20);
-    assert(p.right_edge_known&&p.width_bounded&&p.angle_deg==55);
-    assert(p.lateral_mm>=290&&p.lateral_mm<=292&&p.travel_mm>=354&&p.travel_mm<=357&&p.forward_mm>=200);
-    float wide[5]={100,22,20,22,100};
-    obstacle_plan_t w=obstacle_plan(wide,good,20);
-    assert(w.right_edge_known&&w.width_bounded&&w.angle_deg>p.angle_deg&&w.lateral_mm>p.lateral_mm);
-    float unbounded[5]={20,20,20,20,20};
-    w=obstacle_plan(unbounded,good,20);assert(!w.right_edge_known&&w.angle_deg==90&&w.travel_mm==250);
-    unsigned missing[5]={0,0,3,3,3};
-    w=obstacle_plan(narrow,missing,20);assert(!w.right_edge_known&&w.angle_deg==90);
-    missing[1]=1;w=obstacle_plan(narrow,missing,20);assert(!w.right_edge_known);
-    float invalid[5]={NAN,INFINITY,0,-1,401};
-    w=obstacle_plan(invalid,good,20);assert(!w.right_edge_known&&w.angle_deg==90);
-    /* Full state machine: bounded narrow object gives55deg departure,
-     * corresponding diagonal distance/parallel return, left check,100mm
-     * rear margin, two full side confirmations, then line following. */
-    init();bool planned=false,saw_left=false,saw_tail=false,saw_parallel=false;
+    float narrow[OBSTACLE_PLAN_RAYS]={20,100,100,100,100,100,100,100};
+    obstacle_ray_counts_t narrow_counts[OBSTACLE_PLAN_RAYS]={{.near=3},{.far=3}};
+    obstacle_plan_t p=obstacle_plan(narrow,narrow_counts);
+    assert(p.left_edge_known&&p.angle_deg==50&&p.edge_servo_deg==90&&p.clear_servo_deg==95);
+    assert(p.lateral_mm>=220&&p.lateral_mm<=225&&p.travel_mm>=285&&p.travel_mm<=295);
+    float wide[OBSTACLE_PLAN_RAYS]={20,20,20,20,20,100,100,100};
+    obstacle_ray_counts_t wide_counts[OBSTACLE_PLAN_RAYS]={
+        {.near=3},{.near=3},{.near=3},{.near=3},{.near=3},{.far=3},{.far=3},{.far=3}
+    };
+    obstacle_plan_t w=obstacle_plan(wide,wide_counts);
+    assert(w.left_edge_known&&w.angle_deg>p.angle_deg&&w.lateral_mm>p.lateral_mm);
+    for(unsigned i=0;i<OBSTACLE_PLAN_RAYS;i++)wide_counts[i]=(obstacle_ray_counts_t){.near=3};
+    w=obstacle_plan(wide,wide_counts);assert(!w.left_edge_known&&!w.edge_from_no_return);
+    narrow_counts[1].far=1;w=obstacle_plan(narrow,narrow_counts);assert(!w.left_edge_known&&!w.edge_from_no_return);
+    narrow_counts[1].far=0;w=obstacle_plan(narrow,narrow_counts);assert(!w.left_edge_known&&!w.edge_from_no_return);
+    narrow_counts[1].no_return=2;w=obstacle_plan(narrow,narrow_counts);assert(!w.edge_from_no_return);
+    narrow_counts[1].no_return=3;w=obstacle_plan(narrow,narrow_counts);
+    assert(!w.left_edge_known&&w.edge_from_no_return&&w.angle_deg>=45&&w.travel_mm>200);
+    narrow_counts[0].near=0;w=obstacle_plan(narrow,narrow_counts);assert(!w.edge_from_no_return);
+    /* After the first angled departure, face the original route heading,
+     * repeat A once when the forward scan is blocked, then seek the tape. */
+    init();bool planned=false,saw_forward=false,saw_repeat=false,saw_return=false;
     for(unsigned i=0;i<25000&&!out.stop&&!a.completed;i++){
         float cm=a.phase==AVOID_FOLLOW?20:180;
-        if(a.phase==AVOID_SCAN_INITIAL)cm=a.servo_angle==90?20:100;
+        if(a.phase==AVOID_SCAN_INITIAL)cm=a.servo_angle<=100?20:100;
+        if(a.phase==AVOID_SCAN_FORWARD&&a.offset_mm<340)cm=20;
         int center=(a.phase==AVOID_FOLLOW||a.phase==AVOID_VERIFY||a.phase==AVOID_CHECK_TAPE||a.phase==AVOID_TAPE_PROBE)?700:0;
-        if(a.phase==AVOID_RETURN_LINE)center=((motion_left_position(&a.leg,enc)+motion_right_position(&a.leg,enc))/(2*13.491f))>(int)a.offset_mm-120?700:0;
-        if(a.phase==AVOID_TURN_OUT){planned=true;assert(a.departure_deg==55&&a.leg.left.target==672&&a.leg.right.target==-672);}
-        if(a.phase==AVOID_TURN_FORWARD){saw_parallel=true;assert(a.leg.left.target==-666&&a.leg.right.target==666);assert(a.offset_mm>=290&&a.offset_mm<=292&&a.along_mm>=200);}
-        if(a.phase==AVOID_CHECK_LEFT){saw_left=true;assert(a.servo_angle==125);}
-        if(a.phase==AVOID_CLEAR_TAIL)saw_tail=true;
+        if(a.phase==AVOID_MOVE_ALONG)center=((motion_left_position(&a.leg,enc)+motion_right_position(&a.leg,enc))/(2*13.491f))>35?700:0;
+        if(a.phase==AVOID_TURN_OUT){planned=true;if(a.offset_mm)saw_repeat=true;assert(a.departure_deg==55&&a.leg.left.target==-666&&a.leg.right.target==666);}
+        if(a.phase==AVOID_TURN_FORWARD){
+            if(!saw_forward)assert(a.departure_done_mm==100&&a.offset_mm>=80&&a.offset_mm<=100);
+            saw_forward=true;assert(a.leg.left.target==672&&a.leg.right.target==-672);
+        }
+        assert(a.phase!=AVOID_SCAN_OUT&&a.phase!=AVOID_SCAN_SIDE);
+        assert(a.phase!=AVOID_TURN_TO_LINE&&a.phase!=AVOID_TURN_LOOK);
+        if(a.phase==AVOID_MOVE_ALONG)saw_return=true;
         tick(i%12==0,true,cm,center,false);
     }
     if(out.stop||!a.completed)printf("planned route ended phase=%s reason=%s along=%u\n",obstacle_bypass_phase(a.phase),out.state,a.along_mm);
-    assert(!out.stop&&a.completed==1&&planned&&saw_left&&saw_tail&&saw_parallel&&a.clear_checks==2);
+    assert(!out.stop&&a.completed==1&&planned&&saw_forward&&saw_repeat&&saw_return);
     /* No-return, a single far echo, or a mixed near/far ray do not
      * authorize the extra rear-clearance step. Two/three far samples do. */
     for(unsigned mode=0;mode<4;mode++){
@@ -647,20 +742,68 @@ static void planned_detour_tests(void){
         }
         assert(!out.stop&&a.phase==AVOID_WAIT&&a.next==(mode==3?AVOID_CLEAR_TAIL:AVOID_TURN_LOOK));
     }
-    puts("PASS scan-planned55deg exit, width/unknown-edge bounds, diagonal projection, left check,100mm margin, repeated clearance and return");
+    puts("PASS 5deg edge scan, angled checked legs, original-heading forward check, repeat and return");
+}
+static void unknown_scan_tests(void){
+    for(unsigned mode=0;mode<4;mode++){
+        init();a.phase=AVOID_WAIT;a.episode_us=a.phase_us=now;
+        a.next=mode==0?AVOID_SCAN_INITIAL:mode==1?AVOID_SCAN_OUT:
+            mode==2?AVOID_SCAN_FORWARD:AVOID_SCAN_RETURN;
+        a.departure_travel_mm=a.outward_mm=100;a.offset_mm=mode==0?300:250;a.return_deg=55;
+        for(unsigned i=0;i<1200&&!out.stop;i++){
+            bool valid=!(mode==0?a.servo_angle==105:a.servo_angle==90);
+            float cm=mode==0&&a.servo_angle<=100?20:100;
+            tick(i%12==0,valid,cm,0,false);
+        }
+        const char *reason=mode==0?"AVOID_LEFT_EDGE_UNKNOWN":mode==1?"AVOID_OUTWARD_RANGE_UNKNOWN":
+            mode==2?"AVOID_FORWARD_RANGE_UNKNOWN":"AVOID_RETURN_RANGE_UNKNOWN";
+        assert(out.stop&&!strcmp(out.state,reason));
+    }
+    init();a.phase=AVOID_MOVE_OUT;a.episode_us=now;a.departure_step_mm=100;
+    a.departure_travel_mm=200;a.departure_deg=55;
+    motion_begin_distance(&a.leg,100,enc,now);
+    for(unsigned i=0;i<3&&!out.stop;i++)tick(true,false,0,0,false);
+    assert(out.stop&&!strcmp(out.state,"AVOID_MOVING_RANGE_UNKNOWN"));
+    puts("PASS missing edge, scan clearance or moving range stops unverified travel");
+}
+static void edge_shift_tests(void){
+    init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_INITIAL;
+    a.phase_us=a.episode_us=now;a.approach_min_cm=20;
+    for(unsigned i=0;i<1000&&!out.stop;i++)tick(i%12==0,true,20,0,false);
+    assert(out.stop&&!strcmp(out.state,"AVOID_LEFT_EDGE_UNKNOWN"));
+    assert(a.edge_shift_count==0&&a.offset_mm==0&&a.scan_serial==1);
+    puts("PASS inconclusive initial edge stops without extra scan manoeuvres");
+}
+static void echo_edge_tests(void){
+    init();a.phase=AVOID_WAIT;a.next=AVOID_SCAN_INITIAL;
+    a.phase_us=a.episode_us=now;a.approach_min_cm=20;
+    bool planned=false;
+    for(unsigned i=0;i<3000&&!out.stop;i++){
+        bool initial=a.phase==AVOID_SCAN_INITIAL;
+        bool valid=!(initial&&a.servo_angle>=125);
+        a.no_return=initial&&!valid;
+        float cm=initial?20:100;
+        tick(i%12==0,valid,cm,0,false);
+        if(a.plan.edge_from_no_return)planned=true;
+        if(a.phase==AVOID_MOVE_OUT)break;
+    }
+    assert(planned&&a.plan.edge_from_no_return&&!a.plan.left_edge_known);
+    assert(a.departure_deg>=45&&a.edge_shift_count==0&&a.offset_mm==0);
+    assert(!out.stop&&a.phase==AVOID_MOVE_OUT&&a.departure_step_mm==100&&a.scan_serial==1);
+    puts("PASS initial no-return edge plan leads directly to 100mm angled move without another sweep");
 }
 
 int main(void){
-    planned_detour_tests();
+    planned_detour_tests();unknown_scan_tests();edge_shift_tests();echo_edge_tests();
     endpoint_assist_tests();spatial_ink_tests();
-    corridor_scan_tests();
+    corridor_scan_tests();side_angle_adjustment_test();original_heading_check_test();no_return_path_tests();
     approach_clearance_tests();
     adaptive_cruise_tests();
     cautious_speed_tests();
     no_return_rejoin_tests();turn_assist_tests();
     early_rejoin_tests();
     alignment_drive_tests();
-    alignment_tests();
+    alignment_tests();straight_seek_alignment_test();
     encoder_error_tests();
     retry_tests();
     for(unsigned s=0;s<21;s++)run(s);

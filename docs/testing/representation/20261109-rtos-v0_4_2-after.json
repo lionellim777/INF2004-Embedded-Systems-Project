@@ -1,0 +1,71 @@
+{
+  "recorded_utc": "2026-11-08T16:12:35.718842+00:00",
+  "firmware_version": "0.4.2",
+  "source_commit": "916c0dc",
+  "elf_sha256": "254f431f33ba6dab4fb7def906d1f41e6469f1b4f10ce7e49cc7efee628d5864",
+  "uf2_sha256": "e46e1dc253ba054d2a6c179052b7b282961e440104eaed21e4d7312cb13cffff",
+  "arm_gcc_layout_bytes": {
+    "motion_record_t": 28,
+    "encoder_sample_t": 16,
+    "track_ir_t": 16,
+    "track_diagnostics_t": 28,
+    "track_event_t": 8,
+    "barcode_waveform_t": 73596,
+    "track_runtime_t": 1264,
+    "scan_state_t": 52,
+    "scan_snapshot_t": 32
+  },
+  "linked": {
+    "text": 441352,
+    "data": 0,
+    "bss": 205868,
+    "total_sram": 270336,
+    "arithmetic_remainder": 64468,
+    "remainder_is_measured_free_memory": false
+  },
+  "largest_relevant_allocations": {
+    "waveform": 73596,
+    "first_words": 32768,
+    "first_profiles": 864,
+    "first_failure": 32,
+    "queue": 7168,
+    "kernel_pool": 32768,
+    "memp_memory_PBUF_POOL_base": 36771
+  },
+  "same_semantics_comparison": {
+    "sample_queue_capacity_slots": 512,
+    "legacy_entry_bytes": 16,
+    "current_entry_bytes": 14,
+    "legacy_array_bytes": 8192,
+    "current_array_bytes": 7168,
+    "saving_bytes": 1024,
+    "preserves": "timestamp32 + both raw encoder32 + ADC12; 4 zero pad bits"
+  },
+  "application_payload_bytes": {
+    "motion": [
+      13
+    ],
+    "line": [
+      9
+    ],
+    "barcode": [
+      5
+    ],
+    "status": [
+      10
+    ],
+    "link": [
+      1
+    ],
+    "command_result": [
+      1
+    ]
+  },
+  "limits": [
+    "Runtime stack/heap headroom has not been measured.",
+    "The 32KiB kernel pool already contains application task allocations; do not add requested task stacks again.",
+    "Current feature set differs from v5.63 main; total BSS changes do not establish whole-application bit-packing savings.",
+    "The first-failure debug cache is temporary; remove or reduce after repeatability/full-A recovery validation.",
+    "No whole-application minimum-bit completion claim."
+  ]
+}

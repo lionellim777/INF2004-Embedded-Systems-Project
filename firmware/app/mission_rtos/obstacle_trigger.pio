@@ -1,0 +1,7 @@
+.program obstacle_trigger
+; One command produces a 10 us pulse at the configured 1 MHz PIO clock.
+.wrap_target
+    pull block
+    set pins, 1 [9]
+    set pins, 0
+.wrap

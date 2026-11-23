@@ -1,0 +1,91 @@
+{
+  "recorded_utc": "2026-11-09T03:24:33.078081+00:00",
+  "branch": "yixuan/rtos-minimum-bit-state",
+  "base_commit": "a4e15b5",
+  "status": "Opt-in stage1 implemented and software-validated; no candidate flash or physical timing test",
+  "school_requirement_source": "Change Requirement 1.docx",
+  "decision": "Convert now in small proven increments. Confirm teammate data contracts during development; review each delivered implementation. Preserve Tribunal1 and record corrections with evidence.",
+  "stored_state": {
+    "history_samples": 12,
+    "bits_per_sample": 12,
+    "history_bits": 144,
+    "sum_range": [
+      0,
+      49140
+    ],
+    "sum_bits": 16,
+    "next_range": [
+      0,
+      11
+    ],
+    "next_bits": 4,
+    "count_range": [
+      0,
+      12
+    ],
+    "count_bits": 4,
+    "total_bits": 168,
+    "old_ARM_bytes": 36,
+    "new_ARM_bytes": 21,
+    "object_saving_bytes": 15,
+    "owner": "ADC IRQ only, zero-initialized before enabling timer"
+  },
+  "build": {
+    "accepted": {
+      "version": "0.5.1",
+      "text": 451248,
+      "data": 0,
+      "bss": 207332
+    },
+    "candidate": {
+      "version": "0.6-dev1",
+      "text": 451424,
+      "data": 0,
+      "bss": 207316
+    },
+    "linked_bss_saving_bytes": 16,
+    "alignment_note": "Filter object saves15bytes; the linker reports16bytes lower BSS due to alignment.",
+    "default_option": "OFF",
+    "opt_in": "RTOS_COMPACT_ADC_STATE=ON",
+    "default_binary_equals_accepted_v0_5_1": true,
+    "UF2_binary_compare_pass": true,
+    "candidate_image_private_path": "build/rtos-minbits-stage1-candidate/robocar_rtos_minbits_stage1_candidate.uf2",
+    "candidate_sha256": "2fea60586e485325c6c8aad3da395973367bf552192303d0c5a9c22fa8f2ea3e",
+    "unchanged_allocations": {
+      "waveform": 74620,
+      "queue": 7168,
+      "kernel_pool": 32768,
+      "first_words": 32768
+    }
+  },
+  "correctness": {
+    "reference": "Existing barcode_signal_update implementation",
+    "matched_ADC_updates": 1102600,
+    "all_4096_levels": true,
+    "warmup_and_floor_rounding": true,
+    "random_updates": 1000000,
+    "invalid_update_preserves_state": true,
+    "invalid_ADC_each_of_three_channels_latches_range_stop": true,
+    "default_compact_ADC_course_decoder_PWM_pipeline": "PASS under ASan/UBSan",
+    "diagnostic_export_equivalence": "Byte-identical AAZ, stopped partial, first failure and maximum-size exports"
+  },
+  "validation_logs": [
+    "build/rtos-minbits-stage1-tests.log",
+    "build/rtos-minbits-stage1-build.log",
+    "build/rtos-minbits-stage1-default-build.log"
+  ],
+  "source_sha256": {
+    "firmware/app/mission_rtos/adc12_filter.h": "a9089d1422d5fa2d58b8023c07ae1fd1d30dd0d2dbccc7764d49e8c8a43f5ac2",
+    "firmware/app/mission_rtos/track_sensor.c": "bf37154a60ec8709a795195c742f23328b1ff93ba646ea93302e8f90b4f2d5f3",
+    "firmware/app/mission_rtos/CMakeLists.txt": "27324a60e1acb604ac90d5f860f76e14374483e094caf3658d4953e498bacc5d",
+    "firmware/app/mission_rtos/version.h": "f2905407e4617b62fe9057ce30754882863f303622b8fd4caa70fe878a7eeb9d",
+    "firmware/tests/mission_rtos/adc12_filter_test.c": "e505cbf45d909bebad43dcf26fe3453a259068c3af51a25af3ac36ac875889b3",
+    "tools/test_rtos_minimum_bits.py": "694c48f169b1b7d88c031cb50592589cd1e9e1bc6bf0c2bb94a9a112e02c0189"
+  },
+  "limits": [
+    "This is one bounded application-state conversion, not full-firmware compliance.",
+    "Candidate IRQ/control timing and physical course behavior remain unmeasured; v0.5.1 stays installed.",
+    "No raw encoder/timestamp truncation, changed scanner tolerance, altered sample precision or teammate algorithm change.",
+    "Diagnostic buffer removal is separately classified as a feature/memory profile change, not a bit-packing saving."
+  ]
+}

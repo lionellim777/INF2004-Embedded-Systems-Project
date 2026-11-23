@@ -1,0 +1,30 @@
+{
+  "source_session": "rtos-network-20261108-234218",
+  "source_capture": "scan-1617144765-1.json",
+  "word_count": 8982,
+  "readings": 4491,
+  "encoding": "ADC12_MS4_POS16",
+  "fnv1a": "9b9bfd4a",
+  "sha256": "7c138c3ee11accdf4db2ed7c524bff009f3e98d17385f7af99c3f44714845d71",
+  "saved_snapshot": {
+    "type": "scan_diag",
+    "run": 1,
+    "record": "snapshot",
+    "count": 8982,
+    "motion": true,
+    "paper": 166,
+    "signal_range": 2386,
+    "reason": "NO_VALID_FRAMED_WINDOW",
+    "letter": null,
+    "coherent_mask": 0,
+    "geometry_mask": 0,
+    "start_us": 63378473,
+    "leading_us": 542000,
+    "white_us": 916000,
+    "duration_us": 8980000,
+    "checksum": 2610691402
+  },
+  "original_result": "NO_VALID_FRAMED_WINDOW",
+  "user_observed_expected_barcode": "Half Z at right bend",
+  "physical_new_firmware_tested": false
+}

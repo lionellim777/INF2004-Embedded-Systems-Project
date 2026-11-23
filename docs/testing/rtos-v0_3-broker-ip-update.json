@@ -1,0 +1,36 @@
+{
+  "date_local": "2026-11-08",
+  "reviewed_utc": "2026-11-08T13:14:36.004444+00:00",
+  "source_parent_commit": "4383252",
+  "problem": "--reuse correctly refused saved broker IPv4 because Mac Wi-Fi DHCP address changed",
+  "saved_broker_ipv4": "192.168.1.9",
+  "current_mac_broker_ipv4": "192.168.1.5",
+  "fix": "Updated only private broker IPv4, retained Wi-Fi/MQTT credentials, rebuilt configured image, verified flash and reboot, ran exact --reuse command",
+  "configured_image_sha256": "aed9f157538499b947cc3297715f0648d137f0c1dd4d7edd4ecd6c32f8f4775b",
+  "image_contains_credentials_and_remains_ignored": true,
+  "arm_build": "PASS -Wall -Wextra -Werror",
+  "usb_stop_before_flash_confirmed": true,
+  "picotool_load_verify_passed": true,
+  "actual_reuse_console_passed": true,
+  "mqtt_valid_motion_packets": 141,
+  "mqtt_decode_errors": 0,
+  "controller_fault_codes": [
+    0
+  ],
+  "mqtt_stop_acks": 1,
+  "stop_latched_on_exit": true,
+  "start_command_sent": false,
+  "raw_capture_local": "serial-output/rtos-network-20261108-211251",
+  "capture_files": {
+    "usb.log": "e29e7858642936849e659160ce630ea997232124a9142fe204d41494fc237547",
+    "usb.json": "57cbddb219a64f39bae0183bf624a78975615a0a4315424f27d1527fa79f2293",
+    "mqtt.jsonl": "b11d546b516da392d33cf5ab9c72df2245eedcacdefd2427be4306fff6ba3e1b",
+    "mqtt-summary.json": "271a15213d4124b6ed03864ce4124c4dab14517f2365befa74e06d02153858c6"
+  },
+  "regression_tests": "PASS missing IP vs changed IP vs unchanged settings/image; USB and MQTT command gates",
+  "limits": [
+    "Static broker address still requires rebuild and flash after a genuine Mac IP change",
+    "Intermittent telemetry gaps over 1 second were logged; this does not establish bounded delivery/control timing",
+    "No new physical motor test performed; whole mission and worst-case timing remain pending"
+  ]
+}

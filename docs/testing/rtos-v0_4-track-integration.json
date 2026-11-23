@@ -1,0 +1,198 @@
+{
+  "date_local": "2026-11-08",
+  "reviewed_utc": "2026-11-08T14:50:48.045909+00:00",
+  "version": "0.4",
+  "branch": "yixuan/rtos-track-integration",
+  "source_parent_commit": "07e9e3a",
+  "milestone": "First integrated RTOS line/barcode/motion/binary-MQTT core",
+  "configured_image_local": "build/rtos-network-v0_4/robocar_rtos_network_v0_4.uf2",
+  "configured_image_contains_credentials_and_is_ignored": true,
+  "configured_image_sha256": "32321f12cdd1a516baa2b6a500fe7efe546c6898fd0e1ef84fe080b8685d41d3",
+  "uf2_bytes": 853504,
+  "uf2_blocks": 1667,
+  "uf2_matches_linked_binary": true,
+  "flashed_and_verified": true,
+  "kernel_commit": "15ed232c08f2d89e54e514db79de150e224307e3",
+  "pico_sdk_commit": "bddd20f928ce76142793bef434d4f75f4af6e433",
+  "strict_arm_build": "PASS -Wall -Wextra -Werror",
+  "linked_text_bytes": 426704,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 172180,
+  "static_bss_arithmetic_sram_remainder": 98156,
+  "arithmetic_remainder_is_not_measured_free_heap_or_stack": true,
+  "kernel_pool_bytes": 32768,
+  "requested_task_stacks_inside_pool": {
+    "motion": 4096,
+    "decoder": 8192,
+    "network": 4096,
+    "observer": 4096
+  },
+  "main_stack_reservation_bytes": 4096,
+  "runtime_stack_margins_measured": false,
+  "actual_arm_type_sizes": {
+    "motion_record_t": 28,
+    "motion_runtime_t": 1464,
+    "track_runtime_t": 1264,
+    "course_control_t": 1160,
+    "barcode_waveform_t": 73596,
+    "track_ir_t": 16,
+    "track_diagnostics_t": 28,
+    "track_event_t": 8
+  },
+  "reuse": {
+    "course_controller": "v5.63 source unchanged, centre/right flow mode",
+    "barcode_decoder": "v5.63 grey waveform + geometry source unchanged",
+    "sensor_geometry_mm": {
+      "forward": 80,
+      "left": 85
+    },
+    "adc_sampling_us": 500,
+    "filter_samples": 12,
+    "retained_waveform_period_us": 2000,
+    "sample_queue": {
+      "slots": 512,
+      "bytes_per_slot": 14,
+      "meaningful_bits_per_slot": 108
+    },
+    "motor_single_owner": "board.c and Motion task; IRQ may only remove drive",
+    "terrain_and_obstacle_integrated": false,
+    "barcode_command_mapping_integrated": false,
+    "y_and_z_actions": "straight, matching the accepted AAZ comparison"
+  },
+  "wire": {
+    "motion_bytes": 13,
+    "bench_bits": 98,
+    "track_bits": 104,
+    "track_kind": 7,
+    "track_relative_count_bits_per_wheel": 19,
+    "track_relative_count_limit": 160000,
+    "line_bytes": 9,
+    "barcode_bytes": 5,
+    "status_bytes": 10,
+    "legacy_bench_bytes_unchanged": true,
+    "simulation_flags": 0
+  },
+  "software_tests": {
+    "actual_adc_queue_decoder_course_gate": "PASS full A, half A, Z during line recovery, extended travel and fresh-gesture stop",
+    "faults": "PASS stale ADC, queue overflow, decoder startup timeout, off-line start rejection and partial-scan abort/reset",
+    "clock_and_counts": "PASS raw clock wrap, signed19 boundaries and independent Python decode",
+    "held_boot": "PASS preselected track still requires a fresh GP20 gesture",
+    "old_motion": "PASS all four endpoints, encoder faults/wrap, pending-stop cancellation, starvation and 5005 codec cases",
+    "waveform": "PASS archived decoder-input replays, 832 scale/contrast/orientation frames, 3000 noisy synthetic scans, geometry/recross/repeated-frame checks",
+    "mqtt": {
+      "production_service_sdk_mock": "PASS",
+      "independent_binary_decode": "PASS",
+      "local_broker_binary_roundtrip_packets": 18,
+      "hardware_network_tested": false,
+      "local_broker_restart_cycles": 1,
+      "packet_sizes": {
+        "motion": [
+          13
+        ],
+        "line": [
+          9
+        ],
+        "barcode": [
+          5
+        ],
+        "status": [
+          10
+        ],
+        "link": [
+          1
+        ],
+        "command_result": [
+          1
+        ]
+      }
+    },
+    "console": "PASS v0.3/v0.4 gates, no remote START, exact STOP, buffered input and repeated-letter commands",
+    "broker": "PASS password/ACLs, repeated restart with idle TCP + traffic, parent EOF, b/q cancellation/log saving"
+  },
+  "stationary_pico_check": {
+    "checked_utc": "2026-11-08T14:34:12.046457+00:00",
+    "passed": true,
+    "headless_boot_before_usb_logger": true,
+    "version": "0.4",
+    "no_start_sent": true,
+    "boot_id": 1086951542,
+    "real_line": {
+      "type": "line",
+      "captured_ms": 36461,
+      "raw_adc": [
+        3967,
+        3936,
+        3880
+      ],
+      "pattern": 7,
+      "valid": true
+    },
+    "real_motion": {
+      "type": "motion",
+      "captured_ms": 36461,
+      "left_counts": 0,
+      "right_counts": 0,
+      "left_mm_s": 0,
+      "right_mm_s": 0,
+      "kind": 0,
+      "phase": 0,
+      "fault": 0,
+      "stop_reason": 0,
+      "valid": true,
+      "stop_latched": true
+    },
+    "real_source_mask": 5,
+    "simulated_mask": 0,
+    "mqtt_stop_acknowledged": true,
+    "last_track_info": "[TRACK_INFO] status=IDLE raw=3973/3940/3878 age_us=296 samples=0 frames=0 rejected=0 reads=0 letter=- queue_peak=0 faults=0 decode_max_us=0 adc_max_us=119 recoveries=0",
+    "physical_track_tested": false
+  },
+  "stationary_capture_local": "serial-output/rtos-track-v0_4-stationary-20261108",
+  "stationary_capture_sha256": "c26795f90980030d44d7e8c1ecfd878b1493c5968a68eaebf9b938b0912ee420",
+  "physical_moving_track_tested": false,
+  "baseline_v5_63_unchanged": true,
+  "baseline_v5_63_sha256": "a4e2eccb6fb4e74cd49a6d25214bc1be1807c7e8c23de6664ecd32dac1f6a2a3",
+  "limits": [
+    "No physical moving AAZ/bend acceptance for v0.4 yet; host simulation is not that result",
+    "Stationary ADC updates are verified; optical contrast/placement were not validated with the raised, motor-unpowered car",
+    "No obstacle/sonar stop, terrain/hump producer or final navigation mapping in this milestone",
+    "ADC work/gate timing statistics do not establish a worst-case stopping deadline or survive arbitrary IRQ masking",
+    "Static RAM change is a feature-set/profile change, not whole-application minimum-bit savings",
+    "Loaded timing, stack/heap margins, final sensor interfaces and whole-application representation compliance remain pending"
+  ],
+  "source_sha256": {
+    "firmware/app/mission_rtos/binary_protocol.c": "cadc8797c690f578ab9824c18977e05a121b199e41531bd973f1fc6980ec3a7a",
+    "firmware/app/mission_rtos/binary_protocol.h": "75436adba9d03a6a2a001f9f0160a9ced100112d93287c3424156159784b397c",
+    "firmware/app/mission_rtos/board.c": "0847e04f7623ac9beb61ed5144d87e5be03749a2d99a4df7865d5a220072e909",
+    "firmware/app/mission_rtos/board.h": "62c3e625aaf432882435d5c9c89f50023c920c6efa79978be0bf1f35669b6313",
+    "firmware/app/mission_rtos/lwipopts.h": "6ed9d27bdb374ef55d43db032b75f5ae4864e7b8ca3caf251f3f9ed2e34a6707",
+    "firmware/app/mission_rtos/main.c": "ab18d2086e3c3e0ef907e5865e35af7357edfea5bf4f160487fcc0d6e7cd751b",
+    "firmware/app/mission_rtos/motion_record.c": "e8f3120855e750603a61066022be4c79d9cf4120add8f34d06ba8d7c82f4b729",
+    "firmware/app/mission_rtos/motion_record.h": "87c95d3f704811939690e4fa135a932a9b29105ce46bf52b7b548b445589701b",
+    "firmware/app/mission_rtos/motion_runtime.c": "cec1ef6e5538aa0c20f9d32f9de6e8afe70b49cb2411bb6a9c157e55ae837538",
+    "firmware/app/mission_rtos/motion_runtime.h": "14dae55818e85b758db2f59ff43cf81aa5dc58086ea062167ff700152421703e",
+    "firmware/app/mission_rtos/network_service.c": "f0c2f8b89893b1896f53a3139186b8e5fd734c10ec95f1eb6a8844ce8a5be879",
+    "firmware/app/mission_rtos/network_service.h": "b46238ec9e393199bc899212708a7af4208a979089ab2b6a1e3623bf7f7a9584",
+    "firmware/app/mission_rtos/network_settings.example.h": "ba0653c9eda114e45f3dfe2f2c496efdb31bdd32f31f640bb5b8303f9ed57fc7",
+    "firmware/app/mission_rtos/safety_gate.c": "83732fb4f00487162e412318be9dce3acd85700c0d3aaafa0a526248c0fd4926",
+    "firmware/app/mission_rtos/safety_gate.h": "46e38a72a8cbd12ecbdb9a7171938f5d9ed9b0acdab8165f01b64b7ca54091b0",
+    "firmware/app/mission_rtos/track_runtime.c": "2d4ceaa6f17f375f8514c089f33625471923bd58bd0a5b786ff33b2e325c2bb9",
+    "firmware/app/mission_rtos/track_runtime.h": "40ec8b0d5886259868314689d49bd184d1a24c9695f598cebafc5f7733d30ed9",
+    "firmware/app/mission_rtos/track_sensor.c": "dcb86c1a78ee1eee2866e90fee96ab5831bdcc6f113b51f3a0e58fa924c2b16e",
+    "firmware/app/mission_rtos/track_sensor.h": "19c3180d42a132c51b987a604f557d77eadcade813db371b4063f92d425c44cd",
+    "firmware/app/mission_rtos/version.h": "b3c03e4e92574c80856f8cbbdc5b9337a2af6128fed44d5bf62bdb0d4f5a8133",
+    "firmware/app/robot_firmware/course_control.c": "480ada0c3904c17b555ff489043a716aea1cf1638cc79b8c34c44254d7b6de6c",
+    "firmware/app/robot_firmware/course_control.h": "41e580fd8f8d0ad2ffd88e4a95d09245fbca4d31d5043ca4b1b1640f05e2913d",
+    "firmware/app/robot_firmware/barcode_waveform.c": "2e99dcf7cfbea3c4f521085deb3c9798b1f96154626cc8bf36cfcc33435b719f",
+    "firmware/app/robot_firmware/barcode_waveform.h": "ef1012d20b2eee591ec727af0467260ef2f34de43a3f4af5ae273bf40fb92d3b",
+    "firmware/app/robot_firmware/barcode_decoder.c": "a4b11993a33edfb0cfef9c18d403fd235a2458d6094adf3d1e8e3a81cbc3afdd",
+    "firmware/app/robot_firmware/motion_control.c": "d6d17594a193624b3f15a038152cbb493a4394afee79790db5d25cb00c60fe53",
+    "firmware/app/robot_firmware/encoders.c": "1b684c010e0db68f029b620a7fd04fa412762c04770fb921d8bd2bf7cd1b6f66",
+    "tools/rtos_network_session.py": "e22beceeb8fdf75bf19379751b72dbe977e5937d6adef5ab4b41a1d1ea68f6fc",
+    "tools/rtos_network_setup.py": "99805b26e595598f4cbf03a79591b74b53ffded43773806945c066f6e4fa656b",
+    "tools/rtos_bench.py": "affbcc827365f6197a0af010ff7e0a1d42aa21ba30970d56bbcbaa2dcf5cdf98",
+    "tools/decode_motion_record.py": "ccf31e6d0e783c9656253308d6441c3dad7c393436b06cdec52dd3080b44e898",
+    "tools/rtos_mqtt_observer.py": "448056e5f66e9987f59ebee88dd9e0a1ff954402ce7ad3a1e69e685caa1fee9a",
+    "tools/test_rtos_track.py": "4616da6a4ecfa404dbd2689a5f55cf916ca7c4253c00f30bcff9b8de418c0c94"
+  }
+}

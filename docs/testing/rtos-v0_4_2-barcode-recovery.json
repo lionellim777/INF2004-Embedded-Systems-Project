@@ -1,0 +1,135 @@
+{
+  "version": "0.4.2",
+  "recorded_utc": "2026-11-08T15:59:13.187198+00:00",
+  "branch": "yixuan/rtos-track-integration",
+  "source_session": "serial-output/rtos-network-20261108-234218",
+  "original_run": {
+    "reads": [
+      "A"
+    ],
+    "read_ms": 57776,
+    "recoveries": 35,
+    "rejected": 7,
+    "samples": 19720,
+    "capture_faults": 0,
+    "attempt_overflow": 0,
+    "full_A_best_extrema": 33,
+    "full_A_raw_not_available": true
+  },
+  "diagnosis": {
+    "bend_frame_readings": 4491,
+    "short_apparent_black_units": 2757,
+    "old_interval_floor": 4000,
+    "units": "1000 per mean encoder count",
+    "capture_sha256": "7c138c3ee11accdf4db2ed7c524bff009f3e98d17385f7af99c3f44714845d71",
+    "capture_fnv1a": "9b9bfd4a",
+    "legacy_replay_letter": null,
+    "opt_in_batch_replay_letter": "Z",
+    "opt_in_captured_cadence_replay_letter": "Z",
+    "accepted_profile_mask": "0x38 or more in coherent_mask; strict short-black profile consensus"
+  },
+  "scope": {
+    "new_path_opt_in_only": true,
+    "ordinary_floor_unchanged": true,
+    "minimum_positive_short_black": 1000,
+    "maximum_short_black": 3999,
+    "one_short_black_only": true,
+    "exact_31_extrema_required": true,
+    "strict_guard_separator_bias_width_checks": true,
+    "minimum_agreeing_profiles": 2,
+    "no_expected_letter": true,
+    "no_edge_insertion_or_deletion": true,
+    "steering_and_motor_calibration_unchanged": true,
+    "teammate_modules_not_modified": true
+  },
+  "firmware": {
+    "file": "build/rtos-network-v0_4_2/robocar_rtos_network_v0_4_2.uf2",
+    "credentials_embedded": true,
+    "sha256": "e46e1dc253ba054d2a6c179052b7b282961e440104eaed21e4d7312cb13cffff",
+    "uf2_bytes": 883200,
+    "uf2_blocks": 1725,
+    "uf2_payload_verified_against_bin": true,
+    "text": 441352,
+    "data": 0,
+    "bss": 205868,
+    "bss_increase_over_v0_4_1": 33664,
+    "first_failure_words_bytes": 32768,
+    "task_stack_and_kernel_pool_unchanged": true,
+    "runtime_stack_watermarks_measured": false
+  },
+  "tests": {
+    "legacy_and_recovery_waveform_suites": "PASS: both modes; 832 contrast/size/orientation frames, 3000 jitter/noise cases per mode, spatial/reversal/guard/quiet/timing/storage and archived fixtures",
+    "short_black_matrix": "PASS: 104 A-Z/orientation/size recovered frames; 416 multiple-short/missing-bar/tiny-white/third-wide-black negatives; same originals reject with feature disabled",
+    "actual_track_pipeline": "PASS: full/half A, Z during recovery, raw-button abort, no release restart, queue/stale/startup guards, token/count/clock boundaries",
+    "first_failure_retention": "PASS: actual failed optical capture survives later accepted Z; independent decode/FNV check",
+    "diagnostic_transport_fields": "UNCHANGED from tested v0.4.1; independent receiver and all profiles/chunks/checksum pass in current pipeline",
+    "console": "PASS: v0.4.2 identity/track selection gates, old versions, no START and empty STOP"
+  },
+  "hardware": {
+    "flash_verified": true,
+    "evidence": "serial-output/rtos-v0_4_2-stationary-20261108-235737/stationary-check.json",
+    "result": {
+      "checked_utc": "2026-11-08T15:57:38.001246+00:00",
+      "physical_motors_started": false,
+      "physical_track_tested": false,
+      "headless_mqtt_motion_line_diagnostic_passed": true,
+      "usb_identity_and_stopped_passed": true,
+      "mqtt_stop_ack_passed": true,
+      "scan_state": {
+        "type": "scan_diag",
+        "run": 0,
+        "record": "state",
+        "captured_ms": 44137,
+        "samples": 0,
+        "frames": 0,
+        "rejected": 0,
+        "decode_max_us": 0,
+        "adc_max_us": 120,
+        "reads": 0,
+        "queue_peak": 0,
+        "faults": 0,
+        "enabled": false,
+        "recording": false,
+        "sealed": false,
+        "attempts": 0,
+        "ready": false,
+        "attempt_overflow": 0,
+        "recoveries": 0,
+        "stop_us": 0,
+        "stop_discarded_samples": 0
+      },
+      "motion": {
+        "type": "motion",
+        "captured_ms": 44321,
+        "left_counts": 0,
+        "right_counts": 0,
+        "left_mm_s": 0,
+        "right_mm_s": 0,
+        "kind": 0,
+        "phase": 0,
+        "fault": 0,
+        "stop_reason": 0,
+        "valid": true,
+        "stop_latched": true
+      },
+      "line": {
+        "type": "line",
+        "captured_ms": 45121,
+        "raw_adc": [
+          182,
+          187,
+          256
+        ],
+        "pattern": 0,
+        "valid": true
+      }
+    }
+  },
+  "physical_v0_4_2_track_tested": false,
+  "remaining": [
+    "One new A/A/Z physical pass and saved diagnostics.",
+    "Full A extra-transition cause still requires the newly retained raw waveform if failure repeats.",
+    "Measure loaded timing/stack and remove extra debug cache before final mission memory optimization."
+  ],
+  "later_physical_acceptance_report": "rtos-v0_4_2-track-acceptance.json"
+}

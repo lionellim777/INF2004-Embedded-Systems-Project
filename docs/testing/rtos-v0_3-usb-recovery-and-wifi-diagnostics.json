@@ -1,0 +1,39 @@
+{
+  "date_local": "2026-11-08",
+  "source_parent_commit": "cbf709c",
+  "version": "rtos-network-v0.3",
+  "purpose": "USB boot-drive recovery and explicit Wi-Fi diagnostics",
+  "official_picotool_version": "2.3.1",
+  "picotool_release_url": "https://github.com/raspberrypi/pico-sdk-tools/releases/tag/v2.3.1-0",
+  "picotool_archive_sha256": "7bb3cea5d9f1b000fc758cf4b54774fda5c16a9899d342ef6b0c30138988793b",
+  "finder_mount_failed": true,
+  "usb_picoboot_access_passed": true,
+  "existing_flash_backup_verified": true,
+  "configured_image_load_and_verify_passed": true,
+  "application_reboot_and_usb_v0_3_confirmed": true,
+  "stationary_wifi_attempt_observed": true,
+  "wifi_link_observed": -2,
+  "wifi_link_meaning": "No matching SSID found",
+  "mqtt_motion_received": false,
+  "motor_battery_disconnected_by_user": true,
+  "new_physical_motor_tests_performed": false,
+  "host_network_regressions": "PASS including signed link states -3..3 and real local binary broker roundtrip",
+  "host_console_tests": "PASS",
+  "configured_arm_build": "PASS -Wall -Wextra -Werror",
+  "linked_text_bytes": 387144,
+  "linked_data_bytes": 0,
+  "linked_bss_bytes": 89976,
+  "raw_usb_log_local": "serial-output/rtos-network-20261108-005922/usb.log",
+  "limits": [
+    "Wi-Fi name/band confirmation is pending; radio association and DHCP not accepted",
+    "MQTT and motor-under-network physical acceptance remains pending",
+    "Boot-drive mount root cause is unconfirmed; PICOBOOT bypass works"
+  ],
+  "source_sha256": {
+    "firmware/app/mission_rtos/main.c": "2ad5bc17a076e4379d409ffb555c402543b6217a827bfba094c85f53c8a8b9ba",
+    "firmware/app/mission_rtos/network_service.c": "ba02d24255b72b2a0a2c6ff4e1c1d4e64062da739edf6aa98b4b9ae948fc855c",
+    "firmware/app/mission_rtos/network_service.h": "04bd9cf142640af99a2012947641eadd11ce2c6573d89fe51792dd6c6cbf4e5f",
+    "firmware/tests/mission_rtos/network_test.c": "8136fea1e011dc66a8864d8c09d67b7c29853ad330a4332d088fbcc11c2a269a",
+    "tools/rtos_network_session.py": "e4d27d871368947aea7ddab9737afa12bc92123d2291c1b04c703782ea2b9e9c"
+  }
+}

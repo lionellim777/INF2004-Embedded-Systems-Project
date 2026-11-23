@@ -2,6 +2,7 @@
 #define BARCODE_DRIVE_H
 #include "line_check.h"
 #include "barcode_acquisition.h"
+#include "control_representation.h"
 #define BARCODE_DRIVE_LIMIT_US 8000000u
 #define BARCODE_DRIVE_LIMIT_COUNTS 8000
 #define CONTINUOUS_LIMIT_US 20000000u
@@ -22,20 +23,30 @@ typedef struct {
     float left_speed_sum, right_speed_sum, left_speed_min, right_speed_min;
     float left_speed_max, right_speed_max;
     unsigned speed_samples, steering_intervals;
+#if ROBOCAR_COMPACT_CONTROL_STATE
+    bool started:1,steering_since_update:1,speed_valid:1,both_active:1;
+    bool clear_tracking:1,hard_corner:1,corner_hold:1,cruise_clear_tracking:1;
+    bool center_profile:1,launch_active:1,launch_complete:1,center_bend:1;
+#else
     bool started, steering_since_update, speed_valid;
     bool both_active, clear_tracking;
+#endif
     uint64_t both_since, clear_since;
     int32_t both_left, both_right;
     int8_t edge_direction; /* -1 left, +1 right; barcode channel never steers */
     uint64_t edge_since, edge_last;
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool hard_corner, corner_hold;
     bool cruise_clear_tracking;
     bool center_profile;
     bool launch_active,launch_complete;
+#endif
     uint64_t launch_us;
     int32_t launch_l,launch_r;
     float launch_left_pwm,launch_right_pwm;
+#if !ROBOCAR_COMPACT_CONTROL_STATE
     bool center_bend; /* Bounded course continuation permits stronger forward-only steering. */
+#endif
     float center_steer; /* signed target difference: negative left, positive right */
     float center_cruise_cps; /* Optional course cap; zero retains the 600 cps profile. */
     float yaw_error, yaw_pwm; /* requested minus measured wheel difference, counts/duty */
