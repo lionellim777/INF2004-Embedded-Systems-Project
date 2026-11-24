@@ -197,8 +197,8 @@ and the dashboard decoder tests (12).
 
 ### Known gaps
 
-- Hardware acceptance of the packed image (course run, timing) has not been done. Keep `rtos-obstacle-creep21` as the
-  fallback.
+- The packed image (version `0.6-dev3`, see [FINAL-FIRMWARE.md](FINAL-FIRMWARE.md)) has been run on the car. The
+  unpacked build (`RTOS_COMPACT_*=OFF`) remains available as a reference.
 - Failures that predate this change and were not fixed: `firmware/tests/obstacle_bypass_test.c` (stale expectations
   after the creep fixes; it fails at the approach-warning and fast-cruise asserts, identically with packing on and off),
   `foundation_test.c` via `test_rtos_motion.py` (`!armed()` at line 43), `center_bend_test.c`, and the Python tail of

@@ -1,5 +1,10 @@
 # Wireless calibration checkpoint v5.63
 
+These are the calibration-prototype images, kept for history. The final
+firmware is the RTOS mission image described in
+[../../docs/FINAL-FIRMWARE.md](../../docs/FINAL-FIRMWARE.md); its UF2 is not
+stored here because a build embeds the local Wi-Fi settings.
+
 | Build | Firmware | Evidence |
 | --- | --- | --- |
 | v5.63 — latest | [Download UF2](robocar_motion_integration_v5_63_wireless.uf2) | Measured3/9mm and6/18mm centre-spacing model, lateral recross handling and wider bounded search. Two physical home-track runs accepted AAZ (6/6 target reads), including bend half-Z; final integration remains. [Verification record](build-report-v5_63.json) |

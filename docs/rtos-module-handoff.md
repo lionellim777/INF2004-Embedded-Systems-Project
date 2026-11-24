@@ -1,3 +1,5 @@
+> **Superseded.** This is a record from early November 2026. The final firmware is described in [FINAL-FIRMWARE.md](FINAL-FIRMWARE.md).
+
 # RTOS module handoff draft
 
 **Paused handoff,10 November:** Lionel and Ezra should begin with the

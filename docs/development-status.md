@@ -1,3 +1,5 @@
+> **Superseded.** This is a record from early November 2026. The final firmware is described in [FINAL-FIRMWARE.md](FINAL-FIRMWARE.md).
+
 ## 2026-11-07 — v5.63 barcode decoder accepted on the current home setup
 
 **Barcode decoding: implementation complete and physically validated for the

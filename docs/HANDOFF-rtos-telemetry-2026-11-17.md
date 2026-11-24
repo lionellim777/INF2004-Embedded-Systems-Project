@@ -1,3 +1,5 @@
+> **Superseded.** This is a record from November 2026. The final firmware is described in [FINAL-FIRMWARE.md](FINAL-FIRMWARE.md).
+
 # Handoff: RTOS terrain, hump and obstacle telemetry (2026-11-17)
 
 **For:** Ezra (has the car). **Branch:** `rtos-terrain-telemetry` (from `main` after `6502220`).

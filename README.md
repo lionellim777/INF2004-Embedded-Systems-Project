@@ -4,14 +4,27 @@ Firmware and engineering records for the INF2004 Embedded Systems Programming gr
 
 The goal is an autonomous two-wheel robot that follows a line, decodes navigation barcodes, measures humps, avoids obstacles, reacquires the line, and publishes telemetry over Wi-Fi.
 
-## Current development and handoff
+## Final firmware
 
-Yixuan’s [10 November handoff](docs/HANDOFF-2026-11-10.md) records the baseline,
-including the two physical RTOS v0.5.1 AAZ passes. The repository contains both
-the Pico SDK calibration target and the µT-Kernel mission target. The RTOS
-minimum-bit options and the obstacle mode build option default to OFF.
+The submitted firmware is the **RTOS mission image 0.6-dev3**, built from
+`firmware/app/mission_rtos`. Its identity, build command, options, size and
+verification are in [docs/FINAL-FIRMWARE.md](docs/FINAL-FIRMWARE.md). The CMake
+defaults and `tools/build_rtos_motion.sh` build exactly that configuration:
+minimum-bit packing, obstacle bypass, terrain telemetry, curve following and the
+launch cap are all ON. The UF2 is not committed because a build embeds the local
+Wi-Fi settings.
 
-### Obstacle manoeuvring handoff
+Everything below this heading is earlier work, kept for history. The
+calibration target in `firmware/app/robot_firmware` and the v5.x UF2s in
+`firmware/releases` are not the final firmware.
+
+## Earlier development notes (superseded)
+
+The [10 November handoff](docs/HANDOFF-2026-11-10.md) records the baseline at
+that date, including the two physical RTOS v0.5.1 AAZ passes. The repository
+contains both the Pico SDK calibration target and the µT-Kernel mission target.
+
+### Obstacle manoeuvring handoff (original design)
 
 - On detection, the car stops and scans left in 5° steps to calculate A. It
   turns left by A, drives 100 mm, turns right by A, and scans ahead. A detected
@@ -36,7 +49,7 @@ minimum-bit options and the obstacle mode build option default to OFF.
 
 ## Legacy calibration baseline
 
-Latest checkpoint: **v5.63 barcode baseline**,7 November2026.
+Last calibration checkpoint: **v5.63 barcode baseline**,7 November2026.
 Two physical home-track runs each accepted full-A, half-A and half-Z on the right
 bend: **AAZ / AAZ,6/6 target reads**, without sampling-integrity faults. The
 measured3:1 print-geometry reader and bounded recovery are the working baseline.
@@ -110,6 +123,7 @@ Flash the generated `.uf2` file by holding `BOOTSEL` while connecting the Pico W
 
 ## Documentation
 
+- [Final firmware: identity, build and verification](docs/FINAL-FIRMWARE.md)
 - [Project requirements](docs/project-requirements.md)
 - [Architecture](docs/architecture.md)
 - [Hardware wiring](docs/hardware-wiring.md)
